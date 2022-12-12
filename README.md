@@ -33,7 +33,7 @@ account, accessible with the personal ssh user key. An aggregated RSS-Feed with 
 
 Custom configuration can be applied by setting the following environment variables:
 
-- **STEGODON_HOST (your local server ip, default: 127.0.0.1)
+- **STEGODON_HOST** (your local server ip, default: 127.0.0.1)
 - **STEGODON_SSHPORT** (ssh login port, default: 23232)
 - **STEGODON_HTTPPORT** (http port, default: 9999)
 - **STEGODON_SSLDOMAIN** (your optional hosted ssl domain, default: example.com)
