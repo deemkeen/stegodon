@@ -43,6 +43,7 @@ Custom configuration can be applied by setting the following environment variabl
 
 The SSH login functionality is provided by [wish](https://github.com/charmbracelet/wish).
 The TUI is powered by [bubbletea](https://github.com/charmbracelet/bubbletea) and [lipgloss](https://github.com/charmbracelet/lipgloss).
+**stegodon** persists all the data in a local SQLite database, which can be deleted, if you want to wipe all your notes.
 
 For optimal results, it's recommended to use a terminal with:
 
