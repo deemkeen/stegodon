@@ -1,0 +1,6 @@
+conf:
+  host: 127.0.0.1 # local server ip
+  sshPort: 23232 # ssh login port
+  httpPort: 9999 # local http port
+  sslDomain: example.com  # your hosted ssl domain
+  withAp: false # activitypub (experimental!)

@@ -1,0 +1,6 @@
+/.ssh/
+/.idea/
+/go_build_*
+/*.db
+/stegodon
+
