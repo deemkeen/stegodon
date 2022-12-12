@@ -17,10 +17,10 @@ It is also possible to subscribe to these notes via RSS and to federate via Acti
 
 ## Installation
 
-1. Clone the repository: git clone https://github.com/deemkeen/stegodon
-2. Install dependencies: go get -d
-3. Build the application: go build
-4. Start the server: ./stegodon
+1. Clone the repository: `git clone https://github.com/deemkeen/stegodon`
+2. Install dependencies: `go get -d`
+3. Build the application: `go build`
+4. Start the server: `./stegodon`
 
 ## Usage
 
