@@ -27,6 +27,7 @@ It is also possible to subscribe to these notes via RSS and to federate via Acti
 Once the server is started, open an ssh session via `ssh 127.0.0.1 -p 23232` to access the application.
 You will be authenticated with your own ssh key. On your first login it is necessary to choose a username.
 From there, you can create the notes.
+After adding notes, you can get an RSS-Feed with your personal notes via `http://127.0.0.1:9999/feed?username=<youruser>`
 
 **stegodon** can be used as a multiuser system, if you expose your server to the internet. Every user will get a dedicated
 account, accessible with the personal ssh user key. An aggregated RSS-Feed with all user notes is accessible via `http://127.0.0.1:9999/feed`
