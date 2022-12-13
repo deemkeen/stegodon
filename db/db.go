@@ -53,6 +53,10 @@ const (
     														INNER JOIN accounts ON accounts.id = notes.user_id 
                                                             WHERE notes.user_id = ?
                                                             ORDER BY notes.created_at DESC`
+	sqlSelectNotesByUsername = `SELECT notes.id, accounts.username, notes.message, notes.created_at FROM notes
+    														INNER JOIN accounts ON accounts.id = notes.user_id 
+                                                            WHERE accounts.username = ?
+                                                            ORDER BY notes.created_at DESC`
 	sqlSelectAllNotes = `SELECT notes.id, accounts.username, notes.message, notes.created_at FROM notes
     														INNER JOIN accounts ON accounts.id = notes.user_id 
                                                             ORDER BY notes.created_at DESC`
@@ -71,7 +75,7 @@ func (db *DB) CreateAccount(s ssh.Session, username string) (error, bool) {
 	keypair := util.GeneratePemKeypair()
 	err2 := db.CreateAccByUsername(s, username, keypair)
 	if err2 != nil {
-		log.Fatalln("Creating new user failed: ", err2)
+		log.Println("Creating new user failed: ", err2)
 		return err2, false
 	}
 	return nil, true
@@ -160,6 +164,29 @@ func (db *DB) ReadAccByUsername(username string) (error, *domain.Account) {
 
 func (db *DB) ReadNotesByUserId(userId uuid.UUID) (error, *[]domain.Note) {
 	rows, err := db.db.Query(sqlSelectNotesByUserId, userId)
+	if err != nil {
+		return err, nil
+	}
+	defer rows.Close()
+
+	var notes []domain.Note
+
+	for rows.Next() {
+		var note domain.Note
+		if err := rows.Scan(&note.Id, &note.CreatedBy, &note.Message, &note.CreatedAt); err != nil {
+			return err, &notes
+		}
+		notes = append(notes, note)
+	}
+	if err = rows.Err(); err != nil {
+		return err, &notes
+	}
+
+	return nil, &notes
+}
+
+func (db *DB) ReadNotesByUsername(username string) (error, *[]domain.Note) {
+	rows, err := db.db.Query(sqlSelectNotesByUsername, username)
 	if err != nil {
 		return err, nil
 	}

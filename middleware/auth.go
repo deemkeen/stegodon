@@ -21,13 +21,13 @@ func AuthMiddleware() wish.Middleware {
 				database := db.GetDB()
 				err, created := database.CreateAccount(s, util.RandomString(10))
 				if err != nil {
-					log.Fatalln("Could not create a user: ", err)
+					log.Println("Could not create a user: ", err)
 				}
 
 				if created != false {
 					util.LogPublicKey(s)
 				} else {
-					log.Fatalln("The user is still empty!")
+					log.Println("The user is still empty!")
 				}
 
 			}

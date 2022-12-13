@@ -40,7 +40,7 @@ func updateUserModelCmd(acc *domain.Account) tea.Cmd {
 		acc.FirstTimeLogin = domain.FALSE
 		err := db.GetDB().UpdateLoginById(acc.Username, acc.Id)
 		if err != nil {
-			log.Fatalf("User %s could not be updated!", acc.Username)
+			log.Println(fmt.Sprintf("User %s could not be updated!", acc.Username))
 		}
 		return nil
 	}

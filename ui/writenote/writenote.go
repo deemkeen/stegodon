@@ -44,7 +44,7 @@ func createNoteModelCmd(note *domain.SaveNote) tea.Cmd {
 	return func() tea.Msg {
 		err := db.GetDB().CreateNote(note.UserId, note.Message)
 		if err != nil {
-			log.Fatalf("Note could not be saved!")
+			log.Println("Note could not be saved!")
 		}
 		return common.UpdateNoteList
 	}

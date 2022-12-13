@@ -16,13 +16,14 @@ func MainTui() wish.Middleware {
 
 		pty, _, active := s.Pty()
 		if !active {
-			wish.Fatalln(s, "no active terminal, skipping")
+			wish.Println(s, "no active terminal, skipping")
 			return nil
 		}
 
 		err, acc := db.GetDB().ReadAccBySession(s)
 		if err != nil {
-			log.Fatalln("Could not retrieve the user:", err)
+			log.Println("Could not retrieve the user:", err)
+			return nil
 		}
 
 		m := ui.NewModel(*acc, pty.Window.Width, pty.Window.Height)

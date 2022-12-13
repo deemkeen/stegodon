@@ -77,7 +77,7 @@ func LoadItems(userId uuid.UUID) []item {
 	var items []item
 	err, notes := db.GetDB().ReadNotesByUserId(userId)
 	if err != nil {
-		log.Fatalln("Could not get notes!", err)
+		log.Println("Could not get notes!", err)
 		return nil
 	}
 

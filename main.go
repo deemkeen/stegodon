@@ -22,7 +22,6 @@ func main() {
 	conf, err := util.ReadConf()
 	if err != nil {
 		log.Fatalln(err)
-		os.Exit(1)
 	}
 
 	fmt.Println("Configuration: ")

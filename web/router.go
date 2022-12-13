@@ -18,28 +18,33 @@ func Router(conf *util.AppConfig) error {
 
 	// RSS Feed
 	g.GET("/feed", func(c *gin.Context) {
-		rss, err := GetRSS(conf)
-		if err != nil {
-			return
-		}
 
 		c.Header("Content-Type", "application/xml; charset=utf-8")
-		c.Render(200, render.String{Format: rss})
+
+		username := c.Query("username")
+		rss, err := GetRSS(conf, username)
+		if err != nil {
+			c.Render(404, render.String{Format: ""})
+		} else {
+			c.Render(200, render.String{Format: rss})
+		}
 	})
 
 	g.GET("/feed/:id", func(c *gin.Context) {
+		c.Header("Content-Type", "application/xml; charset=utf-8")
 		name := c.Param("id")
 		feedId, err := uuid.Parse(name)
 		if err != nil {
+			c.Render(404, render.String{Format: ""})
 			return
 		}
 
-		rssItem, err := GetRSSItem(feedId)
+		rssItem, err := GetRSSItem(conf, feedId)
 		if err != nil {
-			return
+			c.Render(404, render.String{Format: ""})
+		} else {
+			c.Render(200, render.String{Format: rssItem})
 		}
-		c.Header("Content-Type", "application/xml; charset=utf-8")
-		c.Render(200, render.String{Format: rssItem})
 	})
 
 	// Endpoints for the ActivityPub functionality, WIP!
