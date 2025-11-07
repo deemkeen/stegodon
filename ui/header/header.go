@@ -26,31 +26,25 @@ func (m Model) View() string {
 }
 
 func GetHeaderStyle(acc *domain.Account, width int) string {
-	// Each lipgloss border (NormalBorder) with sides adds 2 chars to width
-	// Each padding(1) adds 2 chars to width (left + right)
-	// So each styled box adds 4 chars total to the content width
+	// Simpler approach: calculate fixed widths for username, @, version
+	// and give all remaining space to the created section
 
-	// We have 4 boxes, each adding 4 chars overhead = 16 chars total
-	// But we need to be more precise...
+	usernameWidth := 15  // Fixed width for username
+	atWidth := 3         // Fixed width for @ symbol with padding
+	versionWidth := width / 3  // ~33% for version
 
-	// Calculate widths accounting for lipgloss rendering
-	// Username box: content + padding(2) + border(2) = content + 4
-	// At box: content + padding(2) + border(2) = content + 4
-	// Version box: content + padding(2) + border(2) = content + 4
-	// Created box: content + padding(2) + border(2) = content + 4
+	// Calculate remaining width for created section
+	// Account for borders and padding: each section has border on left/right (2 chars) + padding left/right (2 chars) = 4 chars overhead
+	// But we're setting the content Width, so lipgloss will add the 4 chars
+	// Total rendered width will be: usernameWidth+4 + atWidth+4 + versionWidth+4 + createdWidth+4
 
-	overhead := 16 // Total for all 4 boxes
-	availableWidth := width - overhead
+	overhead := 16  // 4 sections * 4 chars each
+	usedWidth := usernameWidth + atWidth + versionWidth + overhead - 4 // Subtract 4 because we'll calculate created differently
+	createdWidth := width - usedWidth - 4  // The remaining space minus its own overhead
 
-	if availableWidth < 40 {
-		availableWidth = 40
+	if createdWidth < 20 {
+		createdWidth = 20  // Minimum width
 	}
-
-	// Distribute available width
-	usernameWidth := availableWidth / 6
-	atWidth := 1
-	versionWidth := availableWidth / 2
-	createdWidth := availableWidth - usernameWidth - atWidth - versionWidth
 
 	username := lipgloss.
 		NewStyle().
@@ -99,11 +93,17 @@ func GetHeaderStyle(acc *domain.Account, width int) string {
 		BorderForeground(lipgloss.Color(common.COLOR_MAGENTA)).
 		String()
 
-	return lipgloss.JoinHorizontal(
+	header := lipgloss.JoinHorizontal(
 		lipgloss.Left,
 		username,
 		at,
 		version,
 		created,
 	)
+
+	// Wrap in a container that fills to exact width
+	return lipgloss.NewStyle().
+		Width(width).
+		Inline(true).
+		Render(header)
 }
