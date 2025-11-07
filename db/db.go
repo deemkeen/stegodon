@@ -342,3 +342,101 @@ func (db *DB) wrapTransaction(f func(tx *sql.Tx) error) error {
 	}
 	return nil
 }
+
+// Remote Accounts queries
+const (
+	sqlInsertRemoteAccount       = `INSERT INTO remote_accounts(id, username, domain, actor_uri, display_name, summary, inbox_uri, outbox_uri, public_key_pem, avatar_url, last_fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	sqlSelectRemoteAccountByURI  = `SELECT id, username, domain, actor_uri, display_name, summary, inbox_uri, outbox_uri, public_key_pem, avatar_url, last_fetched_at FROM remote_accounts WHERE actor_uri = ?`
+	sqlSelectRemoteAccountById   = `SELECT id, username, domain, actor_uri, display_name, summary, inbox_uri, outbox_uri, public_key_pem, avatar_url, last_fetched_at FROM remote_accounts WHERE id = ?`
+	sqlUpdateRemoteAccount       = `UPDATE remote_accounts SET display_name = ?, summary = ?, inbox_uri = ?, outbox_uri = ?, public_key_pem = ?, avatar_url = ?, last_fetched_at = ? WHERE actor_uri = ?`
+)
+
+func (db *DB) CreateRemoteAccount(acc *domain.RemoteAccount) error {
+	return db.wrapTransaction(func(tx *sql.Tx) error {
+		_, err := tx.Exec(sqlInsertRemoteAccount,
+			acc.Id.String(),
+			acc.Username,
+			acc.Domain,
+			acc.ActorURI,
+			acc.DisplayName,
+			acc.Summary,
+			acc.InboxURI,
+			acc.OutboxURI,
+			acc.PublicKeyPem,
+			acc.AvatarURL,
+			acc.LastFetchedAt,
+		)
+		return err
+	})
+}
+
+func (db *DB) ReadRemoteAccountByURI(uri string) (error, *domain.RemoteAccount) {
+	row := db.db.QueryRow(sqlSelectRemoteAccountByURI, uri)
+	var acc domain.RemoteAccount
+	var idStr string
+	err := row.Scan(
+		&idStr,
+		&acc.Username,
+		&acc.Domain,
+		&acc.ActorURI,
+		&acc.DisplayName,
+		&acc.Summary,
+		&acc.InboxURI,
+		&acc.OutboxURI,
+		&acc.PublicKeyPem,
+		&acc.AvatarURL,
+		&acc.LastFetchedAt,
+	)
+	if err == sql.ErrNoRows {
+		return err, nil
+	}
+	if err != nil {
+		return err, nil
+	}
+	acc.Id, _ = uuid.Parse(idStr)
+	return nil, &acc
+}
+
+func (db *DB) ReadRemoteAccountById(id uuid.UUID) (error, *domain.RemoteAccount) {
+	row := db.db.QueryRow(sqlSelectRemoteAccountById, id.String())
+	var acc domain.RemoteAccount
+	var idStr string
+	err := row.Scan(
+		&idStr,
+		&acc.Username,
+		&acc.Domain,
+		&acc.ActorURI,
+		&acc.DisplayName,
+		&acc.Summary,
+		&acc.InboxURI,
+		&acc.OutboxURI,
+		&acc.PublicKeyPem,
+		&acc.AvatarURL,
+		&acc.LastFetchedAt,
+	)
+	if err == sql.ErrNoRows {
+		return err, nil
+	}
+	if err != nil {
+		return err, nil
+	}
+	acc.Id, _ = uuid.Parse(idStr)
+	return nil, &acc
+}
+
+func (db *DB) UpdateRemoteAccount(acc *domain.RemoteAccount) error {
+	return db.wrapTransaction(func(tx *sql.Tx) error {
+		_, err := tx.Exec(sqlUpdateRemoteAccount,
+			acc.DisplayName,
+			acc.Summary,
+			acc.InboxURI,
+			acc.OutboxURI,
+			acc.PublicKeyPem,
+			acc.AvatarURL,
+			acc.LastFetchedAt,
+			acc.ActorURI,
+		)
+		return err
+	})
+}
+
