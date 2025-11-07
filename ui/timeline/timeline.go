@@ -9,15 +9,11 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/deemkeen/stegodon/db"
+	"github.com/deemkeen/stegodon/ui/common"
 	"log"
 )
 
 var (
-	headerStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("63")).
-			MarginBottom(1)
-
 	postStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("240")).
@@ -76,7 +72,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 func (m Model) View() string {
 	var s strings.Builder
 
-	s.WriteString(headerStyle.Render(fmt.Sprintf("Federated Timeline (%d posts)", len(m.Posts))))
+	s.WriteString(common.CaptionStyle.Render(fmt.Sprintf("federated timeline (%d posts)", len(m.Posts))))
 	s.WriteString("\n\n")
 
 	if len(m.Posts) == 0 {
@@ -103,7 +99,7 @@ func (m Model) View() string {
 	}
 
 	s.WriteString("\n")
-	s.WriteString(lipgloss.NewStyle().Faint(true).Render("tab: switch view • ctrl-c: exit"))
+	s.WriteString(common.HelpStyle.Render("tab: switch view • shift+tab: prev view • ctrl-c: exit"))
 
 	return s.String()
 }

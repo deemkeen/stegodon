@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/deemkeen/stegodon/activitypub"
 	"github.com/deemkeen/stegodon/db"
+	"github.com/deemkeen/stegodon/ui/common"
 	"github.com/deemkeen/stegodon/util"
 	"github.com/deemkeen/stegodon/web"
 	"github.com/google/uuid"
@@ -102,7 +103,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 func (m Model) View() string {
 	var s strings.Builder
 
-	s.WriteString(lipgloss.NewStyle().Bold(true).Render("Follow Remote User"))
+	s.WriteString(common.CaptionStyle.Render("follow remote user"))
 	s.WriteString("\n\n")
 	s.WriteString("Enter ActivityPub address (e.g., user@mastodon.social):\n\n")
 	s.WriteString(m.TextInput.View())
@@ -119,7 +120,7 @@ func (m Model) View() string {
 	}
 
 	s.WriteString("\n")
-	s.WriteString(lipgloss.NewStyle().Faint(true).Render("enter: follow • esc: clear • tab: switch view"))
+	s.WriteString(common.HelpStyle.Render("enter: follow • esc: clear • tab: switch view • shift+tab: prev view"))
 
 	return s.String()
 }

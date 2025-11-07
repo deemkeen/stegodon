@@ -8,16 +8,12 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
+	"github.com/deemkeen/stegodon/ui/common"
 	"github.com/google/uuid"
 	"log"
 )
 
 var (
-	headerStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("63")).
-			MarginBottom(1)
-
 	itemStyle = lipgloss.NewStyle().
 			PaddingLeft(2).
 			MarginBottom(0)
@@ -59,7 +55,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 func (m Model) View() string {
 	var s strings.Builder
 
-	s.WriteString(headerStyle.Render(fmt.Sprintf("Followers (%d)", len(m.Followers))))
+	s.WriteString(common.CaptionStyle.Render(fmt.Sprintf("followers (%d)", len(m.Followers))))
 	s.WriteString("\n\n")
 
 	if len(m.Followers) == 0 {
@@ -95,7 +91,7 @@ func (m Model) View() string {
 	}
 
 	s.WriteString("\n")
-	s.WriteString(lipgloss.NewStyle().Faint(true).Render("tab: switch view • ctrl-c: exit"))
+	s.WriteString(common.HelpStyle.Render("tab: switch view • shift+tab: prev view • ctrl-c: exit"))
 
 	return s.String()
 }
