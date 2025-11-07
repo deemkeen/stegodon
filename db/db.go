@@ -3,9 +3,9 @@ package db
 import (
 	"context"
 	"database/sql"
+	"github.com/charmbracelet/ssh"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/util"
-	"github.com/gliderlabs/ssh"
 	"github.com/google/uuid"
 	"log"
 	"modernc.org/sqlite"
@@ -276,6 +276,12 @@ func (db *DB) CreateDB() error {
 
 		return nil
 	})
+}
+
+// RunActivityPubMigrations runs ActivityPub-specific migrations
+func (db *DB) RunActivityPubMigrations() error {
+	log.Println("Running ActivityPub migrations...")
+	return db.RunMigrations()
 }
 
 func (db *DB) createUserTable(tx *sql.Tx) error {

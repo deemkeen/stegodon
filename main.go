@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish/logging"
+	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/middleware"
 	"github.com/deemkeen/stegodon/util"
 	"github.com/deemkeen/stegodon/web"
@@ -14,7 +16,6 @@ import (
 	"time"
 
 	"github.com/charmbracelet/wish"
-	"github.com/gliderlabs/ssh"
 )
 
 func main() {
@@ -28,6 +29,14 @@ func main() {
 	fmt.Println(util.PrettyPrint(conf))
 
 	util.GeneratePemKeypair()
+
+	// Run ActivityPub migrations
+	log.Println("Running database migrations...")
+	database := db.GetDB()
+	if err := database.RunActivityPubMigrations(); err != nil {
+		log.Printf("Warning: Migration errors (may be normal if tables exist): %v", err)
+	}
+	log.Println("Database migrations complete")
 
 	s, err := wish.NewServer(
 		wish.WithAddress(fmt.Sprintf("%s:%d", conf.Conf.Host, conf.Conf.SshPort)),
