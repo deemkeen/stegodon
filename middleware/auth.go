@@ -1,10 +1,10 @@
 package middleware
 
 import (
+	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/util"
-	"github.com/gliderlabs/ssh"
 	"log"
 )
 

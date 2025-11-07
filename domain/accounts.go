@@ -21,6 +21,10 @@ type Account struct {
 	FirstTimeLogin dbBool
 	WebPublicKey   string
 	WebPrivateKey  string
+	// ActivityPub fields
+	DisplayName string
+	Summary     string
+	AvatarURL   string
 }
 
 func (acc *Account) ToString() string {

@@ -1,12 +1,12 @@
 package middleware
 
 import (
+	"github.com/charmbracelet/ssh"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/wish"
 	bm "github.com/charmbracelet/wish/bubbletea"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/ui"
-	"github.com/gliderlabs/ssh"
 	"github.com/muesli/termenv"
 	"log"
 )
