@@ -3,6 +3,8 @@ package db
 import (
 	"context"
 	"database/sql"
+	"sync"
+
 	"github.com/charmbracelet/ssh"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/util"
@@ -17,6 +19,11 @@ import (
 type DB struct {
 	db *sql.DB
 }
+
+var (
+	dbInstance *DB
+	dbOnce     sync.Once
+)
 
 const (
 	//TODO add indices
@@ -242,23 +249,54 @@ func (db *DB) ReadAllNotes() (error, *[]domain.Note) {
 }
 
 func GetDB() *DB {
-	//TODO optimize db access
-	var err error
-	db, err := sql.Open("sqlite", "database.db")
-	if err != nil {
-		panic(err)
-	}
+	dbOnce.Do(func() {
+		// Open database connection
+		db, err := sql.Open("sqlite", "database.db")
+		if err != nil {
+			panic(err)
+		}
 
-	log.Printf("new db operation")
+		// Configure connection pool for concurrent access
+		db.SetMaxOpenConns(25)
+		db.SetMaxIdleConns(5)
+		db.SetConnMaxLifetime(time.Hour)
 
-	d := &DB{db: db}
+		// Try to enable WAL2 mode, fall back to WAL if not supported
+		var journalMode string
+		err = db.QueryRow("PRAGMA journal_mode=WAL2").Scan(&journalMode)
+		if err != nil || journalMode == "delete" {
+			// WAL2 not supported, try regular WAL
+			err = db.QueryRow("PRAGMA journal_mode=WAL").Scan(&journalMode)
+			if err != nil {
+				log.Printf("Warning: Failed to enable WAL mode: %v", err)
+			} else {
+				log.Printf("Database journal mode: %s (WAL2 not supported, using WAL)", journalMode)
+			}
+		} else {
+			log.Printf("Database journal mode: %s", journalMode)
+		}
 
-	err2 := d.CreateDB()
-	if err2 != nil {
-		panic(err2)
-	}
+		// Optimize PRAGMAs for concurrent ActivityPub workload
+		// These need to be set as connection defaults
+		db.Exec("PRAGMA synchronous = NORMAL")      // Reduces fsync calls
+		db.Exec("PRAGMA cache_size = -64000")       // 64MB cache per connection
+		db.Exec("PRAGMA temp_store = MEMORY")       // Store temp tables in RAM
+		db.Exec("PRAGMA busy_timeout = 5000")       // Wait up to 5s for locks
+		db.Exec("PRAGMA foreign_keys = ON")         // Enable FK constraints
+		db.Exec("PRAGMA auto_vacuum = INCREMENTAL") // Better performance than FULL
 
-	return d
+		log.Printf("Database initialized with connection pooling (max 25 connections)")
+
+		dbInstance = &DB{db: db}
+
+		// Run initial schema setup
+		err2 := dbInstance.CreateDB()
+		if err2 != nil {
+			panic(err2)
+		}
+	})
+
+	return dbInstance
 }
 
 // CreateDB creates the database.
