@@ -5,6 +5,7 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/deemkeen/stegodon/activitypub"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
@@ -42,10 +43,52 @@ func InitialNote(contentWidth int, userId uuid.UUID) Model {
 
 func createNoteModelCmd(note *domain.SaveNote) tea.Cmd {
 	return func() tea.Msg {
-		err := db.GetDB().CreateNote(note.UserId, note.Message)
+		database := db.GetDB()
+
+		// Create note in database
+		err := database.CreateNote(note.UserId, note.Message)
 		if err != nil {
 			log.Println("Note could not be saved!")
+			return common.UpdateNoteList
 		}
+
+		// Federate the note via ActivityPub (background task)
+		go func() {
+			// Get the account
+			err, account := database.ReadAccById(note.UserId)
+			if err != nil {
+				log.Printf("Failed to get account for federation: %v", err)
+				return
+			}
+
+			// Get config
+			conf, err := util.ReadConf()
+			if err != nil {
+				log.Printf("Failed to read config for federation: %v", err)
+				return
+			}
+
+			// Only federate if ActivityPub is enabled
+			if !conf.Conf.WithAp {
+				return
+			}
+
+			// Create domain Note from SaveNote
+			domainNote := &domain.Note{
+				Id:        uuid.New(),
+				CreatedBy: account.Username,
+				Message:   note.Message,
+				CreatedAt: account.CreatedAt, // Will be overridden by actual creation time
+			}
+
+			// Send Create activity to all followers
+			if err := activitypub.SendCreate(domainNote, account, conf); err != nil {
+				log.Printf("Failed to federate note: %v", err)
+			} else {
+				log.Printf("Note federated successfully for %s", account.Username)
+			}
+		}()
+
 		return common.UpdateNoteList
 	}
 }
