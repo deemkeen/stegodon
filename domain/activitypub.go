@@ -54,11 +54,10 @@ type Activity struct {
 
 // DeliveryQueueItem represents an item in the delivery queue
 type DeliveryQueueItem struct {
-	Id          uuid.UUID
-	ActivityId  uuid.UUID
-	InboxURI    string
-	Attempts    int
-	NextRetryAt time.Time
-	LastError   string
-	CreatedAt   time.Time
+	Id           uuid.UUID
+	InboxURI     string
+	ActivityJSON string    // The complete activity to deliver
+	Attempts     int
+	NextRetryAt  time.Time
+	CreatedAt    time.Time
 }

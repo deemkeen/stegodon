@@ -75,7 +75,7 @@ func FetchRemoteActor(actorURI string) (*domain.RemoteAccount, error) {
 	}
 
 	// Extract domain from actor URI
-	domain, err := extractDomain(actor.ID)
+	domainName, err := extractDomain(actor.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func FetchRemoteActor(actorURI string) (*domain.RemoteAccount, error) {
 	remoteAcc := &domain.RemoteAccount{
 		Id:            uuid.New(),
 		Username:      actor.PreferredUsername,
-		Domain:        domain,
+		Domain:        domainName,
 		ActorURI:      actor.ID,
 		DisplayName:   actor.Name,
 		Summary:       actor.Summary,

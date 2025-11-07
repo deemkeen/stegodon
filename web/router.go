@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"github.com/deemkeen/stegodon/activitypub"
 	"github.com/deemkeen/stegodon/util"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
@@ -76,9 +77,9 @@ func Router(conf *util.AppConfig) error {
 		})
 
 		g.POST("/users/:actor/inbox", func(c *gin.Context) {
-			log.Println("Posted to inbox..")
-			c.Header("Content-Type", "application/activity+json; charset=utf-8")
-			c.Render(200, render.String{Format: ""})
+			actor := c.Param("actor")
+			log.Printf("POST /users/%s/inbox", actor)
+			activitypub.HandleInbox(c.Writer, c.Request, actor)
 		})
 
 		g.GET("/users/:actor/outbox", func(c *gin.Context) {

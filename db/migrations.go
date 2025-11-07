@@ -82,17 +82,15 @@ const (
 	// Delivery queue table
 	sqlCreateDeliveryQueueTable = `CREATE TABLE IF NOT EXISTS delivery_queue (
 		id TEXT NOT NULL PRIMARY KEY,
-		activity_id TEXT NOT NULL,
 		inbox_uri TEXT NOT NULL,
+		activity_json TEXT NOT NULL,
 		attempts INTEGER DEFAULT 0,
 		next_retry_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		last_error TEXT,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	)`
 
 	sqlCreateDeliveryQueueIndices = `
 		CREATE INDEX IF NOT EXISTS idx_delivery_queue_next_retry ON delivery_queue(next_retry_at);
-		CREATE INDEX IF NOT EXISTS idx_delivery_queue_activity_id ON delivery_queue(activity_id);
 	`
 
 	// Extend existing tables with new columns

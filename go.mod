@@ -3,6 +3,7 @@ module github.com/deemkeen/stegodon
 go 1.25
 
 require (
+	code.superseriousbusiness.org/httpsig v1.5.0
 	github.com/charmbracelet/bubbles v0.21.0
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0

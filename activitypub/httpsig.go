@@ -14,8 +14,8 @@ import (
 // keyId format: "https://example.com/users/alice#main-key"
 func SignRequest(req *http.Request, privateKey *rsa.PrivateKey, keyId string) error {
 	// Create signer with required headers
-	signer, err := httpsig.NewSigner(
-		httpsig.RSA_SHA256,
+	signer, _, err := httpsig.NewSigner(
+		[]httpsig.Algorithm{httpsig.RSA_SHA256},
 		httpsig.DigestSha256,
 		[]string{"(request-target)", "host", "date", "digest"},
 		httpsig.Signature,
@@ -55,10 +55,13 @@ func VerifyRequest(req *http.Request, publicKeyPem string) (string, error) {
 	}
 
 	// Verify the signature
-	keyId, err := verifier.Verify(rsaPubKey, httpsig.RSA_SHA256)
+	err = verifier.Verify(rsaPubKey, httpsig.RSA_SHA256)
 	if err != nil {
 		return "", fmt.Errorf("signature verification failed: %w", err)
 	}
+
+	// Extract keyId from signature header
+	keyId := verifier.KeyId()
 
 	// Extract actor URI from keyId
 	// keyId is usually "https://example.com/users/alice#main-key"

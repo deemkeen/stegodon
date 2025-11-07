@@ -478,3 +478,205 @@ func (db *DB) UpdateRemoteAccount(acc *domain.RemoteAccount) error {
 	})
 }
 
+// Follow queries
+const (
+	sqlInsertFollow      = `INSERT INTO follows(id, account_id, target_account_id, uri, accepted, created_at) VALUES (?, ?, ?, ?, ?, ?)`
+	sqlSelectFollowByURI = `SELECT id, account_id, target_account_id, uri, accepted, created_at FROM follows WHERE uri = ?`
+	sqlDeleteFollowByURI = `DELETE FROM follows WHERE uri = ?`
+)
+
+func (db *DB) CreateFollow(follow *domain.Follow) error {
+	return db.wrapTransaction(func(tx *sql.Tx) error {
+		_, err := tx.Exec(sqlInsertFollow,
+			follow.Id.String(),
+			follow.AccountId.String(),
+			follow.TargetAccountId.String(),
+			follow.URI,
+			follow.Accepted,
+			follow.CreatedAt,
+		)
+		return err
+	})
+}
+
+func (db *DB) ReadFollowByURI(uri string) (error, *domain.Follow) {
+	row := db.db.QueryRow(sqlSelectFollowByURI, uri)
+	var follow domain.Follow
+	var idStr, accountIdStr, targetIdStr string
+	err := row.Scan(
+		&idStr,
+		&accountIdStr,
+		&targetIdStr,
+		&follow.URI,
+		&follow.Accepted,
+		&follow.CreatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return err, nil
+	}
+	if err != nil {
+		return err, nil
+	}
+	follow.Id, _ = uuid.Parse(idStr)
+	follow.AccountId, _ = uuid.Parse(accountIdStr)
+	follow.TargetAccountId, _ = uuid.Parse(targetIdStr)
+	return nil, &follow
+}
+
+func (db *DB) DeleteFollowByURI(uri string) error {
+	return db.wrapTransaction(func(tx *sql.Tx) error {
+		_, err := tx.Exec(sqlDeleteFollowByURI, uri)
+		return err
+	})
+}
+
+// Activity queries
+const (
+	sqlInsertActivity = `INSERT INTO activities(id, activity_uri, activity_type, actor_uri, object_uri, raw_json, processed, local, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	sqlUpdateActivity = `UPDATE activities SET processed = ?, object_uri = ? WHERE id = ?`
+	sqlSelectActivityByURI = `SELECT id, activity_uri, activity_type, actor_uri, object_uri, raw_json, processed, local, created_at FROM activities WHERE activity_uri = ?`
+)
+
+func (db *DB) CreateActivity(activity *domain.Activity) error {
+	return db.wrapTransaction(func(tx *sql.Tx) error {
+		_, err := tx.Exec(sqlInsertActivity,
+			activity.Id.String(),
+			activity.ActivityURI,
+			activity.ActivityType,
+			activity.ActorURI,
+			activity.ObjectURI,
+			activity.RawJSON,
+			activity.Processed,
+			activity.Local,
+			activity.CreatedAt,
+		)
+		return err
+	})
+}
+
+func (db *DB) UpdateActivity(activity *domain.Activity) error {
+	return db.wrapTransaction(func(tx *sql.Tx) error {
+		_, err := tx.Exec(sqlUpdateActivity,
+			activity.Processed,
+			activity.ObjectURI,
+			activity.Id.String(),
+		)
+		return err
+	})
+}
+
+func (db *DB) ReadActivityByURI(uri string) (error, *domain.Activity) {
+	row := db.db.QueryRow(sqlSelectActivityByURI, uri)
+	var activity domain.Activity
+	var idStr string
+	err := row.Scan(
+		&idStr,
+		&activity.ActivityURI,
+		&activity.ActivityType,
+		&activity.ActorURI,
+		&activity.ObjectURI,
+		&activity.RawJSON,
+		&activity.Processed,
+		&activity.Local,
+		&activity.CreatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return err, nil
+	}
+	if err != nil {
+		return err, nil
+	}
+	activity.Id, _ = uuid.Parse(idStr)
+	return nil, &activity
+}
+
+// Delivery Queue queries
+const (
+	sqlInsertDeliveryQueue = `INSERT INTO delivery_queue(id, inbox_uri, activity_json, attempts, next_retry_at, created_at) VALUES (?, ?, ?, ?, ?, ?)`
+	sqlSelectPendingDeliveries = `SELECT id, inbox_uri, activity_json, attempts, next_retry_at, created_at FROM delivery_queue WHERE next_retry_at <= ? ORDER BY created_at ASC LIMIT ?`
+	sqlUpdateDeliveryAttempt = `UPDATE delivery_queue SET attempts = ?, next_retry_at = ? WHERE id = ?`
+	sqlDeleteDelivery = `DELETE FROM delivery_queue WHERE id = ?`
+)
+
+func (db *DB) EnqueueDelivery(item *domain.DeliveryQueueItem) error {
+	return db.wrapTransaction(func(tx *sql.Tx) error {
+		_, err := tx.Exec(sqlInsertDeliveryQueue,
+			item.Id.String(),
+			item.InboxURI,
+			item.ActivityJSON,
+			item.Attempts,
+			item.NextRetryAt,
+			item.CreatedAt,
+		)
+		return err
+	})
+}
+
+func (db *DB) ReadPendingDeliveries(limit int) (error, *[]domain.DeliveryQueueItem) {
+	rows, err := db.db.Query(sqlSelectPendingDeliveries, time.Now(), limit)
+	if err != nil {
+		return err, nil
+	}
+	defer rows.Close()
+
+	var items []domain.DeliveryQueueItem
+	for rows.Next() {
+		var item domain.DeliveryQueueItem
+		var idStr string
+		if err := rows.Scan(&idStr, &item.InboxURI, &item.ActivityJSON, &item.Attempts, &item.NextRetryAt, &item.CreatedAt); err != nil {
+			return err, &items
+		}
+		item.Id, _ = uuid.Parse(idStr)
+		items = append(items, item)
+	}
+	if err = rows.Err(); err != nil {
+		return err, &items
+	}
+	return nil, &items
+}
+
+func (db *DB) UpdateDeliveryAttempt(id uuid.UUID, attempts int, nextRetry time.Time) error {
+	return db.wrapTransaction(func(tx *sql.Tx) error {
+		_, err := tx.Exec(sqlUpdateDeliveryAttempt, attempts, nextRetry, id.String())
+		return err
+	})
+}
+
+func (db *DB) DeleteDelivery(id uuid.UUID) error {
+	return db.wrapTransaction(func(tx *sql.Tx) error {
+		_, err := tx.Exec(sqlDeleteDelivery, id.String())
+		return err
+	})
+}
+
+// Follower queries
+const (
+	sqlSelectFollowersByAccountId = `SELECT id, account_id, target_account_id, uri, accepted, created_at FROM follows WHERE account_id = ? AND accepted = 1`
+)
+
+func (db *DB) ReadFollowersByAccountId(accountId uuid.UUID) (error, *[]domain.Follow) {
+	rows, err := db.db.Query(sqlSelectFollowersByAccountId, accountId.String())
+	if err != nil {
+		return err, nil
+	}
+	defer rows.Close()
+
+	var followers []domain.Follow
+	for rows.Next() {
+		var follow domain.Follow
+		var idStr, accountIdStr, targetIdStr string
+		if err := rows.Scan(&idStr, &accountIdStr, &targetIdStr, &follow.URI, &follow.Accepted, &follow.CreatedAt); err != nil {
+			return err, &followers
+		}
+		follow.Id, _ = uuid.Parse(idStr)
+		follow.AccountId, _ = uuid.Parse(accountIdStr)
+		follow.TargetAccountId, _ = uuid.Parse(targetIdStr)
+		followers = append(followers, follow)
+	}
+	if err = rows.Err(); err != nil {
+		return err, &followers
+	}
+	return nil, &followers
+}
+
+

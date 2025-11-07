@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish/logging"
+	"github.com/deemkeen/stegodon/activitypub"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/middleware"
 	"github.com/deemkeen/stegodon/util"
@@ -37,6 +38,11 @@ func main() {
 		log.Printf("Warning: Migration errors (may be normal if tables exist): %v", err)
 	}
 	log.Println("Database migrations complete")
+
+	// Start ActivityPub delivery worker if enabled
+	if conf.Conf.WithAp {
+		activitypub.StartDeliveryWorker(conf)
+	}
 
 	s, err := wish.NewServer(
 		wish.WithAddress(fmt.Sprintf("%s:%d", conf.Conf.Host, conf.Conf.SshPort)),
