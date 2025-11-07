@@ -1,6 +1,9 @@
 package header
 
 import (
+	"fmt"
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/deemkeen/stegodon/domain"
@@ -26,83 +29,30 @@ func (m Model) View() string {
 }
 
 func GetHeaderStyle(acc *domain.Account, width int) string {
-	// Simpler approach: calculate fixed widths for username, @, version
-	// and give all remaining space to the created section
+	// Single bar design that fills entire width
+	// Format: "username @ stegodon/version | registered: date"
 
-	usernameWidth := 15  // Fixed width for username
-	atWidth := 3         // Fixed width for @ symbol with padding
-	versionWidth := width / 3  // ~33% for version
+	leftText := fmt.Sprintf("%s @ %s", acc.Username, util.GetNameAndVersion())
+	rightText := fmt.Sprintf("registered: %s", acc.CreatedAt.Format(util.DateTimeFormat()))
 
-	// Calculate remaining width for created section
-	// Account for borders and padding: each section has border on left/right (2 chars) + padding left/right (2 chars) = 4 chars overhead
-	// But we're setting the content Width, so lipgloss will add the 4 chars
-	// Total rendered width will be: usernameWidth+4 + atWidth+4 + versionWidth+4 + createdWidth+4
+	// Calculate spacing needed to fill the width
+	// Account for padding on both sides (2 chars each = 4 total)
+	textLength := len(leftText) + len(rightText) + 3 // +3 for " | "
+	paddingTotal := 4
+	spacesNeeded := width - textLength - paddingTotal
 
-	overhead := 16  // 4 sections * 4 chars each
-	usedWidth := usernameWidth + atWidth + versionWidth + overhead - 4 // Subtract 4 because we'll calculate created differently
-	createdWidth := width - usedWidth - 4  // The remaining space minus its own overhead
-
-	if createdWidth < 20 {
-		createdWidth = 20  // Minimum width
+	if spacesNeeded < 1 {
+		spacesNeeded = 1
 	}
 
-	username := lipgloss.
-		NewStyle().
-		SetString(acc.Username).
-		Align(lipgloss.Left).
-		Background(lipgloss.Color(common.COLOR_PURPLE)).
-		Padding(1).
-		Height(2).
-		Width(usernameWidth).
-		Border(lipgloss.NormalBorder(), true, false, true, false).
-		BorderForeground(lipgloss.Color(common.COLOR_MAGENTA)).
-		String()
+	// Build the header text with spacing
+	headerText := fmt.Sprintf("%s%s%s", leftText, strings.Repeat(" ", spacesNeeded), rightText)
 
-	at := lipgloss.
-		NewStyle().
-		SetString("@").
-		Background(lipgloss.NoColor{}).
-		Foreground(lipgloss.Color(common.COLOR_MAGENTA)).
-		Padding(1).
-		Height(2).
-		Width(atWidth).
-		Border(lipgloss.NormalBorder(), true, false, true, false).
-		BorderForeground(lipgloss.Color(common.COLOR_MAGENTA)).
-		String()
-
-	version := lipgloss.
-		NewStyle().
-		SetString(util.GetNameAndVersion()).
-		Width(versionWidth).
-		Height(2).
-		Background(lipgloss.Color(common.COLOR_GREY)).
-		Padding(1).
-		Border(lipgloss.NormalBorder(), true, false, true, false).
-		BorderForeground(lipgloss.Color(common.COLOR_MAGENTA)).
-		String()
-
-	created := lipgloss.
-		NewStyle().
-		SetString("registered: "+acc.CreatedAt.Format(util.DateTimeFormat())).
-		Background(lipgloss.Color(common.COLOR_MAGENTA)).
-		Padding(1).
-		Align(lipgloss.Left).
-		Height(2).
-		Width(createdWidth).
-		Border(lipgloss.NormalBorder(), true, false, true, false).
-		BorderForeground(lipgloss.Color(common.COLOR_MAGENTA)).
-		String()
-
-	header := lipgloss.JoinHorizontal(
-		lipgloss.Left,
-		username,
-		at,
-		version,
-		created,
-	)
-
-	// Wrap in a container that fills to exact width but doesn't constrain height
 	return lipgloss.NewStyle().
 		Width(width).
-		Render(header)
+		Background(lipgloss.Color(common.COLOR_PURPLE)).
+		Foreground(lipgloss.Color("255")).
+		Padding(0, 1).
+		Bold(true).
+		Render(headerText)
 }
