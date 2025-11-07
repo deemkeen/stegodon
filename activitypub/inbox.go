@@ -33,7 +33,7 @@ type FollowActivity struct {
 }
 
 // HandleInbox processes incoming ActivityPub activities
-func HandleInbox(w http.ResponseWriter, r *http.Request, username string) {
+func HandleInbox(w http.ResponseWriter, r *http.Request, username string, conf *util.AppConfig) {
 	// Verify HTTP signature
 	signature := r.Header.Get("Signature")
 	if signature == "" {
@@ -98,7 +98,7 @@ func HandleInbox(w http.ResponseWriter, r *http.Request, username string) {
 	// Process activity based on type
 	switch activity.Type {
 	case "Follow":
-		if err := handleFollowActivity(body, username, remoteActor); err != nil {
+		if err := handleFollowActivity(body, username, remoteActor, conf); err != nil {
 			log.Printf("Inbox: Failed to handle Follow: %v", err)
 			http.Error(w, "Failed to process Follow", http.StatusInternalServerError)
 			return
@@ -134,7 +134,7 @@ func HandleInbox(w http.ResponseWriter, r *http.Request, username string) {
 }
 
 // handleFollowActivity processes a Follow activity
-func handleFollowActivity(body []byte, username string, remoteActor *domain.RemoteAccount) error {
+func handleFollowActivity(body []byte, username string, remoteActor *domain.RemoteAccount, conf *util.AppConfig) error {
 	var follow FollowActivity
 	if err := json.Unmarshal(body, &follow); err != nil {
 		return fmt.Errorf("failed to parse Follow activity: %w", err)
@@ -164,10 +164,7 @@ func handleFollowActivity(body []byte, username string, remoteActor *domain.Remo
 	}
 
 	// Send Accept activity
-	// TODO: Pass proper config from router
-	tempConf := &util.AppConfig{}
-	tempConf.Conf.SslDomain = "example.com"
-	if err := SendAccept(localAccount, remoteActor, follow.ID, tempConf); err != nil {
+	if err := SendAccept(localAccount, remoteActor, follow.ID, conf); err != nil {
 		return fmt.Errorf("failed to send Accept: %w", err)
 	}
 

@@ -79,7 +79,7 @@ func Router(conf *util.AppConfig) error {
 		g.POST("/users/:actor/inbox", func(c *gin.Context) {
 			actor := c.Param("actor")
 			log.Printf("POST /users/%s/inbox", actor)
-			activitypub.HandleInbox(c.Writer, c.Request, actor)
+			activitypub.HandleInbox(c.Writer, c.Request, actor, conf)
 		})
 
 		g.GET("/users/:actor/outbox", func(c *gin.Context) {
@@ -101,6 +101,8 @@ func Router(conf *util.AppConfig) error {
 		})
 
 		g.GET("/.well-known/webfinger", func(c *gin.Context) {
+			c.Header("Content-Type", "application/json; charset=utf-8")
+
 			resource := c.Query("resource")
 			if resource == "" || !strings.HasPrefix(resource, "acct:") {
 				c.Render(404, render.String{Format: GetWebFingerNotFound()})
@@ -114,7 +116,6 @@ func Router(conf *util.AppConfig) error {
 					c.Render(200, render.String{Format: resp})
 				}
 			}
-			c.Header("Content-Type", "application/json; charset=utf-8")
 		})
 
 	}
