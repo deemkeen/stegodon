@@ -103,6 +103,12 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		// Handle window resize
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
+
 	case common.SessionState:
 		switch msg {
 		case common.CreateUserView:
@@ -218,13 +224,65 @@ func (m MainModel) View() string {
 
 	model := m.currentFocusedModel()
 
-	createStyleStr := lipgloss.NewStyle().MaxHeight(25).Height(25).Width(44).MaxWidth(44).Render(m.createModel.View())
-	listStyleStr := lipgloss.NewStyle().MaxHeight(35).Height(35).MaxWidth(88).Margin(1).Render(m.listModel.View())
-	followStyleStr := lipgloss.NewStyle().MaxHeight(35).Height(35).Width(60).MaxWidth(60).Margin(1).Render(m.followModel.View())
-	followersStyleStr := lipgloss.NewStyle().MaxHeight(35).Height(35).Width(60).MaxWidth(60).Margin(1).Render(m.followersModel.View())
-	timelineStyleStr := lipgloss.NewStyle().MaxHeight(35).Height(35).Width(88).MaxWidth(88).Margin(1).Render(m.timelineModel.View())
-	localTimelineStyleStr := lipgloss.NewStyle().MaxHeight(35).Height(35).Width(88).MaxWidth(88).Margin(1).Render(m.localTimelineModel.View())
-	localUsersStyleStr := lipgloss.NewStyle().MaxHeight(35).Height(35).Width(60).MaxWidth(60).Margin(1).Render(m.localUsersModel.View())
+	// Calculate responsive dimensions
+	availableHeight := m.height - 10 // Account for header and help text
+	leftPanelWidth := m.width / 3
+	rightPanelWidth := m.width - leftPanelWidth - 6 // Account for borders and margins
+
+	createStyleStr := lipgloss.NewStyle().
+		MaxHeight(availableHeight).
+		Height(availableHeight).
+		Width(leftPanelWidth).
+		MaxWidth(leftPanelWidth).
+		Render(m.createModel.View())
+
+	listStyleStr := lipgloss.NewStyle().
+		MaxHeight(availableHeight).
+		Height(availableHeight).
+		Width(rightPanelWidth).
+		MaxWidth(rightPanelWidth).
+		Margin(1).
+		Render(m.listModel.View())
+
+	followStyleStr := lipgloss.NewStyle().
+		MaxHeight(availableHeight).
+		Height(availableHeight).
+		Width(rightPanelWidth).
+		MaxWidth(rightPanelWidth).
+		Margin(1).
+		Render(m.followModel.View())
+
+	followersStyleStr := lipgloss.NewStyle().
+		MaxHeight(availableHeight).
+		Height(availableHeight).
+		Width(rightPanelWidth).
+		MaxWidth(rightPanelWidth).
+		Margin(1).
+		Render(m.followersModel.View())
+
+	timelineStyleStr := lipgloss.NewStyle().
+		MaxHeight(availableHeight).
+		Height(availableHeight).
+		Width(rightPanelWidth).
+		MaxWidth(rightPanelWidth).
+		Margin(1).
+		Render(m.timelineModel.View())
+
+	localTimelineStyleStr := lipgloss.NewStyle().
+		MaxHeight(availableHeight).
+		Height(availableHeight).
+		Width(rightPanelWidth).
+		MaxWidth(rightPanelWidth).
+		Margin(1).
+		Render(m.localTimelineModel.View())
+
+	localUsersStyleStr := lipgloss.NewStyle().
+		MaxHeight(availableHeight).
+		Height(availableHeight).
+		Width(rightPanelWidth).
+		MaxWidth(rightPanelWidth).
+		Margin(1).
+		Render(m.localUsersModel.View())
 
 	if m.state == common.CreateUserView {
 		s = createuser.Style.Width(m.width).Render(m.newUserModel.View())
