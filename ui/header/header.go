@@ -101,9 +101,8 @@ func GetHeaderStyle(acc *domain.Account, width int) string {
 		created,
 	)
 
-	// Wrap in a container that fills to exact width
+	// Wrap in a container that fills to exact width but doesn't constrain height
 	return lipgloss.NewStyle().
 		Width(width).
-		Inline(true).
 		Render(header)
 }
