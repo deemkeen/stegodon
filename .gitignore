@@ -2,5 +2,7 @@
 /.idea/
 /go_build_*
 /*.db
+/*.db-shm
+/*.db-wal
 /stegodon
 
