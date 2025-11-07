@@ -26,21 +26,21 @@ func (m Model) View() string {
 }
 
 func GetHeaderStyle(acc *domain.Account, width int) string {
-	// Calculate proportional widths
-	usernameWidth := width / 6      // ~16% of screen
-	versionWidth := width / 2       // ~50% of screen
-	createdWidth := width - usernameWidth - versionWidth - 10 // Remaining space minus borders
+	// Account for borders: each section has left+right borders (2 chars each)
+	// We have 4 sections, so 4*2 = 8 border chars total
+	// Also account for padding: each section has padding left+right (2 chars each) = 4*2 = 8 padding chars
+	totalBorderAndPadding := 16
 
-	// Ensure minimum widths
-	if usernameWidth < 10 {
-		usernameWidth = 10
+	availableWidth := width - totalBorderAndPadding
+	if availableWidth < 40 {
+		availableWidth = 40 // Minimum to prevent overflow
 	}
-	if versionWidth < 20 {
-		versionWidth = 20
-	}
-	if createdWidth < 20 {
-		createdWidth = 20
-	}
+
+	// Distribute available width proportionally
+	usernameWidth := availableWidth / 6      // ~16%
+	atWidth := 1                              // Just the @ symbol
+	versionWidth := availableWidth / 2       // ~50%
+	createdWidth := availableWidth - usernameWidth - atWidth - versionWidth // Remaining
 
 	username := lipgloss.
 		NewStyle().
@@ -65,6 +65,17 @@ func GetHeaderStyle(acc *domain.Account, width int) string {
 		BorderForeground(lipgloss.Color(common.COLOR_MAGENTA)).
 		String()
 
+	version := lipgloss.
+		NewStyle().
+		SetString(util.GetNameAndVersion()).
+		Width(versionWidth).
+		Height(2).
+		Background(lipgloss.Color(common.COLOR_GREY)).
+		Padding(1).
+		Border(lipgloss.NormalBorder(), true, false, true, false).
+		BorderForeground(lipgloss.Color(common.COLOR_MAGENTA)).
+		String()
+
 	created := lipgloss.
 		NewStyle().
 		SetString("registered: "+acc.CreatedAt.Format(util.DateTimeFormat())).
@@ -77,19 +88,17 @@ func GetHeaderStyle(acc *domain.Account, width int) string {
 		BorderForeground(lipgloss.Color(common.COLOR_MAGENTA)).
 		String()
 
-	return lipgloss.JoinHorizontal(
+	header := lipgloss.JoinHorizontal(
 		lipgloss.Left,
 		username,
 		at,
-		lipgloss.NewStyle().
-			SetString(util.GetNameAndVersion()).
-			Width(versionWidth).
-			Height(2).
-			Background(lipgloss.Color(common.COLOR_GREY)).
-			Padding(1).
-			Border(lipgloss.NormalBorder(), true, false, true, false).
-			BorderForeground(lipgloss.Color(common.COLOR_MAGENTA)).
-			String(),
+		version,
 		created,
 	)
+
+	// Wrap in a container that's exactly the terminal width
+	return lipgloss.NewStyle().
+		Width(width).
+		MaxWidth(width).
+		Render(header)
 }
