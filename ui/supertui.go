@@ -107,6 +107,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Handle window resize
 		m.width = msg.Width
 		m.height = msg.Height
+		m.headerModel.Width = msg.Width
 		return m, nil
 
 	case common.SessionState:

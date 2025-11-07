@@ -26,6 +26,22 @@ func (m Model) View() string {
 }
 
 func GetHeaderStyle(acc *domain.Account, width int) string {
+	// Calculate proportional widths
+	usernameWidth := width / 6      // ~16% of screen
+	versionWidth := width / 2       // ~50% of screen
+	createdWidth := width - usernameWidth - versionWidth - 10 // Remaining space minus borders
+
+	// Ensure minimum widths
+	if usernameWidth < 10 {
+		usernameWidth = 10
+	}
+	if versionWidth < 20 {
+		versionWidth = 20
+	}
+	if createdWidth < 20 {
+		createdWidth = 20
+	}
+
 	username := lipgloss.
 		NewStyle().
 		SetString(acc.Username).
@@ -33,8 +49,7 @@ func GetHeaderStyle(acc *domain.Account, width int) string {
 		Background(lipgloss.Color(common.COLOR_PURPLE)).
 		Padding(1).
 		Height(2).
-		Width(width).
-		MaxWidth(15).
+		Width(usernameWidth).
 		Border(lipgloss.NormalBorder(), true, false, true, false).
 		BorderForeground(lipgloss.Color(common.COLOR_MAGENTA)).
 		String()
@@ -57,20 +72,18 @@ func GetHeaderStyle(acc *domain.Account, width int) string {
 		Padding(1).
 		Align(lipgloss.Left).
 		Height(2).
-		Width(width).
-		MaxWidth(75).
+		Width(createdWidth).
 		Border(lipgloss.NormalBorder(), true, false, true, false).
 		BorderForeground(lipgloss.Color(common.COLOR_MAGENTA)).
 		String()
 
 	return lipgloss.JoinHorizontal(
-		lipgloss.Center,
+		lipgloss.Left,
 		username,
 		at,
 		lipgloss.NewStyle().
 			SetString(util.GetNameAndVersion()).
-			Width(65).
-			MaxWidth(45).
+			Width(versionWidth).
 			Height(2).
 			Background(lipgloss.Color(common.COLOR_GREY)).
 			Padding(1).
