@@ -65,8 +65,14 @@ const (
                                                             WHERE accounts.username = ?
                                                             ORDER BY notes.created_at DESC`
 	sqlSelectAllNotes = `SELECT notes.id, accounts.username, notes.message, notes.created_at FROM notes
-    														INNER JOIN accounts ON accounts.id = notes.user_id 
+    														INNER JOIN accounts ON accounts.id = notes.user_id
                                                             ORDER BY notes.created_at DESC`
+
+	// Local users and local timeline queries
+	sqlSelectAllAccounts = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key FROM accounts WHERE first_time_login = 0 ORDER BY username ASC`
+	sqlSelectLocalTimelineNotes = `SELECT notes.id, accounts.username, notes.message, notes.created_at FROM notes
+														INNER JOIN accounts ON accounts.id = notes.user_id
+														ORDER BY notes.created_at DESC LIMIT ?`
 )
 
 func (db *DB) CreateAccount(s ssh.Session, username string) (error, bool) {
@@ -480,13 +486,20 @@ func (db *DB) UpdateRemoteAccount(acc *domain.RemoteAccount) error {
 
 // Follow queries
 const (
-	sqlInsertFollow      = `INSERT INTO follows(id, account_id, target_account_id, uri, accepted, created_at) VALUES (?, ?, ?, ?, ?, ?)`
-	sqlSelectFollowByURI = `SELECT id, account_id, target_account_id, uri, accepted, created_at FROM follows WHERE uri = ?`
-	sqlDeleteFollowByURI = `DELETE FROM follows WHERE uri = ?`
+	sqlInsertFollow         = `INSERT INTO follows(id, account_id, target_account_id, uri, accepted, created_at, is_local) VALUES (?, ?, ?, ?, ?, ?, ?)`
+	sqlSelectFollowByURI    = `SELECT id, account_id, target_account_id, uri, accepted, created_at FROM follows WHERE uri = ?`
+	sqlDeleteFollowByURI    = `DELETE FROM follows WHERE uri = ?`
+	sqlSelectLocalFollowsByAccountId = `SELECT id, account_id, target_account_id, uri, accepted, created_at FROM follows WHERE account_id = ? AND is_local = 1 AND accepted = 1`
+	sqlDeleteLocalFollow    = `DELETE FROM follows WHERE account_id = ? AND target_account_id = ? AND is_local = 1`
+	sqlCheckLocalFollow     = `SELECT COUNT(*) FROM follows WHERE account_id = ? AND target_account_id = ? AND is_local = 1`
 )
 
 func (db *DB) CreateFollow(follow *domain.Follow) error {
 	return db.wrapTransaction(func(tx *sql.Tx) error {
+		isLocal := 0
+		if follow.IsLocal {
+			isLocal = 1
+		}
 		_, err := tx.Exec(sqlInsertFollow,
 			follow.Id.String(),
 			follow.AccountId.String(),
@@ -494,6 +507,7 @@ func (db *DB) CreateFollow(follow *domain.Follow) error {
 			follow.URI,
 			follow.Accepted,
 			follow.CreatedAt,
+			isLocal,
 		)
 		return err
 	})
@@ -707,4 +721,107 @@ func (db *DB) ReadFollowersByAccountId(accountId uuid.UUID) (error, *[]domain.Fo
 	return nil, &followers
 }
 
+// ReadAllAccounts returns all local user accounts (excluding first-time login users)
+func (db *DB) ReadAllAccounts() (error, *[]domain.Account) {
+	rows, err := db.db.Query(sqlSelectAllAccounts)
+	if err != nil {
+		return err, nil
+	}
+	defer rows.Close()
+
+	var accounts []domain.Account
+	for rows.Next() {
+		var acc domain.Account
+		if err := rows.Scan(&acc.Id, &acc.Username, &acc.Publickey, &acc.CreatedAt, &acc.FirstTimeLogin, &acc.WebPublicKey, &acc.WebPrivateKey); err != nil {
+			return err, &accounts
+		}
+		accounts = append(accounts, acc)
+	}
+	if err = rows.Err(); err != nil {
+		return err, &accounts
+	}
+	return nil, &accounts
+}
+
+// ReadLocalTimelineNotes returns recent notes from all local users for the local timeline
+func (db *DB) ReadLocalTimelineNotes(limit int) (error, *[]domain.Note) {
+	rows, err := db.db.Query(sqlSelectLocalTimelineNotes, limit)
+	if err != nil {
+		return err, nil
+	}
+	defer rows.Close()
+
+	var notes []domain.Note
+	for rows.Next() {
+		var note domain.Note
+		if err := rows.Scan(&note.Id, &note.CreatedBy, &note.Message, &note.CreatedAt); err != nil {
+			return err, &notes
+		}
+		notes = append(notes, note)
+	}
+	if err = rows.Err(); err != nil {
+		return err, &notes
+	}
+	return nil, &notes
+}
+
+
+// CreateLocalFollow creates a local-only follow relationship
+func (db *DB) CreateLocalFollow(followerAccountId, targetAccountId uuid.UUID) error {
+	follow := &domain.Follow{
+		Id:              uuid.New(),
+		AccountId:       followerAccountId,
+		TargetAccountId: targetAccountId,
+		URI:             "", // No URI for local follows
+		Accepted:        true,  // Auto-accept for local follows
+		IsLocal:         true,
+		CreatedAt:       time.Now(),
+	}
+	return db.CreateFollow(follow)
+}
+
+// DeleteLocalFollow removes a local follow relationship
+func (db *DB) DeleteLocalFollow(followerAccountId, targetAccountId uuid.UUID) error {
+	return db.wrapTransaction(func(tx *sql.Tx) error {
+		_, err := tx.Exec(sqlDeleteLocalFollow, followerAccountId.String(), targetAccountId.String())
+		return err
+	})
+}
+
+// IsFollowingLocal checks if a user is following another local user
+func (db *DB) IsFollowingLocal(followerAccountId, targetAccountId uuid.UUID) (bool, error) {
+	var count int
+	err := db.db.QueryRow(sqlCheckLocalFollow, followerAccountId.String(), targetAccountId.String()).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// ReadLocalFollowsByAccountId returns all local users that an account is following
+func (db *DB) ReadLocalFollowsByAccountId(accountId uuid.UUID) (error, *[]domain.Follow) {
+	rows, err := db.db.Query(sqlSelectLocalFollowsByAccountId, accountId.String())
+	if err != nil {
+		return err, nil
+	}
+	defer rows.Close()
+
+	var follows []domain.Follow
+	for rows.Next() {
+		var follow domain.Follow
+		var idStr, accountIdStr, targetIdStr string
+		if err := rows.Scan(&idStr, &accountIdStr, &targetIdStr, &follow.URI, &follow.Accepted, &follow.CreatedAt); err != nil {
+			return err, &follows
+		}
+		follow.Id, _ = uuid.Parse(idStr)
+		follow.AccountId, _ = uuid.Parse(accountIdStr)
+		follow.TargetAccountId, _ = uuid.Parse(targetIdStr)
+		follow.IsLocal = true
+		follows = append(follows, follow)
+	}
+	if err = rows.Err(); err != nil {
+		return err, &follows
+	}
+	return nil, &follows
+}
 

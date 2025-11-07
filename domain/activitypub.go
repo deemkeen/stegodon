@@ -25,9 +25,10 @@ type Follow struct {
 	Id              uuid.UUID
 	AccountId       uuid.UUID  // Can be local or remote account
 	TargetAccountId uuid.UUID  // Can be local or remote account
-	URI             string     // ActivityPub Follow activity URI
+	URI             string     // ActivityPub Follow activity URI (empty for local follows)
 	CreatedAt       time.Time
 	Accepted        bool
+	IsLocal         bool       // true if this is a local-only follow
 }
 
 // Like represents a like/favorite on a note

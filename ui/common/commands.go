@@ -7,7 +7,9 @@ const (
 	ListNotesView
 	CreateUserView
 	UpdateNoteList
-	FollowUserView      // New: Follow remote users
-	FollowersView       // New: View followers/following
-	FederatedTimelineView // New: View federated posts
+	FollowUserView         // Follow remote users
+	FollowersView          // View followers/following
+	FederatedTimelineView  // View federated posts
+	LocalTimelineView      // View local posts from all local users
+	LocalUsersView         // Browse and follow local users
 )

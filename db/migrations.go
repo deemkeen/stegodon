@@ -187,5 +187,8 @@ func (db *DB) extendExistingTables(tx *sql.Tx) {
 	tx.Exec("ALTER TABLE notes ADD COLUMN sensitive INTEGER DEFAULT 0")
 	tx.Exec("ALTER TABLE notes ADD COLUMN content_warning TEXT")
 
+	// Add is_local column to follows table to support local follows
+	tx.Exec("ALTER TABLE follows ADD COLUMN is_local INTEGER DEFAULT 0")
+
 	log.Println("Extended existing tables with new columns")
 }

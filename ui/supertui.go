@@ -12,6 +12,8 @@ import (
 	"github.com/deemkeen/stegodon/ui/followuser"
 	"github.com/deemkeen/stegodon/ui/header"
 	"github.com/deemkeen/stegodon/ui/listnotes"
+	"github.com/deemkeen/stegodon/ui/localtimeline"
+	"github.com/deemkeen/stegodon/ui/localusers"
 	"github.com/deemkeen/stegodon/ui/timeline"
 	"github.com/deemkeen/stegodon/ui/writenote"
 	"log"
@@ -28,17 +30,19 @@ var (
 )
 
 type MainModel struct {
-	width           int
-	height          int
-	headerModel     header.Model
-	account         domain.Account
-	state           common.SessionState
-	newUserModel    createuser.Model
-	createModel     writenote.Model
-	listModel       listnotes.Model
-	followModel     followuser.Model
-	followersModel  followers.Model
-	timelineModel   timeline.Model
+	width              int
+	height             int
+	headerModel        header.Model
+	account            domain.Account
+	state              common.SessionState
+	newUserModel       createuser.Model
+	createModel        writenote.Model
+	listModel          listnotes.Model
+	followModel        followuser.Model
+	followersModel     followers.Model
+	timelineModel      timeline.Model
+	localTimelineModel localtimeline.Model
+	localUsersModel    localusers.Model
 }
 
 func updateUserModelCmd(acc *domain.Account) tea.Cmd {
@@ -63,6 +67,8 @@ func NewModel(acc domain.Account, width int, height int) MainModel {
 	followModel := followuser.InitialModel(acc.Id)
 	followersModel := followers.InitialModel(acc.Id, width, height)
 	timelineModel := timeline.InitialModel(width, height)
+	localTimelineModel := localtimeline.InitialModel(width, height)
+	localUsersModel := localusers.InitialModel(acc.Id, width, height)
 
 	m := MainModel{state: common.CreateUserView}
 	m.newUserModel = createuser.InitialModel()
@@ -71,6 +77,8 @@ func NewModel(acc domain.Account, width int, height int) MainModel {
 	m.followModel = followModel
 	m.followersModel = followersModel
 	m.timelineModel = timelineModel
+	m.localTimelineModel = localTimelineModel
+	m.localUsersModel = localUsersModel
 	m.headerModel = headerModel
 	m.account = acc
 	m.width = width
@@ -109,6 +117,10 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = common.FollowersView
 		case common.FederatedTimelineView:
 			m.state = common.FederatedTimelineView
+		case common.LocalTimelineView:
+			m.state = common.LocalTimelineView
+		case common.LocalUsersView:
+			m.state = common.LocalUsersView
 		case common.UpdateNoteList:
 			m.listModel = listnotes.NewPager(m.account.Id, m.width, m.height)
 		}
@@ -132,6 +144,10 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case common.FollowersView:
 				m.state = common.FederatedTimelineView
 			case common.FederatedTimelineView:
+				m.state = common.LocalTimelineView
+			case common.LocalTimelineView:
+				m.state = common.LocalUsersView
+			case common.LocalUsersView:
 				m.state = common.CreateNoteView
 			}
 		case "shift+tab":
@@ -141,7 +157,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			switch m.state {
 			case common.CreateNoteView:
-				m.state = common.FederatedTimelineView
+				m.state = common.LocalUsersView
 			case common.ListNotesView:
 				m.state = common.CreateNoteView
 			case common.FollowUserView:
@@ -150,6 +166,10 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.state = common.FollowUserView
 			case common.FederatedTimelineView:
 				m.state = common.FollowersView
+			case common.LocalTimelineView:
+				m.state = common.FederatedTimelineView
+			case common.LocalUsersView:
+				m.state = common.LocalTimelineView
 			}
 		case "enter":
 			if m.state == common.CreateUserView {
@@ -179,6 +199,12 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case common.FederatedTimelineView:
 			m.headerModel, cmd = m.headerModel.Update(msg)
 			m.timelineModel, cmd = m.timelineModel.Update(msg)
+		case common.LocalTimelineView:
+			m.headerModel, cmd = m.headerModel.Update(msg)
+			m.localTimelineModel, cmd = m.localTimelineModel.Update(msg)
+		case common.LocalUsersView:
+			m.headerModel, cmd = m.headerModel.Update(msg)
+			m.localUsersModel, cmd = m.localUsersModel.Update(msg)
 		}
 		cmds = append(cmds, cmd)
 		return m, tea.Batch(cmds...)
@@ -197,6 +223,8 @@ func (m MainModel) View() string {
 	followStyleStr := lipgloss.NewStyle().MaxHeight(35).Height(35).Width(60).MaxWidth(60).Margin(1).Render(m.followModel.View())
 	followersStyleStr := lipgloss.NewStyle().MaxHeight(35).Height(35).Width(60).MaxWidth(60).Margin(1).Render(m.followersModel.View())
 	timelineStyleStr := lipgloss.NewStyle().MaxHeight(35).Height(35).Width(88).MaxWidth(88).Margin(1).Render(m.timelineModel.View())
+	localTimelineStyleStr := lipgloss.NewStyle().MaxHeight(35).Height(35).Width(88).MaxWidth(88).Margin(1).Render(m.localTimelineModel.View())
+	localUsersStyleStr := lipgloss.NewStyle().MaxHeight(35).Height(35).Width(60).MaxWidth(60).Margin(1).Render(m.localUsersModel.View())
 
 	if m.state == common.CreateUserView {
 		s = createuser.Style.Width(m.width).Render(m.newUserModel.View())
@@ -227,6 +255,14 @@ func (m MainModel) View() string {
 			s += lipgloss.JoinHorizontal(lipgloss.Top,
 				modelStyle.Render(createStyleStr),
 				focusedModelStyle.Render(timelineStyleStr))
+		case common.LocalTimelineView:
+			s += lipgloss.JoinHorizontal(lipgloss.Top,
+				modelStyle.Render(createStyleStr),
+				focusedModelStyle.Render(localTimelineStyleStr))
+		case common.LocalUsersView:
+			s += lipgloss.JoinHorizontal(lipgloss.Top,
+				modelStyle.Render(createStyleStr),
+				focusedModelStyle.Render(localUsersStyleStr))
 		}
 
 		// Help text
@@ -236,6 +272,8 @@ func (m MainModel) View() string {
 			viewCommands = "arrows: scroll"
 		case common.FollowUserView:
 			viewCommands = "enter: follow"
+		case common.LocalUsersView:
+			viewCommands = "↑/↓: select • enter: toggle follow"
 		default:
 			viewCommands = " "
 		}
@@ -258,7 +296,11 @@ func (m MainModel) currentFocusedModel() string {
 	case common.FollowersView:
 		return "followers"
 	case common.FederatedTimelineView:
-		return "timeline"
+		return "federated timeline"
+	case common.LocalTimelineView:
+		return "local timeline"
+	case common.LocalUsersView:
+		return "local users"
 	default:
 		return "create user"
 	}
