@@ -134,25 +134,22 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case common.FederatedTimelineView:
 				m.state = common.CreateNoteView
 			}
-		case "1":
-			if m.state != common.CreateUserView {
-				m.state = common.CreateNoteView
+		case "shift+tab":
+			// Cycle backwards through views
+			if m.state == common.CreateUserView {
+				return m, nil
 			}
-		case "2":
-			if m.state != common.CreateUserView {
-				m.state = common.ListNotesView
-			}
-		case "3":
-			if m.state != common.CreateUserView {
-				m.state = common.FollowUserView
-			}
-		case "4":
-			if m.state != common.CreateUserView {
-				m.state = common.FollowersView
-			}
-		case "5":
-			if m.state != common.CreateUserView {
+			switch m.state {
+			case common.CreateNoteView:
 				m.state = common.FederatedTimelineView
+			case common.ListNotesView:
+				m.state = common.CreateNoteView
+			case common.FollowUserView:
+				m.state = common.ListNotesView
+			case common.FollowersView:
+				m.state = common.FollowUserView
+			case common.FederatedTimelineView:
+				m.state = common.FollowersView
 			}
 		case "enter":
 			if m.state == common.CreateUserView {
@@ -244,7 +241,7 @@ func (m MainModel) View() string {
 		}
 
 		s += common.HelpStyle.Render(fmt.Sprintf(
-			"focused > %s\t\tkeys > 1: write • 2: notes • 3: follow • 4: followers • 5: timeline • tab: cycle • %s • ctrl-c: exit",
+			"focused > %s\t\tkeys > tab: next • shift+tab: prev • %s • ctrl-c: exit",
 			model, viewCommands))
 		return lipgloss.NewStyle().Render(s)
 	}
