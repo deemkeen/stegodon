@@ -590,6 +590,34 @@ func (db *DB) ReadActivityByURI(uri string) (error, *domain.Activity) {
 	return nil, &activity
 }
 
+// ReadFederatedActivities returns recent Create activities from remote actors
+const (
+	sqlSelectFederatedActivities = `SELECT id, activity_uri, activity_type, actor_uri, object_uri, raw_json, processed, local, created_at FROM activities WHERE activity_type = 'Create' AND local = 0 ORDER BY created_at DESC LIMIT ?`
+)
+
+func (db *DB) ReadFederatedActivities(limit int) (error, *[]domain.Activity) {
+	rows, err := db.db.Query(sqlSelectFederatedActivities, limit)
+	if err != nil {
+		return err, nil
+	}
+	defer rows.Close()
+
+	var activities []domain.Activity
+	for rows.Next() {
+		var activity domain.Activity
+		var idStr string
+		if err := rows.Scan(&idStr, &activity.ActivityURI, &activity.ActivityType, &activity.ActorURI, &activity.ObjectURI, &activity.RawJSON, &activity.Processed, &activity.Local, &activity.CreatedAt); err != nil {
+			return err, &activities
+		}
+		activity.Id, _ = uuid.Parse(idStr)
+		activities = append(activities, activity)
+	}
+	if err = rows.Err(); err != nil {
+		return err, &activities
+	}
+	return nil, &activities
+}
+
 // Delivery Queue queries
 const (
 	sqlInsertDeliveryQueue = `INSERT INTO delivery_queue(id, inbox_uri, activity_json, attempts, next_retry_at, created_at) VALUES (?, ?, ?, ?, ?, ?)`

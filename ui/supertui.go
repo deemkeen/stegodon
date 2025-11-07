@@ -8,9 +8,11 @@ import (
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
 	"github.com/deemkeen/stegodon/ui/createuser"
+	"github.com/deemkeen/stegodon/ui/followers"
 	"github.com/deemkeen/stegodon/ui/followuser"
 	"github.com/deemkeen/stegodon/ui/header"
 	"github.com/deemkeen/stegodon/ui/listnotes"
+	"github.com/deemkeen/stegodon/ui/timeline"
 	"github.com/deemkeen/stegodon/ui/writenote"
 	"log"
 )
@@ -26,15 +28,17 @@ var (
 )
 
 type MainModel struct {
-	width          int
-	height         int
-	headerModel    header.Model
-	account        domain.Account
-	state          common.SessionState
-	newUserModel   createuser.Model
-	createModel    writenote.Model
-	listModel      listnotes.Model
-	followModel    followuser.Model
+	width           int
+	height          int
+	headerModel     header.Model
+	account         domain.Account
+	state           common.SessionState
+	newUserModel    createuser.Model
+	createModel     writenote.Model
+	listModel       listnotes.Model
+	followModel     followuser.Model
+	followersModel  followers.Model
+	timelineModel   timeline.Model
 }
 
 func updateUserModelCmd(acc *domain.Account) tea.Cmd {
@@ -57,12 +61,16 @@ func NewModel(acc domain.Account, width int, height int) MainModel {
 	headerModel := header.Model{Width: width, Acc: &acc}
 	listModel := listnotes.NewPager(acc.Id, width, height)
 	followModel := followuser.InitialModel(acc.Id)
+	followersModel := followers.InitialModel(acc.Id, width, height)
+	timelineModel := timeline.InitialModel(width, height)
 
 	m := MainModel{state: common.CreateUserView}
 	m.newUserModel = createuser.InitialModel()
 	m.createModel = noteModel
 	m.listModel = listModel
 	m.followModel = followModel
+	m.followersModel = followersModel
+	m.timelineModel = timelineModel
 	m.headerModel = headerModel
 	m.account = acc
 	m.width = width
@@ -97,6 +105,10 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = common.CreateNoteView
 		case common.FollowUserView:
 			m.state = common.FollowUserView
+		case common.FollowersView:
+			m.state = common.FollowersView
+		case common.FederatedTimelineView:
+			m.state = common.FederatedTimelineView
 		case common.UpdateNoteList:
 			m.listModel = listnotes.NewPager(m.account.Id, m.width, m.height)
 		}
@@ -116,6 +128,10 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case common.ListNotesView:
 				m.state = common.FollowUserView
 			case common.FollowUserView:
+				m.state = common.FollowersView
+			case common.FollowersView:
+				m.state = common.FederatedTimelineView
+			case common.FederatedTimelineView:
 				m.state = common.CreateNoteView
 			}
 		case "1":
@@ -129,6 +145,14 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "3":
 			if m.state != common.CreateUserView {
 				m.state = common.FollowUserView
+			}
+		case "4":
+			if m.state != common.CreateUserView {
+				m.state = common.FollowersView
+			}
+		case "5":
+			if m.state != common.CreateUserView {
+				m.state = common.FederatedTimelineView
 			}
 		case "enter":
 			if m.state == common.CreateUserView {
@@ -152,6 +176,12 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case common.FollowUserView:
 			m.headerModel, cmd = m.headerModel.Update(msg)
 			m.followModel, cmd = m.followModel.Update(msg)
+		case common.FollowersView:
+			m.headerModel, cmd = m.headerModel.Update(msg)
+			m.followersModel, cmd = m.followersModel.Update(msg)
+		case common.FederatedTimelineView:
+			m.headerModel, cmd = m.headerModel.Update(msg)
+			m.timelineModel, cmd = m.timelineModel.Update(msg)
 		}
 		cmds = append(cmds, cmd)
 		return m, tea.Batch(cmds...)
@@ -168,6 +198,8 @@ func (m MainModel) View() string {
 	createStyleStr := lipgloss.NewStyle().MaxHeight(25).Height(25).Width(44).MaxWidth(44).Render(m.createModel.View())
 	listStyleStr := lipgloss.NewStyle().MaxHeight(35).Height(35).MaxWidth(88).Margin(1).Render(m.listModel.View())
 	followStyleStr := lipgloss.NewStyle().MaxHeight(35).Height(35).Width(60).MaxWidth(60).Margin(1).Render(m.followModel.View())
+	followersStyleStr := lipgloss.NewStyle().MaxHeight(35).Height(35).Width(60).MaxWidth(60).Margin(1).Render(m.followersModel.View())
+	timelineStyleStr := lipgloss.NewStyle().MaxHeight(35).Height(35).Width(88).MaxWidth(88).Margin(1).Render(m.timelineModel.View())
 
 	if m.state == common.CreateUserView {
 		s = createuser.Style.Width(m.width).Render(m.newUserModel.View())
@@ -190,21 +222,29 @@ func (m MainModel) View() string {
 			s += lipgloss.JoinHorizontal(lipgloss.Top,
 				modelStyle.Render(createStyleStr),
 				focusedModelStyle.Render(followStyleStr))
+		case common.FollowersView:
+			s += lipgloss.JoinHorizontal(lipgloss.Top,
+				modelStyle.Render(createStyleStr),
+				focusedModelStyle.Render(followersStyleStr))
+		case common.FederatedTimelineView:
+			s += lipgloss.JoinHorizontal(lipgloss.Top,
+				modelStyle.Render(createStyleStr),
+				focusedModelStyle.Render(timelineStyleStr))
 		}
 
 		// Help text
 		var viewCommands string
 		switch m.state {
 		case common.ListNotesView:
-			viewCommands = "arrows: scroll pages"
+			viewCommands = "arrows: scroll"
 		case common.FollowUserView:
-			viewCommands = "enter: follow • esc: clear"
+			viewCommands = "enter: follow"
 		default:
 			viewCommands = " "
 		}
 
 		s += common.HelpStyle.Render(fmt.Sprintf(
-			"focused > %s\t\tkeys > 1: write • 2: notes • 3: follow • tab: cycle • %s • ctrl-c: exit",
+			"focused > %s\t\tkeys > 1: write • 2: notes • 3: follow • 4: followers • 5: timeline • tab: cycle • %s • ctrl-c: exit",
 			model, viewCommands))
 		return lipgloss.NewStyle().Render(s)
 	}
@@ -218,6 +258,10 @@ func (m MainModel) currentFocusedModel() string {
 		return "notes list"
 	case common.FollowUserView:
 		return "follow user"
+	case common.FollowersView:
+		return "followers"
+	case common.FederatedTimelineView:
+		return "timeline"
 	default:
 		return "create user"
 	}

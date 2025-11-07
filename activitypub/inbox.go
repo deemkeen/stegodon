@@ -210,9 +210,43 @@ func handleUndoActivity(body []byte, username string, remoteActor *domain.Remote
 
 // handleCreateActivity processes a Create activity (incoming post/note)
 func handleCreateActivity(body []byte, username string) error {
-	log.Printf("Inbox: Processing Create activity for %s", username)
-	// TODO: Store incoming posts in a separate table or federated timeline
-	// For now, just log it
+	var create struct {
+		Type   string `json:"type"`
+		Actor  string `json:"actor"`
+		Object struct {
+			ID           string `json:"id"`
+			Type         string `json:"type"`
+			Content      string `json:"content"`
+			Published    string `json:"published"`
+			AttributedTo string `json:"attributedTo"`
+		} `json:"object"`
+	}
+
+	if err := json.Unmarshal(body, &create); err != nil {
+		return fmt.Errorf("failed to parse Create activity: %w", err)
+	}
+
+	log.Printf("Inbox: Received post from %s: %s", create.Actor, create.Object.Content)
+
+	// Store the incoming post activity
+	database := db.GetDB()
+	activity := &domain.Activity{
+		Id:           uuid.New(),
+		ActivityURI:  create.Object.ID,
+		ActivityType: "Create",
+		ActorURI:     create.Actor,
+		ObjectURI:    create.Object.ID,
+		RawJSON:      string(body),
+		Processed:    true,
+		Local:        false,
+		CreatedAt:    time.Now(),
+	}
+
+	if err := database.CreateActivity(activity); err != nil {
+		log.Printf("Inbox: Failed to store Create activity: %v", err)
+		// Don't fail the request
+	}
+
 	return nil
 }
 
