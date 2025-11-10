@@ -2,6 +2,8 @@ package activitypub
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -102,8 +104,13 @@ func deliverActivity(item *domain.DeliveryQueueItem, conf *util.AppConfig) error
 		return fmt.Errorf("failed to parse private key: %w", err)
 	}
 
+	// Calculate digest for HTTP signature
+	activityBytes := []byte(item.ActivityJSON)
+	hash := sha256.Sum256(activityBytes)
+	digest := "SHA-256=" + base64.StdEncoding.EncodeToString(hash[:])
+
 	// Create HTTP request
-	req, err := http.NewRequest("POST", item.InboxURI, bytes.NewReader([]byte(item.ActivityJSON)))
+	req, err := http.NewRequest("POST", item.InboxURI, bytes.NewReader(activityBytes))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -112,6 +119,8 @@ func deliverActivity(item *domain.DeliveryQueueItem, conf *util.AppConfig) error
 	req.Header.Set("Accept", "application/activity+json")
 	req.Header.Set("User-Agent", "stegodon/1.0 ActivityPub")
 	req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
+	req.Header.Set("Host", req.URL.Host)
+	req.Header.Set("Digest", digest)
 
 	// Sign request
 	keyID := fmt.Sprintf("https://%s/users/%s#main-key", conf.Conf.SslDomain, username)

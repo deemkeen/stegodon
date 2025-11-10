@@ -2,6 +2,8 @@ package activitypub
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -22,6 +24,10 @@ func SendActivity(activity interface{}, inboxURI string, localAccount *domain.Ac
 		return fmt.Errorf("failed to marshal activity: %w", err)
 	}
 
+	// Calculate digest for HTTP signature
+	hash := sha256.Sum256(activityJSON)
+	digest := "SHA-256=" + base64.StdEncoding.EncodeToString(hash[:])
+
 	// Create HTTP request
 	req, err := http.NewRequest("POST", inboxURI, bytes.NewReader(activityJSON))
 	if err != nil {
@@ -32,6 +38,8 @@ func SendActivity(activity interface{}, inboxURI string, localAccount *domain.Ac
 	req.Header.Set("Accept", "application/activity+json")
 	req.Header.Set("User-Agent", "stegodon/1.0 ActivityPub")
 	req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
+	req.Header.Set("Host", req.URL.Host)
+	req.Header.Set("Digest", digest)
 
 	// Parse private key for signing
 	privateKey, err := ParsePrivateKey(localAccount.WebPrivateKey)
@@ -130,9 +138,10 @@ func SendCreate(note *domain.Note, localAccount *domain.Account, conf *util.AppC
 
 	// Queue delivery to each follower's inbox
 	for _, follower := range *followers {
-		err, remoteActor := database.ReadRemoteAccountById(follower.TargetAccountId)
+		// AccountId is the follower (remote actor we need to deliver to)
+		err, remoteActor := database.ReadRemoteAccountById(follower.AccountId)
 		if err != nil {
-			log.Printf("Outbox: Failed to get remote actor %s: %v", follower.TargetAccountId, err)
+			log.Printf("Outbox: Failed to get remote actor %s: %v", follower.AccountId, err)
 			continue
 		}
 

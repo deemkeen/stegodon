@@ -121,6 +121,12 @@ func HandleInbox(w http.ResponseWriter, r *http.Request, username string, conf *
 			http.Error(w, "Failed to process Like", http.StatusInternalServerError)
 			return
 		}
+	case "Accept":
+		// Accept activities are confirmations of Follow requests
+		if err := handleAcceptActivity(body, username); err != nil {
+			log.Printf("Inbox: Failed to handle Accept: %v", err)
+			// Don't fail the request
+		}
 	default:
 		log.Printf("Inbox: Unsupported activity type: %s", activity.Type)
 	}
@@ -150,10 +156,13 @@ func handleFollowActivity(body []byte, username string, remoteActor *domain.Remo
 	}
 
 	// Create follow relationship
+	// When remote actor follows local account:
+	// - AccountId = remote actor (the follower)
+	// - TargetAccountId = local account (being followed)
 	followRecord := &domain.Follow{
 		Id:              uuid.New(),
-		AccountId:       localAccount.Id,
-		TargetAccountId: remoteActor.Id,
+		AccountId:       remoteActor.Id,      // The follower
+		TargetAccountId: localAccount.Id,     // The target being followed
 		URI:             follow.ID,
 		Accepted:        true, // Auto-accept for now
 		CreatedAt:       time.Now(),
@@ -208,6 +217,7 @@ func handleUndoActivity(body []byte, username string, remoteActor *domain.Remote
 // handleCreateActivity processes a Create activity (incoming post/note)
 func handleCreateActivity(body []byte, username string) error {
 	var create struct {
+		ID     string `json:"id"`
 		Type   string `json:"type"`
 		Actor  string `json:"actor"`
 		Object struct {
@@ -225,11 +235,25 @@ func handleCreateActivity(body []byte, username string) error {
 
 	log.Printf("Inbox: Received post from %s: %s", create.Actor, create.Object.Content)
 
-	// Store the incoming post activity
+	// Use the activity ID, not the object ID
+	activityURI := create.ID
+	if activityURI == "" {
+		// Fallback to object ID if activity ID is missing
+		activityURI = create.Object.ID
+	}
+
+	// Check if we already have this activity
 	database := db.GetDB()
+	err, existingActivity := database.ReadActivityByURI(activityURI)
+	if err == nil && existingActivity != nil {
+		log.Printf("Inbox: Activity %s already exists, skipping", activityURI)
+		return nil
+	}
+
+	// Store the incoming post activity
 	activity := &domain.Activity{
 		Id:           uuid.New(),
-		ActivityURI:  create.Object.ID,
+		ActivityURI:  activityURI,
 		ActivityType: "Create",
 		ActorURI:     create.Actor,
 		ObjectURI:    create.Object.ID,
@@ -251,5 +275,35 @@ func handleCreateActivity(body []byte, username string) error {
 func handleLikeActivity(body []byte, username string) error {
 	log.Printf("Inbox: Processing Like activity for %s", username)
 	// TODO: Store like in likes table
+	return nil
+}
+
+// handleAcceptActivity processes an Accept activity (response to Follow)
+func handleAcceptActivity(body []byte, username string) error {
+	var accept struct {
+		Type   string          `json:"type"`
+		Actor  string          `json:"actor"`
+		Object json.RawMessage `json:"object"`
+	}
+
+	if err := json.Unmarshal(body, &accept); err != nil {
+		return fmt.Errorf("failed to parse Accept activity: %w", err)
+	}
+
+	// Parse the embedded Follow object to get the follow ID
+	var followObj struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(accept.Object, &followObj); err != nil {
+		return fmt.Errorf("failed to parse Accept object: %w", err)
+	}
+
+	// Update the follow to accepted=true
+	database := db.GetDB()
+	if err := database.AcceptFollowByURI(followObj.ID); err != nil {
+		return fmt.Errorf("failed to accept follow: %w", err)
+	}
+
+	log.Printf("Inbox: Follow %s was accepted by %s", followObj.ID, accept.Actor)
 	return nil
 }

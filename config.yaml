@@ -2,5 +2,12 @@ conf:
   host: 127.0.0.1 # local server ip
   sshPort: 23232 # ssh login port
   httpPort: 9999 # local http port
-  sslDomain: example.com  # your hosted ssl domain
+  sslDomain: example.com  # your hosted ssl domain (use ngrok domain for local testing)
   withAp: false # activitypub (experimental!)
+
+# For local federation testing:
+# 1. Run: ./test-federation.sh
+# 2. Or manually:
+#    - Start ngrok: ngrok http 9999
+#    - Run with: STEGODON_WITH_AP=true STEGODON_SSLDOMAIN=your-ngrok-domain.ngrok-free.app ./stegodon
+# See TESTING.md for complete instructions

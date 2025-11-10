@@ -1,133 +1,157 @@
 package listnotes
 
 import (
-	"github.com/charmbracelet/bubbles/paginator"
+	"fmt"
+	"strings"
+	"time"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/deemkeen/stegodon/db"
+	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
-	"github.com/deemkeen/stegodon/util"
 	"github.com/google/uuid"
 	"log"
-	"strings"
-	"time"
+)
+
+var (
+	timeStyle = lipgloss.NewStyle().
+			Align(lipgloss.Left).
+			Foreground(lipgloss.Color(common.COLOR_PURPLE))
+
+	authorStyle = lipgloss.NewStyle().
+			Align(lipgloss.Left).
+			Foreground(lipgloss.Color(common.COLOR_LIGHTBLUE)).
+			Bold(true)
+
+	contentStyle = lipgloss.NewStyle().
+			Align(lipgloss.Left)
+
+	emptyStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241")).
+			Italic(true)
 )
 
 type Model struct {
-	items     []string
-	paginator paginator.Model
-	width     int
-	height    int
+	Notes  []domain.Note
+	Offset int
+	width  int
+	height int
+	userId uuid.UUID
 }
 
 func (m Model) Init() tea.Cmd {
-	return nil
+	return loadNotes(m.userId)
 }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
-	var cmd tea.Cmd
-	var cmds []tea.Cmd
 	switch msg := msg.(type) {
+	case notesLoadedMsg:
+		m.Notes = msg.notes
+		m.Offset = 0
+		return m, nil
+
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c":
-			return m, tea.Quit
+		case "up", "k", "left":
+			if m.Offset > 0 {
+				m.Offset--
+			}
+		case "down", "j", "right":
+			if len(m.Notes) > 0 && m.Offset < len(m.Notes)-1 {
+				m.Offset++
+			}
 		}
 	}
-
-	m.paginator, cmd = m.paginator.Update(msg)
-	cmds = append(cmds, cmd)
-
-	return m, tea.Batch(cmds...)
+	return m, nil
 }
 
 func (m Model) View() string {
-	var b strings.Builder
+	var s strings.Builder
 
-	b.WriteString(lipgloss.NewStyle().
-		Foreground(lipgloss.Color(common.COLOR_MAGENTA)).
-		PaddingBottom(1).Render("notes list"))
+	s.WriteString(common.CaptionStyle.Render(fmt.Sprintf("notes list (%d notes)", len(m.Notes))))
+	s.WriteString("\n\n")
 
-	start, end := m.paginator.GetSliceBounds(len(m.items))
-	for _, item := range m.items[start:end] {
-		b.WriteString(item + "\n\n")
+	if len(m.Notes) == 0 {
+		s.WriteString(emptyStyle.Render("No notes yet.\nCreate your first note!"))
+	} else {
+		itemsPerPage := 10
+		start := m.Offset
+		end := start + itemsPerPage
+		if end > len(m.Notes) {
+			end = len(m.Notes)
+		}
+
+		for i := start; i < end; i++ {
+			note := m.Notes[i]
+
+			// Render in vertical layout like timeline
+			timeStr := timeStyle.Render(formatTime(note.CreatedAt))
+			authorStr := authorStyle.Render("@" + note.CreatedBy)
+			contentStr := contentStyle.Render(truncate(note.Message, 150))
+
+			noteContent := lipgloss.JoinVertical(lipgloss.Left, timeStr, authorStr, contentStr)
+			s.WriteString(noteContent)
+			s.WriteString("\n\n")
+		}
 	}
-	if m.paginator.TotalPages > 1 {
-		pages := lipgloss.NewStyle().
-			Foreground(lipgloss.Color(common.COLOR_MAGENTA)).Align(lipgloss.Bottom).
-			Render("\n\npages:  " + m.paginator.View() + "\n\n")
-		b.WriteString(pages)
-	}
 
-	return lipgloss.NewStyle().
-		Height(common.DefaultListHeight(m.height)).
-		Width(common.DefaultListWidth(m.width)).Margin(1).
-		SetString(b.String()).String()
-
+	return s.String()
 }
 
-type item struct {
-	createdBy string
-	message   string
-	createdAt time.Time
+// notesLoadedMsg is sent when notes are loaded
+type notesLoadedMsg struct {
+	notes []domain.Note
 }
 
-func LoadItems(userId uuid.UUID) []item {
+// loadNotes loads notes for the given user
+func loadNotes(userId uuid.UUID) tea.Cmd {
+	return func() tea.Msg {
+		database := db.GetDB()
+		err, notes := database.ReadNotesByUserId(userId)
+		if err != nil {
+			log.Printf("Failed to load notes: %v", err)
+			return notesLoadedMsg{notes: []domain.Note{}}
+		}
 
-	var items []item
-	err, notes := db.GetDB().ReadNotesByUserId(userId)
-	if err != nil {
-		log.Println("Could not get notes!", err)
-		return nil
+		if notes == nil {
+			return notesLoadedMsg{notes: []domain.Note{}}
+		}
+
+		return notesLoadedMsg{notes: *notes}
 	}
-
-	for _, note := range *notes {
-		it := item{note.CreatedBy, note.Message, note.CreatedAt}
-		items = append(items, it)
-	}
-
-	return items
 }
 
-func renderNote(item item, width int) string {
-	created := lipgloss.NewStyle().
-		Align(lipgloss.Left).
-		Foreground(lipgloss.Color(common.COLOR_PURPLE)).
-		PaddingTop(2).
-		PaddingBottom(1).
-		MaxWidth(100).
-		Width(width).
-		SetString(item.createdAt.Format(util.DateTimeFormat()))
-	message := lipgloss.NewStyle().
-		Align(lipgloss.Left).
-		MaxWidth(150).
-		Width(75).
-		SetString(item.message)
-	return lipgloss.JoinVertical(lipgloss.Left, created.String(), message.String())
+func formatTime(t time.Time) string {
+	duration := time.Since(t)
+
+	if duration < time.Minute {
+		return "just now"
+	} else if duration < time.Hour {
+		mins := int(duration.Minutes())
+		return fmt.Sprintf("%dm ago", mins)
+	} else if duration < 24*time.Hour {
+		hours := int(duration.Hours())
+		return fmt.Sprintf("%dh ago", hours)
+	} else {
+		days := int(duration.Hours() / 24)
+		return fmt.Sprintf("%dd ago", days)
+	}
+}
+
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-3] + "..."
 }
 
 func NewPager(userId uuid.UUID, width int, height int) Model {
-
-	width = common.DefaultListWidth(width)
-	height = common.DefaultWindowHeight(height)
-
-	loadedItems := LoadItems(userId)
-	var styledItems []string
-
-	for _, item := range loadedItems {
-		var styledItem = renderNote(item, width)
-		styledItems = append(styledItems, styledItem)
-	}
-
-	p := paginator.New()
-	p.Type = paginator.Arabic
-	p.PerPage = 4
-	p.SetTotalPages(len(loadedItems))
-
 	return Model{
-		paginator: p,
-		items:     styledItems,
-		width:     width,
-		height:    height,
+		Notes:  []domain.Note{},
+		Offset: 0,
+		width:  width,
+		height: height,
+		userId: userId,
 	}
 }

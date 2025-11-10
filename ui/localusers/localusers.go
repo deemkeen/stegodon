@@ -3,6 +3,7 @@ package localusers
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -70,6 +71,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.Following = msg.following
 		return m, nil
 
+	case clearStatusMsg:
+		m.Status = ""
+		m.Error = ""
+		return m, nil
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "up", "k":
@@ -88,7 +94,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				if selectedUser.Id == m.AccountId {
 					m.Error = "You can't follow yourself!"
 					m.Status = ""
-					return m, nil
+					return m, clearStatusAfter(2 * time.Second)
 				}
 
 				// Toggle follow/unfollow
@@ -119,6 +125,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 					m.Status = fmt.Sprintf("Following @%s", selectedUser.Username)
 				}
 				m.Error = ""
+				return m, clearStatusAfter(2 * time.Second)
 			}
 		}
 	}
@@ -168,8 +175,6 @@ func (m Model) View() string {
 		s.WriteString("\n\n")
 	}
 
-	s.WriteString(common.HelpStyle.Render("↑/↓ or j/k: select • enter/f: follow/unfollow • tab: switch view • shift+tab: prev view"))
-
 	return s.String()
 }
 
@@ -177,6 +182,16 @@ func (m Model) View() string {
 type usersLoadedMsg struct {
 	users     []domain.Account
 	following map[uuid.UUID]bool
+}
+
+// clearStatusMsg is sent after a delay to clear status/error messages
+type clearStatusMsg struct{}
+
+// clearStatusAfter returns a command that sends clearStatusMsg after a duration
+func clearStatusAfter(d time.Duration) tea.Cmd {
+	return tea.Tick(d, func(t time.Time) tea.Msg {
+		return clearStatusMsg{}
+	})
 }
 
 // loadLocalUsers loads all local users and checks which ones are being followed

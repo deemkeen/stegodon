@@ -3,6 +3,7 @@ package timeline
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -14,22 +15,17 @@ import (
 )
 
 var (
-	postStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("240")).
-			Padding(0, 1).
-			MarginBottom(1)
+	timeStyle = lipgloss.NewStyle().
+			Align(lipgloss.Left).
+			Foreground(lipgloss.Color(common.COLOR_PURPLE))
 
 	authorStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("86")).
+			Align(lipgloss.Left).
+			Foreground(lipgloss.Color(common.COLOR_LIGHTBLUE)).
 			Bold(true)
 
 	contentStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("252"))
-
-	timeStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241")).
-			Faint(true)
+			Align(lipgloss.Left)
 
 	emptyStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241")).
@@ -38,6 +34,7 @@ var (
 
 type Model struct {
 	Posts  []FederatedPost
+	Offset int // Pagination offset
 	Width  int
 	Height int
 }
@@ -51,6 +48,7 @@ type FederatedPost struct {
 func InitialModel(width, height int) Model {
 	return Model{
 		Posts:  []FederatedPost{},
+		Offset: 0,
 		Width:  width,
 		Height: height,
 	}
@@ -64,7 +62,21 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case postsLoadedMsg:
 		m.Posts = msg.posts
+		m.Offset = 0 // Reset offset on reload
 		return m, nil
+
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "up", "k", "left":
+			if m.Offset > 0 {
+				m.Offset--
+			}
+		case "down", "j", "right":
+			// Allow scrolling if we have any posts at all
+			if len(m.Posts) > 0 && m.Offset < len(m.Posts)-1 {
+				m.Offset++
+			}
+		}
 	}
 	return m, nil
 }
@@ -78,28 +90,26 @@ func (m Model) View() string {
 	if len(m.Posts) == 0 {
 		s.WriteString(emptyStyle.Render("No federated posts yet.\nFollow some accounts to see their posts here!"))
 	} else {
-		displayCount := min(len(m.Posts), 5) // Show max 5 posts
-		for i := 0; i < displayCount; i++ {
+		itemsPerPage := 5
+		start := m.Offset
+		end := start + itemsPerPage
+		if end > len(m.Posts) {
+			end = len(m.Posts)
+		}
+
+		for i := start; i < end; i++ {
 			post := m.Posts[i]
 
-			postContent := fmt.Sprintf("%s\n%s\n%s",
-				authorStyle.Render(post.Actor),
-				contentStyle.Render(truncate(post.Content, 80)),
-				timeStyle.Render(formatTime(post.Time)),
-			)
+			// Render in vertical layout like notes list
+			timeStr := timeStyle.Render(formatTime(post.Time))
+			authorStr := authorStyle.Render(post.Actor)
+			contentStr := contentStyle.Render(truncate(post.Content, 150))
 
-			s.WriteString(postStyle.Render(postContent))
-			s.WriteString("\n")
-		}
-
-		if len(m.Posts) > 5 {
-			s.WriteString(emptyStyle.Render(fmt.Sprintf("... and %d more posts", len(m.Posts)-5)))
-			s.WriteString("\n")
+			postContent := lipgloss.JoinVertical(lipgloss.Left, timeStr, authorStr, contentStr)
+			s.WriteString(postContent)
+			s.WriteString("\n\n")
 		}
 	}
-
-	s.WriteString("\n")
-	s.WriteString(common.HelpStyle.Render("tab: switch view • shift+tab: prev view • ctrl-c: exit"))
 
 	return s.String()
 }
@@ -138,15 +148,39 @@ func loadFederatedPosts() tea.Cmd {
 				continue
 			}
 
+			// Strip HTML tags from content
+			cleanContent := stripHTMLTags(create.Object.Content)
+
 			posts = append(posts, FederatedPost{
 				Actor:   activity.ActorURI,
-				Content: create.Object.Content,
+				Content: cleanContent,
 				Time:    activity.CreatedAt,
 			})
 		}
 
 		return postsLoadedMsg{posts: posts}
 	}
+}
+
+var htmlTagRegex = regexp.MustCompile(`<[^>]*>`)
+
+// stripHTMLTags removes HTML tags from a string and converts common HTML entities
+func stripHTMLTags(html string) string {
+	// Remove all HTML tags
+	text := htmlTagRegex.ReplaceAllString(html, "")
+
+	// Convert common HTML entities
+	text = strings.ReplaceAll(text, "&lt;", "<")
+	text = strings.ReplaceAll(text, "&gt;", ">")
+	text = strings.ReplaceAll(text, "&amp;", "&")
+	text = strings.ReplaceAll(text, "&quot;", "\"")
+	text = strings.ReplaceAll(text, "&#39;", "'")
+	text = strings.ReplaceAll(text, "&nbsp;", " ")
+
+	// Clean up extra whitespace
+	text = strings.TrimSpace(text)
+
+	return text
 }
 
 func min(a, b int) int {

@@ -9,6 +9,7 @@ import (
 	"github.com/deemkeen/stegodon/ui/common"
 	"github.com/deemkeen/stegodon/ui/createuser"
 	"github.com/deemkeen/stegodon/ui/followers"
+	"github.com/deemkeen/stegodon/ui/following"
 	"github.com/deemkeen/stegodon/ui/followuser"
 	"github.com/deemkeen/stegodon/ui/header"
 	"github.com/deemkeen/stegodon/ui/listnotes"
@@ -40,6 +41,7 @@ type MainModel struct {
 	listModel          listnotes.Model
 	followModel        followuser.Model
 	followersModel     followers.Model
+	followingModel     following.Model
 	timelineModel      timeline.Model
 	localTimelineModel localtimeline.Model
 	localUsersModel    localusers.Model
@@ -66,6 +68,7 @@ func NewModel(acc domain.Account, width int, height int) MainModel {
 	listModel := listnotes.NewPager(acc.Id, width, height)
 	followModel := followuser.InitialModel(acc.Id)
 	followersModel := followers.InitialModel(acc.Id, width, height)
+	followingModel := following.InitialModel(acc.Id, width, height)
 	timelineModel := timeline.InitialModel(width, height)
 	localTimelineModel := localtimeline.InitialModel(width, height)
 	localUsersModel := localusers.InitialModel(acc.Id, width, height)
@@ -76,6 +79,7 @@ func NewModel(acc domain.Account, width int, height int) MainModel {
 	m.listModel = listModel
 	m.followModel = followModel
 	m.followersModel = followersModel
+	m.followingModel = followingModel
 	m.timelineModel = timelineModel
 	m.localTimelineModel = localTimelineModel
 	m.localUsersModel = localUsersModel
@@ -87,15 +91,22 @@ func NewModel(acc domain.Account, width int, height int) MainModel {
 }
 
 func (m MainModel) Init() tea.Cmd {
+	var cmds []tea.Cmd
+
+	// Load notes list on startup
+	cmds = append(cmds, m.listModel.Init())
+
 	if m.account.FirstTimeLogin == domain.TRUE {
-		return func() tea.Msg {
+		cmds = append(cmds, func() tea.Msg {
 			return common.CreateUserView
-		}
+		})
+	} else {
+		cmds = append(cmds, func() tea.Msg {
+			return common.CreateNoteView
+		})
 	}
 
-	return func() tea.Msg {
-		return common.CreateNoteView
-	}
+	return tea.Batch(cmds...)
 }
 
 func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -122,6 +133,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = common.FollowUserView
 		case common.FollowersView:
 			m.state = common.FollowersView
+		case common.FollowingView:
+			m.state = common.FollowingView
 		case common.FederatedTimelineView:
 			m.state = common.FederatedTimelineView
 		case common.LocalTimelineView:
@@ -130,6 +143,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = common.LocalUsersView
 		case common.UpdateNoteList:
 			m.listModel = listnotes.NewPager(m.account.Id, m.width, m.height)
+			// Reload the notes after creating a new pager
+			return m, m.listModel.Init()
 		}
 
 	case tea.KeyMsg:
@@ -141,42 +156,58 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.state == common.CreateUserView {
 				return m, nil
 			}
+			oldState := m.state
 			switch m.state {
 			case common.CreateNoteView:
 				m.state = common.ListNotesView
 			case common.ListNotesView:
-				m.state = common.FollowUserView
-			case common.FollowUserView:
-				m.state = common.FollowersView
-			case common.FollowersView:
 				m.state = common.FederatedTimelineView
 			case common.FederatedTimelineView:
 				m.state = common.LocalTimelineView
 			case common.LocalTimelineView:
+				m.state = common.FollowUserView
+			case common.FollowUserView:
+				m.state = common.FollowersView
+			case common.FollowersView:
+				m.state = common.FollowingView
+			case common.FollowingView:
 				m.state = common.LocalUsersView
 			case common.LocalUsersView:
 				m.state = common.CreateNoteView
+			}
+			// Reload data when switching to certain views
+			if oldState != m.state {
+				cmd = getViewInitCmd(m.state, &m)
+				cmds = append(cmds, cmd)
 			}
 		case "shift+tab":
 			// Cycle backwards through views
 			if m.state == common.CreateUserView {
 				return m, nil
 			}
+			oldState := m.state
 			switch m.state {
 			case common.CreateNoteView:
 				m.state = common.LocalUsersView
 			case common.ListNotesView:
 				m.state = common.CreateNoteView
-			case common.FollowUserView:
-				m.state = common.ListNotesView
-			case common.FollowersView:
-				m.state = common.FollowUserView
 			case common.FederatedTimelineView:
-				m.state = common.FollowersView
+				m.state = common.ListNotesView
 			case common.LocalTimelineView:
 				m.state = common.FederatedTimelineView
-			case common.LocalUsersView:
+			case common.FollowUserView:
 				m.state = common.LocalTimelineView
+			case common.FollowersView:
+				m.state = common.FollowUserView
+			case common.FollowingView:
+				m.state = common.FollowersView
+			case common.LocalUsersView:
+				m.state = common.FollowingView
+			}
+			// Reload data when switching to certain views
+			if oldState != m.state {
+				cmd = getViewInitCmd(m.state, &m)
+				cmds = append(cmds, cmd)
 			}
 		case "enter":
 			if m.state == common.CreateUserView {
@@ -186,37 +217,55 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, updateUserModelCmd(&m.account)
 			}
 		}
+	}
 
-		// Route to appropriate sub-model
+	// Route non-keyboard messages to ALL sub-models
+	// This ensures data loading messages like followersLoadedMsg reach their destination
+	// But keyboard messages should only go to the active view
+	if _, isKeyMsg := msg.(tea.KeyMsg); !isKeyMsg {
+		m.headerModel, _ = m.headerModel.Update(msg)
+		m.followModel, cmd = m.followModel.Update(msg)
+		cmds = append(cmds, cmd)
+		m.followersModel, cmd = m.followersModel.Update(msg)
+		cmds = append(cmds, cmd)
+		m.followingModel, cmd = m.followingModel.Update(msg)
+		cmds = append(cmds, cmd)
+		m.timelineModel, cmd = m.timelineModel.Update(msg)
+		cmds = append(cmds, cmd)
+		m.localTimelineModel, cmd = m.localTimelineModel.Update(msg)
+		cmds = append(cmds, cmd)
+		m.localUsersModel, cmd = m.localUsersModel.Update(msg)
+		cmds = append(cmds, cmd)
+		m.listModel, cmd = m.listModel.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+
+	// Route keyboard input ONLY to active model
+	if _, ok := msg.(tea.KeyMsg); ok {
 		switch m.state {
 		case common.CreateUserView:
 			m.newUserModel, cmd = m.newUserModel.Update(msg)
-		case common.ListNotesView:
-			m.headerModel, cmd = m.headerModel.Update(msg)
-			m.listModel, cmd = m.listModel.Update(msg)
 		case common.CreateNoteView:
-			m.headerModel, cmd = m.headerModel.Update(msg)
 			m.createModel, cmd = m.createModel.Update(msg)
+		case common.ListNotesView:
+			m.listModel, cmd = m.listModel.Update(msg)
 		case common.FollowUserView:
-			m.headerModel, cmd = m.headerModel.Update(msg)
 			m.followModel, cmd = m.followModel.Update(msg)
 		case common.FollowersView:
-			m.headerModel, cmd = m.headerModel.Update(msg)
 			m.followersModel, cmd = m.followersModel.Update(msg)
+		case common.FollowingView:
+			m.followingModel, cmd = m.followingModel.Update(msg)
 		case common.FederatedTimelineView:
-			m.headerModel, cmd = m.headerModel.Update(msg)
 			m.timelineModel, cmd = m.timelineModel.Update(msg)
 		case common.LocalTimelineView:
-			m.headerModel, cmd = m.headerModel.Update(msg)
 			m.localTimelineModel, cmd = m.localTimelineModel.Update(msg)
 		case common.LocalUsersView:
-			m.headerModel, cmd = m.headerModel.Update(msg)
 			m.localUsersModel, cmd = m.localUsersModel.Update(msg)
 		}
 		cmds = append(cmds, cmd)
-		return m, tea.Batch(cmds...)
 	}
-	return m, nil
+
+	return m, tea.Batch(cmds...)
 }
 
 func (m MainModel) View() string {
@@ -260,6 +309,14 @@ func (m MainModel) View() string {
 		MaxWidth(rightPanelWidth).
 		Margin(1).
 		Render(m.followersModel.View())
+
+	followingStyleStr := lipgloss.NewStyle().
+		MaxHeight(availableHeight).
+		Height(availableHeight).
+		Width(rightPanelWidth).
+		MaxWidth(rightPanelWidth).
+		Margin(1).
+		Render(m.followingModel.View())
 
 	timelineStyleStr := lipgloss.NewStyle().
 		MaxHeight(availableHeight).
@@ -310,6 +367,10 @@ func (m MainModel) View() string {
 			s += lipgloss.JoinHorizontal(lipgloss.Top,
 				modelStyle.Render(createStyleStr),
 				focusedModelStyle.Render(followersStyleStr))
+		case common.FollowingView:
+			s += lipgloss.JoinHorizontal(lipgloss.Top,
+				modelStyle.Render(createStyleStr),
+				focusedModelStyle.Render(followingStyleStr))
 		case common.FederatedTimelineView:
 			s += lipgloss.JoinHorizontal(lipgloss.Top,
 				modelStyle.Render(createStyleStr),
@@ -331,6 +392,14 @@ func (m MainModel) View() string {
 			viewCommands = "arrows: scroll"
 		case common.FollowUserView:
 			viewCommands = "enter: follow"
+		case common.FollowersView:
+			viewCommands = "↑/↓: scroll"
+		case common.FollowingView:
+			viewCommands = "↑/↓: select • u/enter: unfollow"
+		case common.FederatedTimelineView:
+			viewCommands = "↑/↓: scroll"
+		case common.LocalTimelineView:
+			viewCommands = "↑/↓: scroll"
 		case common.LocalUsersView:
 			viewCommands = "↑/↓: select • enter: toggle follow"
 		default:
@@ -354,6 +423,8 @@ func (m MainModel) currentFocusedModel() string {
 		return "follow user"
 	case common.FollowersView:
 		return "followers"
+	case common.FollowingView:
+		return "following"
 	case common.FederatedTimelineView:
 		return "federated timeline"
 	case common.LocalTimelineView:
@@ -362,5 +433,25 @@ func (m MainModel) currentFocusedModel() string {
 		return "local users"
 	default:
 		return "create user"
+	}
+}
+
+// getViewInitCmd returns the init command for a view to reload its data
+func getViewInitCmd(state common.SessionState, m *MainModel) tea.Cmd {
+	switch state {
+	case common.FollowersView:
+		return m.followersModel.Init()
+	case common.FollowingView:
+		return m.followingModel.Init()
+	case common.FederatedTimelineView:
+		return m.timelineModel.Init()
+	case common.LocalTimelineView:
+		return m.localTimelineModel.Init()
+	case common.LocalUsersView:
+		return m.localUsersModel.Init()
+	case common.ListNotesView:
+		return m.listModel.Init()
+	default:
+		return nil
 	}
 }

@@ -26,6 +26,7 @@ var (
 type Model struct {
 	AccountId uuid.UUID
 	Followers []domain.Follow
+	Offset    int // Pagination offset
 	Width     int
 	Height    int
 }
@@ -34,6 +35,7 @@ func InitialModel(accountId uuid.UUID, width, height int) Model {
 	return Model{
 		AccountId: accountId,
 		Followers: []domain.Follow{},
+		Offset:    0,
 		Width:     width,
 		Height:    height,
 	}
@@ -47,7 +49,21 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case followersLoadedMsg:
 		m.Followers = msg.followers
+		m.Offset = 0 // Reset offset on reload
 		return m, nil
+
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "up", "k", "left":
+			if m.Offset > 0 {
+				m.Offset--
+			}
+		case "down", "j", "right":
+			// Allow scrolling if we have any followers at all
+			if len(m.Followers) > 0 && m.Offset < len(m.Followers)-1 {
+				m.Offset++
+			}
+		}
 	}
 	return m, nil
 }
@@ -61,15 +77,19 @@ func (m Model) View() string {
 	if len(m.Followers) == 0 {
 		s.WriteString(emptyStyle.Render("No followers yet. Share your account to get followers!"))
 	} else {
-		for i, follow := range m.Followers {
-			if i >= 10 { // Limit display to 10 for now
-				s.WriteString(itemStyle.Render(fmt.Sprintf("... and %d more", len(m.Followers)-10)))
-				break
-			}
+		itemsPerPage := 10
+		start := m.Offset
+		end := start + itemsPerPage
+		if end > len(m.Followers) {
+			end = len(m.Followers)
+		}
+
+		for i := start; i < end; i++ {
+			follow := m.Followers[i]
 
 			// Get remote account details
 			database := db.GetDB()
-			err, remoteAcc := database.ReadRemoteAccountById(follow.TargetAccountId)
+			err, remoteAcc := database.ReadRemoteAccountById(follow.AccountId)
 			if err != nil {
 				log.Printf("Failed to read remote account: %v", err)
 				continue
@@ -89,9 +109,6 @@ func (m Model) View() string {
 			s.WriteString("\n")
 		}
 	}
-
-	s.WriteString("\n")
-	s.WriteString(common.HelpStyle.Render("tab: switch view • shift+tab: prev view • ctrl-c: exit"))
 
 	return s.String()
 }

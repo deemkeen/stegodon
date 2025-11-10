@@ -69,9 +69,9 @@ func getIRI(domain string, username string, action action) string {
 	prefix := fmt.Sprintf("https://%s/users/%s", domain, username)
 	switch action {
 	case inbox:
-		return fmt.Sprintf("/%s/inbox", prefix)
+		return fmt.Sprintf("%s/inbox", prefix)
 	case outbox:
-		return fmt.Sprintf("/%s/outbox", prefix)
+		return fmt.Sprintf("%s/outbox", prefix)
 	case followers:
 		return fmt.Sprintf("%s/followers", prefix)
 	case following:

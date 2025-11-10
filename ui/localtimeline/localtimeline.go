@@ -14,22 +14,17 @@ import (
 )
 
 var (
-	postStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("240")).
-			Padding(0, 1).
-			MarginBottom(1)
+	timeStyle = lipgloss.NewStyle().
+			Align(lipgloss.Left).
+			Foreground(lipgloss.Color(common.COLOR_PURPLE))
 
 	authorStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("86")).
+			Align(lipgloss.Left).
+			Foreground(lipgloss.Color(common.COLOR_LIGHTBLUE)).
 			Bold(true)
 
 	contentStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("252"))
-
-	timeStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241")).
-			Faint(true)
+			Align(lipgloss.Left)
 
 	emptyStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241")).
@@ -38,6 +33,7 @@ var (
 
 type Model struct {
 	Posts  []domain.Note
+	Offset int // Pagination offset
 	Width  int
 	Height int
 }
@@ -45,6 +41,7 @@ type Model struct {
 func InitialModel(width, height int) Model {
 	return Model{
 		Posts:  []domain.Note{},
+		Offset: 0,
 		Width:  width,
 		Height: height,
 	}
@@ -58,7 +55,21 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case postsLoadedMsg:
 		m.Posts = msg.posts
+		m.Offset = 0 // Reset offset on reload
 		return m, nil
+
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "up", "k", "left":
+			if m.Offset > 0 {
+				m.Offset--
+			}
+		case "down", "j", "right":
+			// Allow scrolling if we have any posts at all
+			if len(m.Posts) > 0 && m.Offset < len(m.Posts)-1 {
+				m.Offset++
+			}
+		}
 	}
 	return m, nil
 }
@@ -72,28 +83,26 @@ func (m Model) View() string {
 	if len(m.Posts) == 0 {
 		s.WriteString(emptyStyle.Render("No local posts yet.\nCreate some notes or invite others to join!"))
 	} else {
-		displayCount := min(len(m.Posts), 10) // Show max 10 posts
-		for i := 0; i < displayCount; i++ {
+		itemsPerPage := 10
+		start := m.Offset
+		end := start + itemsPerPage
+		if end > len(m.Posts) {
+			end = len(m.Posts)
+		}
+
+		for i := start; i < end; i++ {
 			post := m.Posts[i]
 
-			postContent := fmt.Sprintf("%s\n%s\n%s",
-				authorStyle.Render("@"+post.CreatedBy),
-				contentStyle.Render(truncate(post.Message, 80)),
-				timeStyle.Render(formatTime(post.CreatedAt)),
-			)
+			// Render in vertical layout like notes list
+			timeStr := timeStyle.Render(formatTime(post.CreatedAt))
+			authorStr := authorStyle.Render("@" + post.CreatedBy)
+			contentStr := contentStyle.Render(truncate(post.Message, 150))
 
-			s.WriteString(postStyle.Render(postContent))
-			s.WriteString("\n")
-		}
-
-		if len(m.Posts) > 10 {
-			s.WriteString(emptyStyle.Render(fmt.Sprintf("... and %d more posts", len(m.Posts)-10)))
-			s.WriteString("\n")
+			postContent := lipgloss.JoinVertical(lipgloss.Left, timeStr, authorStr, contentStr)
+			s.WriteString(postContent)
+			s.WriteString("\n\n")
 		}
 	}
-
-	s.WriteString("\n")
-	s.WriteString(common.HelpStyle.Render("tab: switch view • shift+tab: prev view • ctrl-c: exit"))
 
 	return s.String()
 }

@@ -1,7 +1,10 @@
 package web
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"github.com/deemkeen/stegodon/activitypub"
 	"github.com/deemkeen/stegodon/util"
 	"github.com/gin-contrib/gzip"
@@ -71,9 +74,56 @@ func Router(conf *util.AppConfig) error {
 		})
 
 		g.POST("/inbox", func(c *gin.Context) {
-			log.Println("Posted to shared inbox..")
-			c.Header("Content-Type", "application/activity+json; charset=utf-8")
-			c.Render(200, render.String{Format: ""})
+			log.Println("POST /inbox (shared inbox)")
+			// Shared inbox - extract target username from activity object
+			body, err := c.GetRawData()
+			if err != nil {
+				log.Printf("Shared inbox: Failed to read body: %v", err)
+				c.Status(400)
+				return
+			}
+
+			// Parse to get target actor
+			var activity map[string]interface{}
+			if err := json.Unmarshal(body, &activity); err != nil {
+				log.Printf("Shared inbox: Failed to parse activity: %v", err)
+				c.Status(400)
+				return
+			}
+
+			// Extract username from object (for Create) or object field (for others)
+			var targetUsername string
+			if _, ok := activity["object"].(map[string]interface{}); ok {
+				// For Create activities, object might have "to" or "cc" fields
+				// Try to extract from the first "to" address
+				if toArray, ok := activity["to"].([]interface{}); ok && len(toArray) > 0 {
+					if toStr, ok := toArray[0].(string); ok {
+						// Extract username from "https://domain/users/username"
+						parts := strings.Split(toStr, "/")
+						if len(parts) > 0 {
+							targetUsername = parts[len(parts)-1]
+						}
+					}
+				}
+			} else if objStr, ok := activity["object"].(string); ok {
+				// For Follow/Accept/etc, object is actor URI
+				parts := strings.Split(objStr, "/")
+				if len(parts) > 0 {
+					targetUsername = parts[len(parts)-1]
+				}
+			}
+
+			if targetUsername == "" {
+				log.Printf("Shared inbox: Could not determine target username from activity: %v", activity)
+				c.Status(202) // Accept anyway to be nice
+				return
+			}
+
+			log.Printf("Shared inbox: Routing to user %s", targetUsername)
+			// Create a new request with the body
+			req := c.Request.Clone(c.Request.Context())
+			req.Body = io.NopCloser(bytes.NewReader(body))
+			activitypub.HandleInbox(c.Writer, req, targetUsername, conf)
 		})
 
 		g.POST("/users/:actor/inbox", func(c *gin.Context) {

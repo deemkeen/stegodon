@@ -544,6 +544,13 @@ func (db *DB) DeleteFollowByURI(uri string) error {
 	})
 }
 
+func (db *DB) AcceptFollowByURI(uri string) error {
+	return db.wrapTransaction(func(tx *sql.Tx) error {
+		_, err := tx.Exec("UPDATE follows SET accepted = 1 WHERE uri = ?", uri)
+		return err
+	})
+}
+
 // Activity queries
 const (
 	sqlInsertActivity = `INSERT INTO activities(id, activity_uri, activity_type, actor_uri, object_uri, raw_json, processed, local, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -693,7 +700,8 @@ func (db *DB) DeleteDelivery(id uuid.UUID) error {
 
 // Follower queries
 const (
-	sqlSelectFollowersByAccountId = `SELECT id, account_id, target_account_id, uri, accepted, created_at FROM follows WHERE account_id = ? AND accepted = 1`
+	sqlSelectFollowersByAccountId  = `SELECT id, account_id, target_account_id, uri, accepted, created_at FROM follows WHERE target_account_id = ? AND accepted = 1`
+	sqlSelectFollowingByAccountId = `SELECT id, account_id, target_account_id, uri, accepted, created_at FROM follows WHERE account_id = ? AND accepted = 1`
 )
 
 func (db *DB) ReadFollowersByAccountId(accountId uuid.UUID) (error, *[]domain.Follow) {
@@ -719,6 +727,32 @@ func (db *DB) ReadFollowersByAccountId(accountId uuid.UUID) (error, *[]domain.Fo
 		return err, &followers
 	}
 	return nil, &followers
+}
+
+// ReadFollowingByAccountId returns all accounts that the given account is following (remote accounts)
+func (db *DB) ReadFollowingByAccountId(accountId uuid.UUID) (error, *[]domain.Follow) {
+	rows, err := db.db.Query(sqlSelectFollowingByAccountId, accountId.String())
+	if err != nil {
+		return err, nil
+	}
+	defer rows.Close()
+
+	var following []domain.Follow
+	for rows.Next() {
+		var follow domain.Follow
+		var idStr, accountIdStr, targetIdStr string
+		if err := rows.Scan(&idStr, &accountIdStr, &targetIdStr, &follow.URI, &follow.Accepted, &follow.CreatedAt); err != nil {
+			return err, &following
+		}
+		follow.Id, _ = uuid.Parse(idStr)
+		follow.AccountId, _ = uuid.Parse(accountIdStr)
+		follow.TargetAccountId, _ = uuid.Parse(targetIdStr)
+		following = append(following, follow)
+	}
+	if err = rows.Err(); err != nil {
+		return err, &following
+	}
+	return nil, &following
 }
 
 // ReadAllAccounts returns all local user accounts (excluding first-time login users)
