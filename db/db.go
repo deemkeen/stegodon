@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/charmbracelet/ssh"
@@ -176,6 +177,22 @@ func (db *DB) ReadAccByUsername(username string) (error, *domain.Account) {
 	return err, &tempAcc
 }
 
+// parseTimestamp parses a timestamp string from SQLite, handling both ISO 8601 and space-separated formats
+// SQLite driver returns timestamps with Z suffix even though they're stored in local time
+func parseTimestamp(timestampStr string) (time.Time, error) {
+	if timestampStr == "" {
+		return time.Time{}, fmt.Errorf("empty timestamp")
+	}
+
+	// Remove Z suffix and convert T to space for ISO 8601 format
+	if strings.HasSuffix(timestampStr, "Z") {
+		timestampStr = strings.TrimSuffix(timestampStr, "Z")
+		timestampStr = strings.Replace(timestampStr, "T", " ", 1)
+	}
+
+	return time.ParseInLocation("2006-01-02 15:04:05", timestampStr, time.Local)
+}
+
 func (db *DB) ReadNotesByUserId(userId uuid.UUID) (error, *[]domain.Note) {
 	rows, err := db.db.Query(sqlSelectNotesByUserId, userId)
 	if err != nil {
@@ -187,9 +204,15 @@ func (db *DB) ReadNotesByUserId(userId uuid.UUID) (error, *[]domain.Note) {
 
 	for rows.Next() {
 		var note domain.Note
-		if err := rows.Scan(&note.Id, &note.CreatedBy, &note.Message, &note.CreatedAt); err != nil {
+		var createdAtStr string
+		if err := rows.Scan(&note.Id, &note.CreatedBy, &note.Message, &createdAtStr); err != nil {
 			return err, &notes
 		}
+
+		if parsedTime, err := parseTimestamp(createdAtStr); err == nil {
+			note.CreatedAt = parsedTime
+		}
+
 		notes = append(notes, note)
 	}
 	if err = rows.Err(); err != nil {
@@ -210,9 +233,15 @@ func (db *DB) ReadNotesByUsername(username string) (error, *[]domain.Note) {
 
 	for rows.Next() {
 		var note domain.Note
-		if err := rows.Scan(&note.Id, &note.CreatedBy, &note.Message, &note.CreatedAt); err != nil {
+		var createdAtStr string
+		if err := rows.Scan(&note.Id, &note.CreatedBy, &note.Message, &createdAtStr); err != nil {
 			return err, &notes
 		}
+
+		if parsedTime, err := parseTimestamp(createdAtStr); err == nil {
+			note.CreatedAt = parsedTime
+		}
+
 		notes = append(notes, note)
 	}
 	if err = rows.Err(); err != nil {
@@ -243,9 +272,15 @@ func (db *DB) ReadAllNotes() (error, *[]domain.Note) {
 
 	for rows.Next() {
 		var note domain.Note
-		if err := rows.Scan(&note.Id, &note.CreatedBy, &note.Message, &note.CreatedAt); err != nil {
+		var createdAtStr string
+		if err := rows.Scan(&note.Id, &note.CreatedBy, &note.Message, &createdAtStr); err != nil {
 			return err, &notes
 		}
+
+		if parsedTime, err := parseTimestamp(createdAtStr); err == nil {
+			note.CreatedAt = parsedTime
+		}
+
 		notes = append(notes, note)
 	}
 	if err = rows.Err(); err != nil {
@@ -345,7 +380,7 @@ func (db *DB) insertUser(tx *sql.Tx, username string, publicKey string, webKeyPa
 }
 
 func (db *DB) insertNote(tx *sql.Tx, userId uuid.UUID, message string) error {
-	_, err := tx.Exec(sqlInsertNote, uuid.New(), userId, message, time.Now())
+	_, err := tx.Exec(sqlInsertNote, uuid.New(), userId, message, time.Now().Format("2006-01-02 15:04:05"))
 	return err
 }
 
@@ -570,7 +605,7 @@ func (db *DB) CreateActivity(activity *domain.Activity) error {
 			activity.RawJSON,
 			activity.Processed,
 			activity.Local,
-			activity.CreatedAt,
+			activity.CreatedAt.Format("2006-01-02 15:04:05"),
 		)
 		return err
 	})
@@ -660,10 +695,16 @@ func (db *DB) ReadFederatedActivities(limit int) (error, *[]domain.Activity) {
 	for rows.Next() {
 		var activity domain.Activity
 		var idStr string
-		if err := rows.Scan(&idStr, &activity.ActivityURI, &activity.ActivityType, &activity.ActorURI, &activity.ObjectURI, &activity.RawJSON, &activity.Processed, &activity.Local, &activity.CreatedAt); err != nil {
+		var createdAtStr string
+		if err := rows.Scan(&idStr, &activity.ActivityURI, &activity.ActivityType, &activity.ActorURI, &activity.ObjectURI, &activity.RawJSON, &activity.Processed, &activity.Local, &createdAtStr); err != nil {
 			return err, &activities
 		}
 		activity.Id, _ = uuid.Parse(idStr)
+
+		if parsedTime, err := parseTimestamp(createdAtStr); err == nil {
+			activity.CreatedAt = parsedTime
+		}
+
 		activities = append(activities, activity)
 	}
 	if err = rows.Err(); err != nil {
@@ -821,9 +862,15 @@ func (db *DB) ReadLocalTimelineNotes(limit int) (error, *[]domain.Note) {
 	var notes []domain.Note
 	for rows.Next() {
 		var note domain.Note
-		if err := rows.Scan(&note.Id, &note.CreatedBy, &note.Message, &note.CreatedAt); err != nil {
+		var createdAtStr string
+		if err := rows.Scan(&note.Id, &note.CreatedBy, &note.Message, &createdAtStr); err != nil {
 			return err, &notes
 		}
+
+		if parsedTime, err := parseTimestamp(createdAtStr); err == nil {
+			note.CreatedAt = parsedTime
+		}
+
 		notes = append(notes, note)
 	}
 	if err = rows.Err(); err != nil {

@@ -55,14 +55,31 @@ func InitialModel(width, height int) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return loadFederatedPosts()
+	return tea.Batch(
+		loadFederatedPosts(),
+		tickRefresh(),
+	)
+}
+
+// refreshTickMsg is sent periodically to refresh the timeline
+type refreshTickMsg struct{}
+
+// tickRefresh returns a command that sends refreshTickMsg every 10 seconds
+func tickRefresh() tea.Cmd {
+	return tea.Tick(10*time.Second, func(t time.Time) tea.Msg {
+		return refreshTickMsg{}
+	})
 }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case refreshTickMsg:
+		// Reload posts and schedule next refresh
+		return m, tea.Batch(loadFederatedPosts(), tickRefresh())
+
 	case postsLoadedMsg:
 		m.Posts = msg.posts
-		m.Offset = 0 // Reset offset on reload
+		// Don't reset offset on auto-refresh, only on manual Init
 		return m, nil
 
 	case tea.KeyMsg:
