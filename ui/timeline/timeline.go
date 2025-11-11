@@ -137,19 +137,26 @@ func loadFederatedPosts() tea.Cmd {
 		posts := make([]FederatedPost, 0, len(*activities))
 		for _, activity := range *activities {
 			// Parse the raw JSON to extract content
-			var create struct {
+			// Handle both Create and Update activities (Update is stored in Create activities)
+			var activityWrapper struct {
+				Type   string `json:"type"`
 				Object struct {
 					Content string `json:"content"`
 				} `json:"object"`
 			}
 
-			if err := json.Unmarshal([]byte(activity.RawJSON), &create); err != nil {
+			if err := json.Unmarshal([]byte(activity.RawJSON), &activityWrapper); err != nil {
 				log.Printf("Failed to parse activity JSON: %v", err)
 				continue
 			}
 
+			// Skip if content is empty
+			if activityWrapper.Object.Content == "" {
+				continue
+			}
+
 			// Strip HTML tags from content
-			cleanContent := stripHTMLTags(create.Object.Content)
+			cleanContent := stripHTMLTags(activityWrapper.Object.Content)
 
 			posts = append(posts, FederatedPost{
 				Actor:   activity.ActorURI,

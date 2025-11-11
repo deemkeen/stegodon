@@ -127,6 +127,18 @@ func HandleInbox(w http.ResponseWriter, r *http.Request, username string, conf *
 			log.Printf("Inbox: Failed to handle Accept: %v", err)
 			// Don't fail the request
 		}
+	case "Update":
+		if err := handleUpdateActivity(body, username); err != nil {
+			log.Printf("Inbox: Failed to handle Update: %v", err)
+			http.Error(w, "Failed to process Update", http.StatusInternalServerError)
+			return
+		}
+	case "Delete":
+		if err := handleDeleteActivity(body, username); err != nil {
+			log.Printf("Inbox: Failed to handle Delete: %v", err)
+			http.Error(w, "Failed to process Delete", http.StatusInternalServerError)
+			return
+		}
 	default:
 		log.Printf("Inbox: Unsupported activity type: %s", activity.Type)
 	}
@@ -305,5 +317,136 @@ func handleAcceptActivity(body []byte, username string) error {
 	}
 
 	log.Printf("Inbox: Follow %s was accepted by %s", followObj.ID, accept.Actor)
+	return nil
+}
+
+// handleUpdateActivity processes an Update activity (e.g., profile updates, post edits)
+func handleUpdateActivity(body []byte, username string) error {
+	var update struct {
+		ID     string          `json:"id"`
+		Type   string          `json:"type"`
+		Actor  string          `json:"actor"`
+		Object json.RawMessage `json:"object"`
+	}
+
+	if err := json.Unmarshal(body, &update); err != nil {
+		return fmt.Errorf("failed to parse Update activity: %w", err)
+	}
+
+	// Parse the object to determine what type it is
+	var objectType struct {
+		Type string `json:"type"`
+		ID   string `json:"id"`
+	}
+	if err := json.Unmarshal(update.Object, &objectType); err != nil {
+		return fmt.Errorf("failed to parse Update object: %w", err)
+	}
+
+	log.Printf("Inbox: Processing Update for %s (type: %s) from %s", objectType.ID, objectType.Type, update.Actor)
+
+	database := db.GetDB()
+
+	switch objectType.Type {
+	case "Person":
+		// Profile update - re-fetch and update cached actor
+		remoteActor, err := GetOrFetchActor(update.Actor)
+		if err != nil {
+			return fmt.Errorf("failed to fetch updated actor: %w", err)
+		}
+		log.Printf("Inbox: Updated profile for %s@%s", remoteActor.Username, remoteActor.Domain)
+
+	case "Note", "Article":
+		// Post edit - find the existing activity that contains this Note/Article
+		// The activity is stored with the Create activity ID, but we need to find it by the Note ID
+		err, existingActivity := database.ReadActivityByObjectURI(objectType.ID)
+		if err != nil || existingActivity == nil {
+			log.Printf("Inbox: Note/Article %s not found for update, ignoring", objectType.ID)
+			return nil
+		}
+
+		// Update the stored activity with new content but keep activity_type as 'Create'
+		// so it still shows up in the timeline
+		existingActivity.RawJSON = string(body)
+		// Don't change the ActivityType - keep it as 'Create' so it shows in timeline
+		if err := database.UpdateActivity(existingActivity); err != nil {
+			return fmt.Errorf("failed to update activity: %w", err)
+		}
+		log.Printf("Inbox: Updated Note/Article %s", objectType.ID)
+
+	default:
+		log.Printf("Inbox: Unsupported Update object type: %s", objectType.Type)
+	}
+
+	return nil
+}
+
+// handleDeleteActivity processes a Delete activity (e.g., post deletion, account deletion)
+func handleDeleteActivity(body []byte, username string) error {
+	var delete struct {
+		ID     string      `json:"id"`
+		Type   string      `json:"type"`
+		Actor  string      `json:"actor"`
+		Object interface{} `json:"object"`
+	}
+
+	if err := json.Unmarshal(body, &delete); err != nil {
+		return fmt.Errorf("failed to parse Delete activity: %w", err)
+	}
+
+	database := db.GetDB()
+
+	// Object can be either a string URI or an embedded object
+	var objectURI string
+	switch obj := delete.Object.(type) {
+	case string:
+		objectURI = obj
+	case map[string]interface{}:
+		if id, ok := obj["id"].(string); ok {
+			objectURI = id
+		}
+		if typ, ok := obj["type"].(string); ok && typ == "Tombstone" {
+			// Tombstone object indicates a deletion
+			if id, ok := obj["id"].(string); ok {
+				objectURI = id
+			}
+		}
+	}
+
+	if objectURI == "" {
+		return fmt.Errorf("could not determine object URI from Delete activity")
+	}
+
+	log.Printf("Inbox: Processing Delete for %s from %s", objectURI, delete.Actor)
+
+	// Check if it's an actor deletion (URI matches the actor)
+	if objectURI == delete.Actor {
+		// Actor deletion - remove all their activities and follows
+		log.Printf("Inbox: Actor %s deleted their account", delete.Actor)
+
+		// Delete remote account
+		err, remoteAcc := database.ReadRemoteAccountByActorURI(objectURI)
+		if err == nil && remoteAcc != nil {
+			// Delete all follows to/from this actor
+			database.DeleteFollowsByRemoteAccountId(remoteAcc.Id)
+			// Delete the remote account
+			database.DeleteRemoteAccount(remoteAcc.Id)
+			log.Printf("Inbox: Removed actor %s and all associated data", objectURI)
+		}
+	} else {
+		// Object deletion (post, note, etc.) - find the activity containing this object
+		database := db.GetDB()
+		err, activity := database.ReadActivityByObjectURI(objectURI)
+		if err != nil || activity == nil {
+			log.Printf("Inbox: Activity with object %s not found for deletion, ignoring", objectURI)
+			return nil
+		}
+
+		// Delete the activity from the database
+		if err := database.DeleteActivity(activity.Id); err != nil {
+			return fmt.Errorf("failed to delete activity: %w", err)
+		}
+		log.Printf("Inbox: Deleted activity containing object %s", objectURI)
+	}
+
 	return nil
 }

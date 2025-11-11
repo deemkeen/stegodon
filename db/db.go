@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"sync"
 
 	"github.com/charmbracelet/ssh"
@@ -554,7 +555,7 @@ func (db *DB) AcceptFollowByURI(uri string) error {
 // Activity queries
 const (
 	sqlInsertActivity = `INSERT INTO activities(id, activity_uri, activity_type, actor_uri, object_uri, raw_json, processed, local, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	sqlUpdateActivity = `UPDATE activities SET processed = ?, object_uri = ? WHERE id = ?`
+	sqlUpdateActivity = `UPDATE activities SET raw_json = ?, processed = ?, object_uri = ? WHERE id = ?`
 	sqlSelectActivityByURI = `SELECT id, activity_uri, activity_type, actor_uri, object_uri, raw_json, processed, local, created_at FROM activities WHERE activity_uri = ?`
 )
 
@@ -578,6 +579,7 @@ func (db *DB) CreateActivity(activity *domain.Activity) error {
 func (db *DB) UpdateActivity(activity *domain.Activity) error {
 	return db.wrapTransaction(func(tx *sql.Tx) error {
 		_, err := tx.Exec(sqlUpdateActivity,
+			activity.RawJSON,
 			activity.Processed,
 			activity.ObjectURI,
 			activity.Id.String(),
@@ -608,6 +610,37 @@ func (db *DB) ReadActivityByURI(uri string) (error, *domain.Activity) {
 		return err, nil
 	}
 	activity.Id, _ = uuid.Parse(idStr)
+	return nil, &activity
+}
+
+// ReadActivityByObjectURI reads an activity by searching for the object URI in the raw JSON
+// This is needed because Create activities are stored with their activity ID, not the Note ID
+func (db *DB) ReadActivityByObjectURI(objectURI string) (error, *domain.Activity) {
+	var activity domain.Activity
+	var idStr, actorURIStr string
+
+	// Search for CREATE activities where the raw JSON contains the object URI
+	// Filter by activity_type='Create' to avoid finding Update/Delete activities
+	err := db.db.QueryRow(
+		`SELECT id, activity_uri, activity_type, actor_uri, raw_json, processed, local, created_at
+		 FROM activities
+		 WHERE activity_type = 'Create' AND raw_json LIKE ?
+		 ORDER BY created_at DESC
+		 LIMIT 1`,
+		"%\"id\":\""+objectURI+"\"%",
+	).Scan(&idStr, &activity.ActivityURI, &activity.ActivityType, &actorURIStr,
+		&activity.RawJSON, &activity.Processed, &activity.Local, &activity.CreatedAt)
+
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return nil, nil
+		}
+		return err, nil
+	}
+
+	activity.Id, _ = uuid.Parse(idStr)
+	activity.ActorURI = actorURIStr
+
 	return nil, &activity
 }
 
@@ -857,5 +890,62 @@ func (db *DB) ReadLocalFollowsByAccountId(accountId uuid.UUID) (error, *[]domain
 		return err, &follows
 	}
 	return nil, &follows
+}
+
+// DeleteActivity deletes an activity by ID
+func (db *DB) DeleteActivity(id uuid.UUID) error {
+	_, err := db.db.Exec("DELETE FROM activities WHERE id = ?", id.String())
+	if err != nil {
+		return fmt.Errorf("failed to delete activity: %w", err)
+	}
+	return nil
+}
+
+// ReadRemoteAccountByActorURI reads a remote account by its ActivityPub actor URI
+func (db *DB) ReadRemoteAccountByActorURI(actorURI string) (error, *domain.RemoteAccount) {
+	var account domain.RemoteAccount
+	var idStr string
+
+	err := db.db.QueryRow(
+		`SELECT id, actor_uri, username, domain, display_name, summary, avatar_url,
+		 public_key_pem, inbox_uri, outbox_uri, last_fetched_at
+		 FROM remote_accounts WHERE actor_uri = ?`,
+		actorURI,
+	).Scan(
+		&idStr, &account.ActorURI, &account.Username, &account.Domain,
+		&account.DisplayName, &account.Summary, &account.AvatarURL,
+		&account.PublicKeyPem, &account.InboxURI, &account.OutboxURI,
+		&account.LastFetchedAt,
+	)
+
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return nil, nil
+		}
+		return err, nil
+	}
+
+	account.Id, _ = uuid.Parse(idStr)
+	return nil, &account
+}
+
+// DeleteRemoteAccount deletes a remote account by ID
+func (db *DB) DeleteRemoteAccount(id uuid.UUID) error {
+	_, err := db.db.Exec("DELETE FROM remote_accounts WHERE id = ?", id.String())
+	if err != nil {
+		return fmt.Errorf("failed to delete remote account: %w", err)
+	}
+	return nil
+}
+
+// DeleteFollowsByRemoteAccountId deletes all follows to/from a remote account
+func (db *DB) DeleteFollowsByRemoteAccountId(remoteAccountId uuid.UUID) error {
+	// Delete follows where this account is the follower (account_id)
+	_, err := db.db.Exec("DELETE FROM follows WHERE account_id = ? OR target_account_id = ?",
+		remoteAccountId.String(), remoteAccountId.String())
+	if err != nil {
+		return fmt.Errorf("failed to delete follows: %w", err)
+	}
+	return nil
 }
 
