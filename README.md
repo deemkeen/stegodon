@@ -49,16 +49,10 @@ Once the server is started, open an SSH session via `ssh 127.0.0.1 -p 23232` to 
 You will be authenticated with your SSH public key. On your first login, you'll be prompted to choose a username.
 
 **Navigation:**
-- `Tab`: Cycle through views
-- `1-5`: Jump directly to a specific view
-  1. New Note
-  2. Notes List
-  3. Follow User
-  4. Followers
-  5. Federated Timeline
+- `Tab`: Cycle through views (New Note → Notes List → Follow User → Followers → Federated Timeline)
 - `↑/↓` or `j/k`: Navigate items in lists
-- `u`: Edit selected note
-- `d`: Delete selected note (with confirmation)
+- `u`: Edit selected note (in Notes List view)
+- `d`: Delete selected note with confirmation (in Notes List view)
 - `Ctrl+S`: Save/post note
 - `Ctrl+C` or `q`: Quit
 
