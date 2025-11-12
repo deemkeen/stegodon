@@ -262,7 +262,35 @@ func handleCreateActivity(body []byte, username string) error {
 		return fmt.Errorf("failed to parse Create activity: %w", err)
 	}
 
-	log.Printf("Inbox: Received post from %s: %s", create.Actor, create.Object.Content)
+	log.Printf("Inbox: Received post from %s", create.Actor)
+
+	// Validate that we follow this actor (prevent spam)
+	database := db.GetDB()
+
+	// Get the local account
+	err, localAccount := database.ReadAccByUsername(username)
+	if err != nil {
+		log.Printf("Inbox: Failed to get local account %s: %v", username, err)
+		return fmt.Errorf("failed to get local account: %w", err)
+	}
+	log.Printf("Inbox: Local account: %s (ID: %s)", localAccount.Username, localAccount.Id)
+
+	// Get the remote actor
+	err, remoteActor := database.ReadRemoteAccountByActorURI(create.Actor)
+	if err != nil || remoteActor == nil {
+		log.Printf("Inbox: Rejecting Create from unknown actor %s (not cached)", create.Actor)
+		return fmt.Errorf("unknown actor")
+	}
+	log.Printf("Inbox: Remote actor: %s@%s (ID: %s)", remoteActor.Username, remoteActor.Domain, remoteActor.Id)
+
+	// Check if we follow this actor
+	err, follow := database.ReadFollowByAccountIds(localAccount.Id, remoteActor.Id)
+	if err != nil || follow == nil {
+		log.Printf("Inbox: Rejecting Create from %s - not following (err: %v, follow: %v)", create.Actor, err, follow)
+		return fmt.Errorf("not following this actor")
+	}
+
+	log.Printf("Inbox: Accepted post from followed user %s@%s (follow accepted: %v)", remoteActor.Username, remoteActor.Domain, follow.Accepted)
 
 	// Use the activity ID, not the object ID
 	activityURI := create.ID
@@ -272,7 +300,6 @@ func handleCreateActivity(body []byte, username string) error {
 	}
 
 	// Check if we already have this activity
-	database := db.GetDB()
 	err, existingActivity := database.ReadActivityByURI(activityURI)
 	if err == nil && existingActivity != nil {
 		log.Printf("Inbox: Activity %s already exists, skipping", activityURI)

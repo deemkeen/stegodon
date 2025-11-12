@@ -591,6 +591,7 @@ const (
 	sqlSelectLocalFollowsByAccountId = `SELECT id, account_id, target_account_id, uri, accepted, created_at FROM follows WHERE account_id = ? AND is_local = 1 AND accepted = 1`
 	sqlDeleteLocalFollow    = `DELETE FROM follows WHERE account_id = ? AND target_account_id = ? AND is_local = 1`
 	sqlCheckLocalFollow     = `SELECT COUNT(*) FROM follows WHERE account_id = ? AND target_account_id = ? AND is_local = 1`
+	sqlSelectFollowByAccountIds = `SELECT id, account_id, target_account_id, uri, accepted, created_at FROM follows WHERE account_id = ? AND target_account_id = ? AND accepted = 1`
 )
 
 func (db *DB) CreateFollow(follow *domain.Follow) error {
@@ -614,6 +615,30 @@ func (db *DB) CreateFollow(follow *domain.Follow) error {
 
 func (db *DB) ReadFollowByURI(uri string) (error, *domain.Follow) {
 	row := db.db.QueryRow(sqlSelectFollowByURI, uri)
+	var follow domain.Follow
+	var idStr, accountIdStr, targetIdStr string
+	err := row.Scan(
+		&idStr,
+		&accountIdStr,
+		&targetIdStr,
+		&follow.URI,
+		&follow.Accepted,
+		&follow.CreatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return err, nil
+	}
+	if err != nil {
+		return err, nil
+	}
+	follow.Id, _ = uuid.Parse(idStr)
+	follow.AccountId, _ = uuid.Parse(accountIdStr)
+	follow.TargetAccountId, _ = uuid.Parse(targetIdStr)
+	return nil, &follow
+}
+
+func (db *DB) ReadFollowByAccountIds(accountId, targetAccountId uuid.UUID) (error, *domain.Follow) {
+	row := db.db.QueryRow(sqlSelectFollowByAccountIds, accountId.String(), targetAccountId.String())
 	var follow domain.Follow
 	var idStr, accountIdStr, targetIdStr string
 	err := row.Scan(

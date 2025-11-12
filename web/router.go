@@ -5,14 +5,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
+	"strings"
+
 	"github.com/deemkeen/stegodon/activitypub"
+	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/util"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/render"
 	"github.com/google/uuid"
-	"log"
-	"strings"
 )
 
 func Router(conf *util.AppConfig) error {
@@ -110,30 +112,93 @@ func Router(conf *util.AppConfig) error {
 				return
 			}
 
-			// Extract username from object (for Create) or object field (for others)
+			// Extract username from activity addressing
 			var targetUsername string
-			if _, ok := activity["object"].(map[string]interface{}); ok {
-				// For Create activities, object might have "to" or "cc" fields
-				// Try to extract from the first "to" address
-				if toArray, ok := activity["to"].([]interface{}); ok && len(toArray) > 0 {
-					if toStr, ok := toArray[0].(string); ok {
-						// Extract username from "https://domain/users/username"
-						parts := strings.Split(toStr, "/")
-						if len(parts) > 0 {
-							targetUsername = parts[len(parts)-1]
+
+			// Helper function to extract username from URI
+			extractUsername := func(uri string) string {
+				// Check if it's one of our users: https://domain/users/username
+				if strings.Contains(uri, conf.Conf.SslDomain) && strings.Contains(uri, "/users/") {
+					parts := strings.Split(uri, "/")
+					for i, part := range parts {
+						if part == "users" && i+1 < len(parts) {
+							// Extract just the username, handle /followers suffix
+							username := parts[i+1]
+							// Remove /followers or /following if present
+							if slashIdx := strings.Index(username, "/"); slashIdx > 0 {
+								username = username[:slashIdx]
+							}
+							return username
 						}
 					}
 				}
-			} else if objStr, ok := activity["object"].(string); ok {
-				// For Follow/Accept/etc, object is actor URI
-				parts := strings.Split(objStr, "/")
-				if len(parts) > 0 {
-					targetUsername = parts[len(parts)-1]
+				return ""
+			}
+
+			// Try to find target in "to" field first
+			if toArray, ok := activity["to"].([]interface{}); ok {
+				for _, to := range toArray {
+					if toStr, ok := to.(string); ok {
+						if username := extractUsername(toStr); username != "" {
+							targetUsername = username
+							break
+						}
+					}
+				}
+			}
+
+			// If not found, try "cc" field (followers collections)
+			if targetUsername == "" {
+				if ccArray, ok := activity["cc"].([]interface{}); ok {
+					for _, cc := range ccArray {
+						if ccStr, ok := cc.(string); ok {
+							// Check for followers URI: https://domain/users/username/followers
+							if username := extractUsername(ccStr); username != "" {
+								targetUsername = username
+								break
+							}
+						}
+					}
+				}
+			}
+
+			// For Follow activities, check the object field
+			if targetUsername == "" {
+				if objStr, ok := activity["object"].(string); ok {
+					targetUsername = extractUsername(objStr)
 				}
 			}
 
 			if targetUsername == "" {
-				log.Printf("Shared inbox: Could not determine target username from activity: %v", activity)
+				// For Create/Update/Delete activities, find which local user(s) follow this actor
+				actorURI, _ := activity["actor"].(string)
+				if actorURI != "" {
+					database := db.GetDB()
+
+					// Get the remote actor
+					err, remoteActor := database.ReadRemoteAccountByActorURI(actorURI)
+					if err == nil && remoteActor != nil {
+						// Find followers of this remote actor (local users who follow them)
+						err, followers := database.ReadFollowersByAccountId(remoteActor.Id)
+						if err == nil && followers != nil && len(*followers) > 0 {
+							// Get the first local user who follows this actor
+							firstFollower := (*followers)[0]
+							err, localAccount := database.ReadAccById(firstFollower.AccountId)
+							if err == nil && localAccount != nil {
+								targetUsername = localAccount.Username
+								log.Printf("Shared inbox: Routing to follower %s of %s", targetUsername, actorURI)
+							}
+						} else {
+							log.Printf("Shared inbox: No local followers found for %s", actorURI)
+						}
+					} else {
+						log.Printf("Shared inbox: Remote actor %s not found in cache", actorURI)
+					}
+				}
+			}
+
+			if targetUsername == "" {
+				log.Printf("Shared inbox: Could not determine target username from activity type %v", activity["type"])
 				c.Status(202) // Accept anyway to be nice
 				return
 			}
