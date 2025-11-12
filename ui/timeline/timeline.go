@@ -107,7 +107,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		log.Printf("Timeline received key: %s", msg.String())
 		switch msg.String() {
 		case "up", "k":
 			if m.Selected > 0 {
@@ -120,18 +119,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				m.Offset = m.Selected // Keep selected at top
 			}
 		case "o":
-			log.Printf("'o' key pressed, posts count: %d, selected: %d", len(m.Posts), m.Selected)
 			// Open selected post URL in default browser
 			if len(m.Posts) > 0 && m.Selected < len(m.Posts) {
 				selectedPost := m.Posts[m.Selected]
-				log.Printf("Selected post ObjectURI: %s", selectedPost.ObjectURI)
 				if selectedPost.ObjectURI != "" {
 					return m, openURLCmd(selectedPost.ObjectURI)
-				} else {
-					log.Printf("No ObjectURI for selected post")
 				}
-			} else {
-				log.Printf("No posts or selected index out of bounds")
 			}
 		}
 	}
