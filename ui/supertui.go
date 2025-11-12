@@ -121,6 +121,29 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.headerModel.Width = msg.Width
 		return m, nil
 
+	case tea.MouseMsg:
+		// Handle mouse clicks to switch focus between left and right panels
+		if msg.Type == tea.MouseLeft {
+			leftPanelWidth := m.width / 3
+
+			// Click on left panel (write note area)
+			if msg.X < leftPanelWidth {
+				if m.state != common.CreateUserView {
+					m.state = common.CreateNoteView
+				}
+			} else {
+				// Click on right panel - switch to the currently displayed view
+				// The right panel shows different views depending on current state
+				// Don't change state if already in a right-panel view, just ensure focus
+				if m.state == common.CreateNoteView {
+					// Default to notes list when clicking right from write note
+					m.state = common.ListNotesView
+				}
+				// Otherwise keep the current right-panel view
+			}
+		}
+		return m, nil
+
 	case common.SessionState:
 		switch msg {
 		case common.CreateUserView:

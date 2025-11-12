@@ -27,7 +27,7 @@ func MainTui() wish.Middleware {
 		}
 
 		m := ui.NewModel(*acc, pty.Window.Width, pty.Window.Height)
-		return tea.NewProgram(m, tea.WithInput(s), tea.WithOutput(s), tea.WithAltScreen())
+		return tea.NewProgram(m, tea.WithInput(s), tea.WithOutput(s), tea.WithAltScreen(), tea.WithMouseCellMotion())
 	}
 	return bm.MiddlewareWithProgramHandler(teaHandler, termenv.ANSI256)
 }

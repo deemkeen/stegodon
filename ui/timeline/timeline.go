@@ -175,8 +175,15 @@ func loadFederatedPosts() tea.Cmd {
 			// Strip HTML tags from content
 			cleanContent := stripHTMLTags(activityWrapper.Object.Content)
 
+			// Get remote account to format handle as username@domain
+			handle := activity.ActorURI // fallback to URI
+			err, remoteAcc := database.ReadRemoteAccountByActorURI(activity.ActorURI)
+			if err == nil && remoteAcc != nil {
+				handle = "@" + remoteAcc.Username + "@" + remoteAcc.Domain
+			}
+
 			posts = append(posts, FederatedPost{
-				Actor:   activity.ActorURI,
+				Actor:   handle,
 				Content: cleanContent,
 				Time:    activity.CreatedAt,
 			})
