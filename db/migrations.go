@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"encoding/json"
 	"log"
 )
 
@@ -159,6 +160,11 @@ func (db *DB) RunMigrations() error {
 		// Extend existing tables (ignore errors if columns already exist)
 		db.extendExistingTables(tx)
 
+		// Backfill object_uri for existing activities
+		if err := db.backfillActivityObjectURIs(tx); err != nil {
+			log.Printf("Warning: Failed to backfill activity object_uri: %v", err)
+		}
+
 		return nil
 	})
 }
@@ -192,4 +198,61 @@ func (db *DB) extendExistingTables(tx *sql.Tx) {
 	tx.Exec("ALTER TABLE follows ADD COLUMN is_local INTEGER DEFAULT 0")
 
 	log.Println("Extended existing tables with new columns")
+}
+
+// backfillActivityObjectURIs extracts object_uri from raw_json for activities that are missing it
+func (db *DB) backfillActivityObjectURIs(tx *sql.Tx) error {
+	// Find activities with empty object_uri
+	rows, err := tx.Query(`SELECT id, raw_json FROM activities WHERE object_uri IS NULL OR object_uri = ''`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	updated := 0
+	for rows.Next() {
+		var id, rawJSON string
+		if err := rows.Scan(&id, &rawJSON); err != nil {
+			log.Printf("Warning: Failed to scan activity: %v", err)
+			continue
+		}
+
+		// Parse the raw JSON to extract object ID
+		var activity struct {
+			Object interface{} `json:"object"`
+		}
+		if err := json.Unmarshal([]byte(rawJSON), &activity); err != nil {
+			log.Printf("Warning: Failed to parse activity JSON for ID %s: %v", id, err)
+			continue
+		}
+
+		// Extract object URI
+		var objectURI string
+		if activity.Object != nil {
+			switch obj := activity.Object.(type) {
+			case string:
+				objectURI = obj
+			case map[string]interface{}:
+				if idVal, ok := obj["id"].(string); ok {
+					objectURI = idVal
+				}
+			}
+		}
+
+		// Update the activity if we found an object URI
+		if objectURI != "" {
+			_, err := tx.Exec(`UPDATE activities SET object_uri = ? WHERE id = ?`, objectURI, id)
+			if err != nil {
+				log.Printf("Warning: Failed to update activity %s: %v", id, err)
+			} else {
+				updated++
+			}
+		}
+	}
+
+	if updated > 0 {
+		log.Printf("Backfilled object_uri for %d activities", updated)
+	}
+
+	return nil
 }

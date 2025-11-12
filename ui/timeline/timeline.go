@@ -214,6 +214,7 @@ func loadFederatedPosts() tea.Cmd {
 			var activityWrapper struct {
 				Type   string `json:"type"`
 				Object struct {
+					ID      string `json:"id"`
 					Content string `json:"content"`
 				} `json:"object"`
 			}
@@ -238,11 +239,17 @@ func loadFederatedPosts() tea.Cmd {
 				handle = "@" + remoteAcc.Username + "@" + remoteAcc.Domain
 			}
 
+			// Use ObjectURI from activity, or extract from raw JSON if empty
+			objectURI := activity.ObjectURI
+			if objectURI == "" && activityWrapper.Object.ID != "" {
+				objectURI = activityWrapper.Object.ID
+			}
+
 			posts = append(posts, FederatedPost{
 				Actor:     handle,
 				Content:   cleanContent,
 				Time:      activity.CreatedAt,
-				ObjectURI: activity.ObjectURI,
+				ObjectURI: objectURI,
 			})
 		}
 
