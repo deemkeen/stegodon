@@ -432,7 +432,7 @@ func (m MainModel) View() string {
 		case common.FollowingView:
 			viewCommands = "↑/↓: select • u/enter: unfollow"
 		case common.FederatedTimelineView:
-			viewCommands = "↑/↓: scroll"
+			viewCommands = "↑/↓: select • o: open URL"
 		case common.LocalTimelineView:
 			viewCommands = "↑/↓: scroll"
 		case common.LocalUsersView:

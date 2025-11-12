@@ -236,10 +236,12 @@ func (m Model) View() string {
 
 	helpText := "post message: ctrl+s"
 	if m.isEditing {
-		helpText = "save changes: ctrl+s • cancel: esc"
+		helpText = "save changes: ctrl+s\ncancel: esc"
 	}
-	charsLeft := common.HelpStyle.PaddingLeft(7).Render(fmt.Sprintf("characters left: %d\n\n%s",
-		m.lettersLeft, helpText))
+
+	// Build the help section with proper formatting
+	helpLines := fmt.Sprintf("characters left: %d\n\n%s", m.lettersLeft, helpText)
+	charsLeft := common.HelpStyle.Render(lipgloss.NewStyle().PaddingLeft(7).Render(helpLines))
 
 	captionText := "new note"
 	if m.isEditing {

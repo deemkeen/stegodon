@@ -3,7 +3,10 @@ package timeline
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"os/exec"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 
@@ -11,7 +14,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/ui/common"
-	"log"
 )
 
 var (
@@ -30,27 +32,44 @@ var (
 	emptyStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241")).
 			Italic(true)
+
+	// Inverted styles for selected posts
+	selectedTimeStyle = lipgloss.NewStyle().
+				Align(lipgloss.Left).
+				Foreground(lipgloss.Color("255")) // White
+
+	selectedAuthorStyle = lipgloss.NewStyle().
+				Align(lipgloss.Left).
+				Foreground(lipgloss.Color("255")). // White
+				Bold(true)
+
+	selectedContentStyle = lipgloss.NewStyle().
+				Align(lipgloss.Left).
+				Foreground(lipgloss.Color("255")) // White
 )
 
 type Model struct {
-	Posts  []FederatedPost
-	Offset int // Pagination offset
-	Width  int
-	Height int
+	Posts    []FederatedPost
+	Offset   int // Pagination offset
+	Selected int // Currently selected post index
+	Width    int
+	Height   int
 }
 
 type FederatedPost struct {
-	Actor   string
-	Content string
-	Time    time.Time
+	Actor     string
+	Content   string
+	Time      time.Time
+	ObjectURI string // URL to the original post
 }
 
 func InitialModel(width, height int) Model {
 	return Model{
-		Posts:  []FederatedPost{},
-		Offset: 0,
-		Width:  width,
-		Height: height,
+		Posts:    []FederatedPost{},
+		Offset:   0,
+		Selected: 0,
+		Width:    width,
+		Height:   height,
 	}
 }
 
@@ -79,19 +98,40 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	case postsLoadedMsg:
 		m.Posts = msg.posts
-		// Don't reset offset on auto-refresh, only on manual Init
+		// Keep selection within bounds after reload
+		if m.Selected >= len(m.Posts) {
+			m.Selected = max(0, len(m.Posts)-1)
+		}
+		// Keep Offset in sync
+		m.Offset = m.Selected
 		return m, nil
 
 	case tea.KeyMsg:
+		log.Printf("Timeline received key: %s", msg.String())
 		switch msg.String() {
-		case "up", "k", "left":
-			if m.Offset > 0 {
-				m.Offset--
+		case "up", "k":
+			if m.Selected > 0 {
+				m.Selected--
+				m.Offset = m.Selected // Keep selected at top
 			}
-		case "down", "j", "right":
-			// Allow scrolling if we have any posts at all
-			if len(m.Posts) > 0 && m.Offset < len(m.Posts)-1 {
-				m.Offset++
+		case "down", "j":
+			if len(m.Posts) > 0 && m.Selected < len(m.Posts)-1 {
+				m.Selected++
+				m.Offset = m.Selected // Keep selected at top
+			}
+		case "o":
+			log.Printf("'o' key pressed, posts count: %d, selected: %d", len(m.Posts), m.Selected)
+			// Open selected post URL in default browser
+			if len(m.Posts) > 0 && m.Selected < len(m.Posts) {
+				selectedPost := m.Posts[m.Selected]
+				log.Printf("Selected post ObjectURI: %s", selectedPost.ObjectURI)
+				if selectedPost.ObjectURI != "" {
+					return m, openURLCmd(selectedPost.ObjectURI)
+				} else {
+					log.Printf("No ObjectURI for selected post")
+				}
+			} else {
+				log.Printf("No posts or selected index out of bounds")
 			}
 		}
 	}
@@ -107,6 +147,10 @@ func (m Model) View() string {
 	if len(m.Posts) == 0 {
 		s.WriteString(emptyStyle.Render("No federated posts yet.\nFollow some accounts to see their posts here!"))
 	} else {
+		// Calculate right panel width for selection background
+		leftPanelWidth := m.Width / 3
+		rightPanelWidth := m.Width - leftPanelWidth - 6
+
 		itemsPerPage := 5
 		start := m.Offset
 		end := start + itemsPerPage
@@ -117,13 +161,32 @@ func (m Model) View() string {
 		for i := start; i < end; i++ {
 			post := m.Posts[i]
 
-			// Render in vertical layout like notes list
-			timeStr := timeStyle.Render(formatTime(post.Time))
-			authorStr := authorStyle.Render(post.Actor)
-			contentStr := contentStyle.Render(truncate(post.Content, 150))
+			// Format timestamp
+			timeStr := formatTime(post.Time)
 
-			postContent := lipgloss.JoinVertical(lipgloss.Left, timeStr, authorStr, contentStr)
-			s.WriteString(postContent)
+			// Apply selection highlighting - full width box with inverted colors
+			if i == m.Selected {
+				selectedBg := lipgloss.NewStyle().
+					Background(lipgloss.Color("62")).
+					Width(rightPanelWidth - 4)
+
+				timeFormatted := selectedBg.Render(selectedTimeStyle.Render(timeStr))
+				authorFormatted := selectedBg.Render(selectedAuthorStyle.Render(post.Actor))
+				contentFormatted := selectedBg.Render(selectedContentStyle.Render(truncate(post.Content, 150)))
+
+				s.WriteString(timeFormatted + "\n")
+				s.WriteString(authorFormatted + "\n")
+				s.WriteString(contentFormatted)
+			} else {
+				timeFormatted := timeStyle.Render(timeStr)
+				authorStr := authorStyle.Render(post.Actor)
+				contentStr := contentStyle.Render(truncate(post.Content, 150))
+
+				s.WriteString(timeFormatted + "\n")
+				s.WriteString(authorStr + "\n")
+				s.WriteString(contentStr)
+			}
+
 			s.WriteString("\n\n")
 		}
 	}
@@ -183,9 +246,10 @@ func loadFederatedPosts() tea.Cmd {
 			}
 
 			posts = append(posts, FederatedPost{
-				Actor:   handle,
-				Content: cleanContent,
-				Time:    activity.CreatedAt,
+				Actor:     handle,
+				Content:   cleanContent,
+				Time:      activity.CreatedAt,
+				ObjectURI: activity.ObjectURI,
 			})
 		}
 
@@ -242,5 +306,41 @@ func formatTime(t time.Time) string {
 	} else {
 		days := int(duration.Hours() / 24)
 		return fmt.Sprintf("%dd ago", days)
+	}
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+// openURLCmd opens a URL in the default browser
+func openURLCmd(url string) tea.Cmd {
+	return func() tea.Msg {
+		var cmd *exec.Cmd
+
+		// Determine command based on OS
+		switch runtime.GOOS {
+		case "darwin":
+			cmd = exec.Command("open", url)
+		case "linux":
+			cmd = exec.Command("xdg-open", url)
+		case "windows":
+			cmd = exec.Command("cmd", "/c", "start", url)
+		default:
+			log.Printf("Unsupported OS for opening URLs: %s", runtime.GOOS)
+			return nil
+		}
+
+		log.Printf("Opening URL in browser: %s (OS: %s)", url, runtime.GOOS)
+		err := cmd.Start()
+		if err != nil {
+			log.Printf("Failed to open URL: %v", err)
+		} else {
+			log.Printf("Successfully opened URL: %s", url)
+		}
+		return nil
 	}
 }

@@ -79,11 +79,28 @@ func HandleInbox(w http.ResponseWriter, r *http.Request, username string, conf *
 
 	// Store activity in database
 	database := db.GetDB()
+
+	// Extract ObjectURI from the activity's object field
+	objectURI := ""
+	if activity.Object != nil {
+		switch obj := activity.Object.(type) {
+		case string:
+			// Object is a simple URI string (like in Follow, Undo, etc.)
+			objectURI = obj
+		case map[string]interface{}:
+			// Object is a full object (like in Create, Update)
+			if id, ok := obj["id"].(string); ok {
+				objectURI = id
+			}
+		}
+	}
+
 	activityRecord := &domain.Activity{
 		Id:           uuid.New(),
 		ActivityURI:  activity.ID,
 		ActivityType: activity.Type,
 		ActorURI:     activity.Actor,
+		ObjectURI:    objectURI,
 		RawJSON:      string(body),
 		Processed:    false,
 		Local:        false,
