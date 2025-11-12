@@ -164,6 +164,144 @@ func SendCreate(note *domain.Note, localAccount *domain.Account, conf *util.AppC
 	return nil
 }
 
+// SendUpdate sends an Update activity to all followers when a note is edited
+func SendUpdate(note *domain.Note, localAccount *domain.Account, conf *util.AppConfig) error {
+	actorURI := fmt.Sprintf("https://%s/users/%s", conf.Conf.SslDomain, localAccount.Username)
+	noteURI := fmt.Sprintf("https://%s/notes/%s", conf.Conf.SslDomain, note.Id.String())
+	updateID := fmt.Sprintf("https://%s/activities/%s", conf.Conf.SslDomain, uuid.New().String())
+
+	// Use EditedAt if available, otherwise use CreatedAt
+	updatedTime := note.CreatedAt
+	if note.EditedAt != nil {
+		updatedTime = *note.EditedAt
+	}
+
+	update := map[string]interface{}{
+		"@context": "https://www.w3.org/ns/activitystreams",
+		"id":       updateID,
+		"type":     "Update",
+		"actor":    actorURI,
+		"to": []string{
+			"https://www.w3.org/ns/activitystreams#Public",
+		},
+		"cc": []string{
+			fmt.Sprintf("https://%s/users/%s/followers", conf.Conf.SslDomain, localAccount.Username),
+		},
+		"object": map[string]interface{}{
+			"id":           noteURI,
+			"type":         "Note",
+			"attributedTo": actorURI,
+			"content":      note.Message,
+			"published":    note.CreatedAt.Format(time.RFC3339),
+			"updated":      updatedTime.Format(time.RFC3339),
+			"to": []string{
+				"https://www.w3.org/ns/activitystreams#Public",
+			},
+			"cc": []string{
+				fmt.Sprintf("https://%s/users/%s/followers", conf.Conf.SslDomain, localAccount.Username),
+			},
+		},
+	}
+
+	// Get all followers and queue delivery to their inboxes
+	database := db.GetDB()
+	err, followers := database.ReadFollowersByAccountId(localAccount.Id)
+	if err != nil {
+		log.Printf("Outbox: Failed to get followers for Update: %v", err)
+		return nil
+	}
+
+	if followers == nil || len(*followers) == 0 {
+		log.Printf("Outbox: No followers to deliver Update to")
+		return nil
+	}
+
+	// Queue delivery to each follower's inbox
+	for _, follower := range *followers {
+		err, remoteActor := database.ReadRemoteAccountById(follower.AccountId)
+		if err != nil {
+			log.Printf("Outbox: Failed to get remote actor %s: %v", follower.AccountId, err)
+			continue
+		}
+
+		queueItem := &domain.DeliveryQueueItem{
+			Id:          uuid.New(),
+			InboxURI:    remoteActor.InboxURI,
+			ActivityJSON: mustMarshal(update),
+			Attempts:    0,
+			NextRetryAt: time.Now(),
+			CreatedAt:   time.Now(),
+		}
+
+		if err := database.EnqueueDelivery(queueItem); err != nil {
+			log.Printf("Outbox: Failed to queue Update delivery to %s: %v", remoteActor.InboxURI, err)
+		}
+	}
+
+	log.Printf("Outbox: Queued Update activity for note %s to %d followers", note.Id, len(*followers))
+	return nil
+}
+
+// SendDelete sends a Delete activity to all followers when a note is deleted
+func SendDelete(noteId uuid.UUID, localAccount *domain.Account, conf *util.AppConfig) error {
+	actorURI := fmt.Sprintf("https://%s/users/%s", conf.Conf.SslDomain, localAccount.Username)
+	noteURI := fmt.Sprintf("https://%s/notes/%s", conf.Conf.SslDomain, noteId.String())
+	deleteID := fmt.Sprintf("https://%s/activities/%s", conf.Conf.SslDomain, uuid.New().String())
+
+	deleteActivity := map[string]interface{}{
+		"@context": "https://www.w3.org/ns/activitystreams",
+		"id":       deleteID,
+		"type":     "Delete",
+		"actor":    actorURI,
+		"published": time.Now().Format(time.RFC3339),
+		"to": []string{
+			"https://www.w3.org/ns/activitystreams#Public",
+		},
+		"cc": []string{
+			fmt.Sprintf("https://%s/users/%s/followers", conf.Conf.SslDomain, localAccount.Username),
+		},
+		"object": noteURI,
+	}
+
+	// Get all followers and queue delivery to their inboxes
+	database := db.GetDB()
+	err, followers := database.ReadFollowersByAccountId(localAccount.Id)
+	if err != nil {
+		log.Printf("Outbox: Failed to get followers for Delete: %v", err)
+		return nil
+	}
+
+	if followers == nil || len(*followers) == 0 {
+		log.Printf("Outbox: No followers to deliver Delete to")
+		return nil
+	}
+
+	// Queue delivery to each follower's inbox
+	for _, follower := range *followers {
+		err, remoteActor := database.ReadRemoteAccountById(follower.AccountId)
+		if err != nil {
+			log.Printf("Outbox: Failed to get remote actor %s: %v", follower.AccountId, err)
+			continue
+		}
+
+		queueItem := &domain.DeliveryQueueItem{
+			Id:          uuid.New(),
+			InboxURI:    remoteActor.InboxURI,
+			ActivityJSON: mustMarshal(deleteActivity),
+			Attempts:    0,
+			NextRetryAt: time.Now(),
+			CreatedAt:   time.Now(),
+		}
+
+		if err := database.EnqueueDelivery(queueItem); err != nil {
+			log.Printf("Outbox: Failed to queue Delete delivery to %s: %v", remoteActor.InboxURI, err)
+		}
+	}
+
+	log.Printf("Outbox: Queued Delete activity for note %s to %d followers", noteId, len(*followers))
+	return nil
+}
+
 // SendFollow sends a Follow activity to a remote actor
 func SendFollow(localAccount *domain.Account, remoteActorURI string, conf *util.AppConfig) error {
 	// Fetch remote actor

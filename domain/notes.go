@@ -16,6 +16,7 @@ type Note struct {
 	CreatedBy string
 	Message   string
 	CreatedAt time.Time
+	EditedAt  *time.Time // When the note was last edited (nil if never edited)
 	// ActivityPub fields
 	Visibility     string  // "public", "unlisted", "followers", "direct"
 	InReplyToURI   string  // URI of the note this is replying to

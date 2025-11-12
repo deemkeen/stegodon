@@ -55,24 +55,26 @@ const (
                         created_at timestamp default current_timestamp
                         )`
 	sqlInsertNote     = `INSERT INTO notes(id, user_id, message, created_at) VALUES (?, ?, ?, ?)`
-	sqlSelectNoteById = `SELECT notes.id, accounts.username, notes.message, notes.created_at FROM notes
-    														INNER JOIN accounts ON accounts.id = notes.user_id 
+	sqlUpdateNote     = `UPDATE notes SET message = ?, edited_at = ? WHERE id = ?`
+	sqlDeleteNote     = `DELETE FROM notes WHERE id = ?`
+	sqlSelectNoteById = `SELECT notes.id, accounts.username, notes.message, notes.created_at, notes.edited_at FROM notes
+    														INNER JOIN accounts ON accounts.id = notes.user_id
                                                             WHERE notes.id = ?`
-	sqlSelectNotesByUserId = `SELECT notes.id, accounts.username, notes.message, notes.created_at FROM notes
-    														INNER JOIN accounts ON accounts.id = notes.user_id 
+	sqlSelectNotesByUserId = `SELECT notes.id, accounts.username, notes.message, notes.created_at, notes.edited_at FROM notes
+    														INNER JOIN accounts ON accounts.id = notes.user_id
                                                             WHERE notes.user_id = ?
                                                             ORDER BY notes.created_at DESC`
-	sqlSelectNotesByUsername = `SELECT notes.id, accounts.username, notes.message, notes.created_at FROM notes
-    														INNER JOIN accounts ON accounts.id = notes.user_id 
+	sqlSelectNotesByUsername = `SELECT notes.id, accounts.username, notes.message, notes.created_at, notes.edited_at FROM notes
+    														INNER JOIN accounts ON accounts.id = notes.user_id
                                                             WHERE accounts.username = ?
                                                             ORDER BY notes.created_at DESC`
-	sqlSelectAllNotes = `SELECT notes.id, accounts.username, notes.message, notes.created_at FROM notes
+	sqlSelectAllNotes = `SELECT notes.id, accounts.username, notes.message, notes.created_at, notes.edited_at FROM notes
     														INNER JOIN accounts ON accounts.id = notes.user_id
                                                             ORDER BY notes.created_at DESC`
 
 	// Local users and local timeline queries
 	sqlSelectAllAccounts = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key FROM accounts WHERE first_time_login = 0 ORDER BY username ASC`
-	sqlSelectLocalTimelineNotes = `SELECT notes.id, accounts.username, notes.message, notes.created_at FROM notes
+	sqlSelectLocalTimelineNotes = `SELECT notes.id, accounts.username, notes.message, notes.created_at, notes.edited_at FROM notes
 														INNER JOIN accounts ON accounts.id = notes.user_id
 														ORDER BY notes.created_at DESC LIMIT ?`
 )
@@ -106,9 +108,32 @@ func (db *DB) CreateAccByUsername(s ssh.Session, username string, webKeyPair *ut
 	})
 }
 
-func (db *DB) CreateNote(userId uuid.UUID, message string) error {
+func (db *DB) CreateNote(userId uuid.UUID, message string) (uuid.UUID, error) {
+	var noteId uuid.UUID
+	err := db.wrapTransaction(func(tx *sql.Tx) error {
+		id, err := db.insertNote(tx, userId, message)
+		if err != nil {
+			return err
+		}
+		noteId = id
+		return nil
+	})
+	return noteId, err
+}
+
+func (db *DB) UpdateNote(noteId uuid.UUID, message string) error {
 	return db.wrapTransaction(func(tx *sql.Tx) error {
-		err := db.insertNote(tx, userId, message)
+		err := db.updateNote(tx, noteId, message)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func (db *DB) DeleteNoteById(noteId uuid.UUID) error {
+	return db.wrapTransaction(func(tx *sql.Tx) error {
+		err := db.deleteNote(tx, noteId)
 		if err != nil {
 			return err
 		}
@@ -205,12 +230,19 @@ func (db *DB) ReadNotesByUserId(userId uuid.UUID) (error, *[]domain.Note) {
 	for rows.Next() {
 		var note domain.Note
 		var createdAtStr string
-		if err := rows.Scan(&note.Id, &note.CreatedBy, &note.Message, &createdAtStr); err != nil {
+		var editedAtStr sql.NullString
+		if err := rows.Scan(&note.Id, &note.CreatedBy, &note.Message, &createdAtStr, &editedAtStr); err != nil {
 			return err, &notes
 		}
 
 		if parsedTime, err := parseTimestamp(createdAtStr); err == nil {
 			note.CreatedAt = parsedTime
+		}
+
+		if editedAtStr.Valid {
+			if parsedTime, err := parseTimestamp(editedAtStr.String); err == nil {
+				note.EditedAt = &parsedTime
+			}
 		}
 
 		notes = append(notes, note)
@@ -234,12 +266,19 @@ func (db *DB) ReadNotesByUsername(username string) (error, *[]domain.Note) {
 	for rows.Next() {
 		var note domain.Note
 		var createdAtStr string
-		if err := rows.Scan(&note.Id, &note.CreatedBy, &note.Message, &createdAtStr); err != nil {
+		var editedAtStr sql.NullString
+		if err := rows.Scan(&note.Id, &note.CreatedBy, &note.Message, &createdAtStr, &editedAtStr); err != nil {
 			return err, &notes
 		}
 
 		if parsedTime, err := parseTimestamp(createdAtStr); err == nil {
 			note.CreatedAt = parsedTime
+		}
+
+		if editedAtStr.Valid {
+			if parsedTime, err := parseTimestamp(editedAtStr.String); err == nil {
+				note.EditedAt = &parsedTime
+			}
 		}
 
 		notes = append(notes, note)
@@ -254,9 +293,15 @@ func (db *DB) ReadNotesByUsername(username string) (error, *[]domain.Note) {
 func (db *DB) ReadNoteId(id uuid.UUID) (error, *domain.Note) {
 	row := db.db.QueryRow(sqlSelectNoteById, id)
 	var note domain.Note
-	err := row.Scan(&note.Id, &note.CreatedBy, &note.Message, &note.CreatedAt)
+	var editedAtStr sql.NullString
+	err := row.Scan(&note.Id, &note.CreatedBy, &note.Message, &note.CreatedAt, &editedAtStr)
 	if err == sql.ErrNoRows {
 		return err, nil
+	}
+	if editedAtStr.Valid {
+		if parsedTime, err := parseTimestamp(editedAtStr.String); err == nil {
+			note.EditedAt = &parsedTime
+		}
 	}
 	return err, &note
 }
@@ -273,12 +318,19 @@ func (db *DB) ReadAllNotes() (error, *[]domain.Note) {
 	for rows.Next() {
 		var note domain.Note
 		var createdAtStr string
-		if err := rows.Scan(&note.Id, &note.CreatedBy, &note.Message, &createdAtStr); err != nil {
+		var editedAtStr sql.NullString
+		if err := rows.Scan(&note.Id, &note.CreatedBy, &note.Message, &createdAtStr, &editedAtStr); err != nil {
 			return err, &notes
 		}
 
 		if parsedTime, err := parseTimestamp(createdAtStr); err == nil {
 			note.CreatedAt = parsedTime
+		}
+
+		if editedAtStr.Valid {
+			if parsedTime, err := parseTimestamp(editedAtStr.String); err == nil {
+				note.EditedAt = &parsedTime
+			}
 		}
 
 		notes = append(notes, note)
@@ -379,8 +431,19 @@ func (db *DB) insertUser(tx *sql.Tx, username string, publicKey string, webKeyPa
 	return err
 }
 
-func (db *DB) insertNote(tx *sql.Tx, userId uuid.UUID, message string) error {
-	_, err := tx.Exec(sqlInsertNote, uuid.New(), userId, message, time.Now().Format("2006-01-02 15:04:05"))
+func (db *DB) insertNote(tx *sql.Tx, userId uuid.UUID, message string) (uuid.UUID, error) {
+	noteId := uuid.New()
+	_, err := tx.Exec(sqlInsertNote, noteId, userId, message, time.Now().Format("2006-01-02 15:04:05"))
+	return noteId, err
+}
+
+func (db *DB) updateNote(tx *sql.Tx, noteId uuid.UUID, message string) error {
+	_, err := tx.Exec(sqlUpdateNote, message, time.Now().Format("2006-01-02 15:04:05"), noteId)
+	return err
+}
+
+func (db *DB) deleteNote(tx *sql.Tx, noteId uuid.UUID) error {
+	_, err := tx.Exec(sqlDeleteNote, noteId)
 	return err
 }
 
@@ -863,12 +926,19 @@ func (db *DB) ReadLocalTimelineNotes(limit int) (error, *[]domain.Note) {
 	for rows.Next() {
 		var note domain.Note
 		var createdAtStr string
-		if err := rows.Scan(&note.Id, &note.CreatedBy, &note.Message, &createdAtStr); err != nil {
+		var editedAtStr sql.NullString
+		if err := rows.Scan(&note.Id, &note.CreatedBy, &note.Message, &createdAtStr, &editedAtStr); err != nil {
 			return err, &notes
 		}
 
 		if parsedTime, err := parseTimestamp(createdAtStr); err == nil {
 			note.CreatedAt = parsedTime
+		}
+
+		if editedAtStr.Valid {
+			if parsedTime, err := parseTimestamp(editedAtStr.String); err == nil {
+				note.EditedAt = &parsedTime
+			}
 		}
 
 		notes = append(notes, note)

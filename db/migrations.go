@@ -186,6 +186,7 @@ func (db *DB) extendExistingTables(tx *sql.Tx) {
 	tx.Exec("ALTER TABLE notes ADD COLUMN federated INTEGER DEFAULT 1")
 	tx.Exec("ALTER TABLE notes ADD COLUMN sensitive INTEGER DEFAULT 0")
 	tx.Exec("ALTER TABLE notes ADD COLUMN content_warning TEXT")
+	tx.Exec("ALTER TABLE notes ADD COLUMN edited_at TIMESTAMP")
 
 	// Add is_local column to follows table to support local follows
 	tx.Exec("ALTER TABLE follows ADD COLUMN is_local INTEGER DEFAULT 0")

@@ -170,6 +170,18 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.listModel.Init()
 		}
 
+	case common.EditNoteMsg:
+		// Route EditNote message to writenote model and switch to CreateNoteView
+		m.createModel, cmd = m.createModel.Update(msg)
+		m.state = common.CreateNoteView
+		cmds = append(cmds, cmd)
+		return m, tea.Batch(cmds...)
+
+	case common.DeleteNoteMsg:
+		// Note was deleted, reload the list
+		m.listModel = listnotes.NewPager(m.account.Id, m.width, m.height)
+		return m, m.listModel.Init()
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
@@ -412,7 +424,7 @@ func (m MainModel) View() string {
 		var viewCommands string
 		switch m.state {
 		case common.ListNotesView:
-			viewCommands = "arrows: scroll"
+			viewCommands = "↑/↓: select • u: edit • d: delete"
 		case common.FollowUserView:
 			viewCommands = "enter: follow"
 		case common.FollowersView:

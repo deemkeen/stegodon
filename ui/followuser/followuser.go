@@ -33,7 +33,7 @@ type Model struct {
 
 func InitialModel(accountId uuid.UUID) Model {
 	ti := textinput.New()
-	ti.Placeholder = "user@mastodon.social"
+	ti.Placeholder = "user@domain or @user@domain"
 	ti.Focus()
 	ti.CharLimit = 100
 	ti.Width = 50
@@ -79,20 +79,28 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				return m, clearStatusAfter(2 * time.Second)
 			}
 
+			// Remove leading @ if present
+			input = strings.TrimPrefix(input, "@")
+
 			parts := strings.Split(input, "@")
 			if len(parts) != 2 {
-				m.Error = "Invalid format. Use: user@domain.com"
+				m.Error = "Invalid format. Use: user@domain.com or @user@domain.com"
 				return m, clearStatusAfter(2 * time.Second)
 			}
 
 			username := parts[0]
 			domain := parts[1]
 
+			if username == "" || domain == "" {
+				m.Error = "Invalid format. Use: user@domain.com or @user@domain.com"
+				return m, clearStatusAfter(2 * time.Second)
+			}
+
 			// Attempt to follow
-			m.Status = fmt.Sprintf("Following %s...", input)
+			m.Status = fmt.Sprintf("Following %s@%s...", username, domain)
 			m.Error = ""
 
-			return m, followRemoteUserCmd(m.AccountId, username, domain, input)
+			return m, followRemoteUserCmd(m.AccountId, username, domain, fmt.Sprintf("%s@%s", username, domain))
 		case "esc":
 			m.TextInput.SetValue("")
 			m.Status = ""
@@ -110,7 +118,8 @@ func (m Model) View() string {
 
 	s.WriteString(common.CaptionStyle.Render("follow remote user"))
 	s.WriteString("\n\n")
-	s.WriteString("Enter ActivityPub address (e.g., user@mastodon.social):\n\n")
+	s.WriteString("Enter ActivityPub address:\n")
+	s.WriteString("(e.g., user@mastodon.social or @user@mastodon.social)\n\n")
 	s.WriteString(m.TextInput.View())
 	s.WriteString("\n\n")
 

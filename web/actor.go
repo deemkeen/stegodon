@@ -1,9 +1,13 @@
 package web
 
 import (
+	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/util"
+	"github.com/google/uuid"
 	"strings"
 )
 
@@ -83,4 +87,50 @@ func getIRI(domain string, username string, action action) string {
 	default:
 		return ""
 	}
+}
+
+// GetNoteObject returns a Note object as ActivityPub JSON
+func GetNoteObject(noteId uuid.UUID, conf *util.AppConfig) (error, string) {
+	database := db.GetDB()
+	err, note := database.ReadNoteId(noteId)
+	if err != nil {
+		return err, "{}"
+	}
+
+	// Get the account to build actor URI
+	err, account := database.ReadAccByUsername(note.CreatedBy)
+	if err != nil {
+		return err, "{}"
+	}
+
+	actorURI := fmt.Sprintf("https://%s/users/%s", conf.Conf.SslDomain, account.Username)
+	noteURI := fmt.Sprintf("https://%s/notes/%s", conf.Conf.SslDomain, note.Id.String())
+
+	// Build the Note object
+	noteObj := map[string]interface{}{
+		"@context":      "https://www.w3.org/ns/activitystreams",
+		"id":            noteURI,
+		"type":          "Note",
+		"attributedTo":  actorURI,
+		"content":       note.Message,
+		"published":     note.CreatedAt.Format(time.RFC3339),
+		"to": []string{
+			"https://www.w3.org/ns/activitystreams#Public",
+		},
+		"cc": []string{
+			fmt.Sprintf("https://%s/users/%s/followers", conf.Conf.SslDomain, account.Username),
+		},
+	}
+
+	// Add updated field if note was edited
+	if note.EditedAt != nil {
+		noteObj["updated"] = note.EditedAt.Format(time.RFC3339)
+	}
+
+	jsonBytes, err := json.Marshal(noteObj)
+	if err != nil {
+		return err, "{}"
+	}
+
+	return nil, string(jsonBytes)
 }

@@ -53,6 +53,25 @@ func Router(conf *util.AppConfig) error {
 
 	// Endpoints for the ActivityPub functionality, WIP!
 	if conf.Conf.WithAp {
+		// Serve individual notes as ActivityPub objects
+		g.GET("/notes/:id", func(c *gin.Context) {
+			c.Header("Content-Type", "application/activity+json; charset=utf-8")
+
+			noteIdStr := c.Param("id")
+			noteId, err := uuid.Parse(noteIdStr)
+			if err != nil {
+				c.JSON(404, gin.H{"error": "Invalid note ID"})
+				return
+			}
+
+			err, note := GetNoteObject(noteId, conf)
+			if err != nil {
+				c.JSON(404, gin.H{"error": "Note not found"})
+			} else {
+				c.Render(200, render.String{Format: note})
+			}
+		})
+
 		g.GET("/users/:actor", func(c *gin.Context) {
 
 			data, err := c.GetRawData()
