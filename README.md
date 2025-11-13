@@ -110,7 +110,7 @@ Default configuration is in `config.yaml`.
 
 For optimal results, use a terminal with:
 - True Color (24-bit) support
-- At least 160 columns × 50 rows
+- At least 115 columns × 28 rows
 
 ## ActivityPub Implementation
 

@@ -2,13 +2,13 @@ package header
 
 import (
 	"fmt"
-	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
 	"github.com/deemkeen/stegodon/util"
+	"github.com/mattn/go-runewidth"
 )
 
 type Model struct {
@@ -29,30 +29,56 @@ func (m Model) View() string {
 }
 
 func GetHeaderStyle(acc *domain.Account, width int) string {
-	// Single bar design that fills entire width
-	// Format: "username @ stegodon/version | registered: date"
+	// Single-line header with manual spacing
+	elephant := "🦣"
 
-	leftText := fmt.Sprintf("%s @ %s", acc.Username, util.GetNameAndVersion())
-	rightText := fmt.Sprintf("registered: %s", acc.CreatedAt.Format(util.DateTimeFormat()))
+	leftText := fmt.Sprintf("%s %s", elephant, acc.Username)
+	centerText := fmt.Sprintf("stegodon v%s", util.GetVersion())
+	rightText := fmt.Sprintf("joined: %s", acc.CreatedAt.Format("2006-01-02"))
 
-	// Calculate spacing needed to fill the width
-	// Account for padding on both sides (2 chars each = 4 total)
-	textLength := len(leftText) + len(rightText) + 3 // +3 for " | "
-	paddingTotal := 4
-	spacesNeeded := width - textLength - paddingTotal
+	// Calculate display widths
+	leftLen := runewidth.StringWidth(leftText)
+	centerLen := runewidth.StringWidth(centerText)
+	rightLen := runewidth.StringWidth(rightText)
 
-	if spacesNeeded < 1 {
-		spacesNeeded = 1
+	// Calculate spacing to distribute evenly
+	totalTextLen := leftLen + centerLen + rightLen
+	totalSpacing := width - totalTextLen - 4 // -4 for side padding
+
+	if totalSpacing < 2 {
+		totalSpacing = 2
 	}
 
-	// Build the header text with spacing
-	headerText := fmt.Sprintf("%s%s%s", leftText, strings.Repeat(" ", spacesNeeded), rightText)
+	// Split spacing: half before center, half after
+	leftSpacing := totalSpacing / 2
+	rightSpacing := totalSpacing - leftSpacing
+
+	// Build the header as a single string with spaces
+	spaces := func(n int) string {
+		if n < 0 {
+			n = 0
+		}
+		result := ""
+		for i := 0; i < n; i++ {
+			result += " "
+		}
+		return result
+	}
+
+	header := fmt.Sprintf("  %s%s%s%s%s  ",
+		leftText,
+		spaces(leftSpacing),
+		centerText,
+		spaces(rightSpacing),
+		rightText,
+	)
 
 	return lipgloss.NewStyle().
 		Width(width).
+		MaxWidth(width).
 		Background(lipgloss.Color(common.COLOR_PURPLE)).
 		Foreground(lipgloss.Color("255")).
-		Padding(0, 1).
 		Bold(true).
-		Render(headerText)
+		Inline(true).
+		Render(header)
 }

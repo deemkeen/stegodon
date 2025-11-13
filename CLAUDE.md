@@ -174,7 +174,7 @@ Default configuration is in `config.yaml`.
 - No test files exist in the codebase currently
 - The `.ssh/hostkey` file is auto-generated on first run via `util.GeneratePemKeypair()`
 - Database file `database.db` is created in working directory
-- Terminal requirements: 24-bit color support, minimum 160 cols x 50 rows
+- Terminal requirements: 24-bit color support, minimum 115 cols x 28 rows
 - Public keys are hashed with SHA256 before storage for privacy
 
 ## Recent Updates (2025)

@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -306,12 +307,30 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m MainModel) View() string {
 
+	// Check minimum terminal size
+	minWidth := 115
+	minHeight := 28
+
+	if m.width < minWidth || m.height < minHeight {
+		message := fmt.Sprintf(
+			"Terminal too small!\n\nMinimum required: %dx%d\nCurrent size: %dx%d\n\nPlease resize your terminal.",
+			minWidth, minHeight, m.width, m.height,
+		)
+		return lipgloss.NewStyle().
+			Width(m.width).
+			Height(m.height).
+			Align(lipgloss.Center, lipgloss.Center).
+			Foreground(lipgloss.Color("9")).
+			Bold(true).
+			Render(message)
+	}
+
 	var s string
 
 	model := m.currentFocusedModel()
 
 	// Calculate responsive dimensions
-	availableHeight := m.height - 10 // Account for header and help text
+	availableHeight := m.height - 5 // Account for header and footer
 	leftPanelWidth := m.width / 3
 	rightPanelWidth := m.width - leftPanelWidth - 6 // Account for borders and margins
 
@@ -442,9 +461,24 @@ func (m MainModel) View() string {
 			viewCommands = " "
 		}
 
-		s += common.HelpStyle.Render(fmt.Sprintf(
+		helpText := fmt.Sprintf(
 			"focused > %s\t\tkeys > tab: next • shift+tab: prev • %s • ctrl-c: exit",
-			model, viewCommands))
+			model, viewCommands)
+
+		helpStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color(common.COLOR_GREY)).
+			Width(m.width).
+			Align(lipgloss.Center)
+
+		// Calculate remaining vertical space and add it before footer
+		currentContentHeight := availableHeight + 2 // panels + header
+		remainingHeight := m.height - currentContentHeight - 1 // -1 for footer itself
+
+		if remainingHeight > 0 {
+			s += strings.Repeat("\n", remainingHeight)
+		}
+
+		s += helpStyle.Render(helpText)
 		return lipgloss.NewStyle().Render(s)
 	}
 }
