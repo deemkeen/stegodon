@@ -22,6 +22,18 @@ func Router(conf *util.AppConfig) error {
 	g := gin.Default()
 	g.Use(gzip.Gzip(gzip.DefaultCompression))
 
+	// Load HTML templates
+	g.LoadHTMLGlob("web/templates/*")
+
+	// Web UI routes
+	g.GET("/", func(c *gin.Context) {
+		HandleIndex(c, conf)
+	})
+
+	g.GET("/u/:username", func(c *gin.Context) {
+		HandleProfile(c, conf)
+	})
+
 	// RSS Feed
 	g.GET("/feed", func(c *gin.Context) {
 

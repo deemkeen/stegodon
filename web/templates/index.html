@@ -1,0 +1,166 @@
+{{define "index.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - Stegodon</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 2em;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+        h3 {
+            color: #7f8c8d;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+        .info-box {
+            background: #ecf0f1;
+            padding: 20px;
+            border-radius: 6px;
+            margin-bottom: 30px;
+            border-left: 4px solid #3498db;
+        }
+        .info-box code {
+            background: #34495e;
+            color: #ecf0f1;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        .post {
+            border-bottom: 1px solid #ecf0f1;
+            padding: 20px 0;
+        }
+        .post:last-child {
+            border-bottom: none;
+        }
+        .post-meta {
+            color: #7f8c8d;
+            font-size: 0.9em;
+            margin-bottom: 8px;
+        }
+        .post-author {
+            font-weight: bold;
+            color: #3498db;
+            text-decoration: none;
+        }
+        .post-author:hover {
+            text-decoration: underline;
+        }
+        .post-time {
+            color: #95a5a6;
+        }
+        .post-content {
+            color: #2c3e50;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ecf0f1;
+        }
+        .pagination a, .pagination span {
+            padding: 8px 16px;
+            background: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+        .pagination a:hover {
+            background: #2980b9;
+        }
+        .pagination span {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #95a5a6;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Stegodon</h1>
+
+    <div class="info-box">
+        <h3>Connect to this server</h3>
+        <p>Connect via SSH to start posting:</p>
+        <p><code>ssh -p {{.SSHPort}} {{.Host}}</code></p>
+        <p style="margin-top: 10px;">On first connection, you'll be prompted to choose a username. After that, you can create posts, follow users, and explore the federated timeline.</p>
+    </div>
+
+    <h2>Local Timeline</h2>
+
+    {{if .Posts}}
+        {{range .Posts}}
+        <div class="post">
+            <div class="post-meta">
+                <a href="/u/{{.Username}}" class="post-author">@{{.Username}}</a>
+                <span class="post-time">• {{.TimeAgo}}</span>
+            </div>
+            <div class="post-content">{{.Message}}</div>
+        </div>
+        {{end}}
+
+        {{if or .HasPrev .HasNext}}
+        <div class="pagination">
+            <div>
+                {{if .HasPrev}}
+                <a href="/?page={{.PrevPage}}">← Previous</a>
+                {{else}}
+                <span>← Previous</span>
+                {{end}}
+            </div>
+            <div>
+                {{if .HasNext}}
+                <a href="/?page={{.NextPage}}">Next →</a>
+                {{else}}
+                <span>Next →</span>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+    {{else}}
+        <div class="empty-state">
+            No posts yet. Connect and be the first to post!
+        </div>
+    {{end}}
+</div>
+</body>
+</html>
+{{end}}
