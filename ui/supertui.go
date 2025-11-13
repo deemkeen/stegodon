@@ -2,6 +2,8 @@ package ui
 
 import (
 	"fmt"
+	"log"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/deemkeen/stegodon/db"
@@ -17,7 +19,6 @@ import (
 	"github.com/deemkeen/stegodon/ui/localusers"
 	"github.com/deemkeen/stegodon/ui/timeline"
 	"github.com/deemkeen/stegodon/ui/writenote"
-	"log"
 )
 
 var (
@@ -52,7 +53,7 @@ func updateUserModelCmd(acc *domain.Account) tea.Cmd {
 		acc.FirstTimeLogin = domain.FALSE
 		err := db.GetDB().UpdateLoginById(acc.Username, acc.Id)
 		if err != nil {
-			log.Println(fmt.Sprintf("User %s could not be updated!", acc.Username))
+			log.Printf("User %s could not be updated!", acc.Username)
 		}
 		return nil
 	}

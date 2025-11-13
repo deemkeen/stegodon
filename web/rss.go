@@ -3,13 +3,14 @@ package web
 import (
 	"errors"
 	"fmt"
+	"log"
+	"time"
+
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/util"
 	"github.com/google/uuid"
 	"github.com/gorilla/feeds"
-	"log"
-	"time"
 )
 
 func GetRSS(conf *util.AppConfig, username string) (string, error) {
@@ -38,7 +39,7 @@ func GetRSS(conf *util.AppConfig, username string) (string, error) {
 			log.Println("Could not get notes!", err)
 			return "", errors.New("error retrieving notes")
 		}
-		title = fmt.Sprintf("All Stegodon Notes")
+		title = "All Stegodon Notes"
 		createdBy = "everyone"
 		email = fmt.Sprintf("%s@stegodon", createdBy)
 	}

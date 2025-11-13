@@ -2,6 +2,7 @@ package createuser
 
 import (
 	"fmt"
+
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -38,7 +39,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 func (m Model) View() string {
 	return fmt.Sprintf(
-		"You don't have a username yet, please choose wisely!\n\n%s\n\n%s",
+		"Logging into STEGODON v%s\n\nYou don't have a username yet, please choose wisely!\n\n%s\n\n%s",
+		util.GetVersion(),
 		m.TextInput.View(),
 		"(enter to save, ctrl-c to quit)",
 	) + "\n"

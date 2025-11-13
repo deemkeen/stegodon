@@ -1,14 +1,15 @@
 package middleware
 
 import (
-	"github.com/charmbracelet/ssh"
+	"log"
+
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	bm "github.com/charmbracelet/wish/bubbletea"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/ui"
 	"github.com/muesli/termenv"
-	"log"
 )
 
 func MainTui() wish.Middleware {
