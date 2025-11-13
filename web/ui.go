@@ -25,13 +25,20 @@ type IndexPageData struct {
 
 type ProfilePageData struct {
 	Title      string
-	User       domain.Account
+	User       UserView
 	Posts      []PostView
 	TotalPosts int
 	HasPrev    bool
 	HasNext    bool
 	PrevPage   int
 	NextPage   int
+}
+
+type UserView struct {
+	Username    string
+	DisplayName string
+	Summary     string
+	JoinedAgo   string
 }
 
 type PostView struct {
@@ -192,8 +199,13 @@ func HandleProfile(c *gin.Context, conf *util.AppConfig) {
 	}
 
 	data := ProfilePageData{
-		Title:      fmt.Sprintf("@%s", username),
-		User:       *account,
+		Title: fmt.Sprintf("@%s", username),
+		User: UserView{
+			Username:    account.Username,
+			DisplayName: account.DisplayName,
+			Summary:     account.Summary,
+			JoinedAgo:   formatTimeAgo(account.CreatedAt),
+		},
 		Posts:      posts,
 		TotalPosts: totalPosts,
 		HasPrev:    page > 1,
