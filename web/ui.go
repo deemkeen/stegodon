@@ -25,6 +25,8 @@ type IndexPageData struct {
 
 type ProfilePageData struct {
 	Title      string
+	Host       string
+	SSHPort    int
 	User       UserView
 	Posts      []PostView
 	TotalPosts int
@@ -125,9 +127,15 @@ func HandleIndex(c *gin.Context, conf *util.AppConfig) {
 		})
 	}
 
+	// Use SSLDomain if federation is enabled, otherwise use Host
+	host := conf.Conf.Host
+	if conf.Conf.WithAp {
+		host = conf.Conf.SslDomain
+	}
+
 	data := IndexPageData{
 		Title:    "Home",
-		Host:     conf.Conf.Host,
+		Host:     host,
 		SSHPort:  conf.Conf.SshPort,
 		Posts:    posts,
 		HasPrev:  page > 1,
@@ -198,8 +206,16 @@ func HandleProfile(c *gin.Context, conf *util.AppConfig) {
 		})
 	}
 
+	// Use SSLDomain if federation is enabled, otherwise use Host
+	host := conf.Conf.Host
+	if conf.Conf.WithAp {
+		host = conf.Conf.SslDomain
+	}
+
 	data := ProfilePageData{
-		Title: fmt.Sprintf("@%s", username),
+		Title:   fmt.Sprintf("@%s", username),
+		Host:    host,
+		SSHPort: conf.Conf.SshPort,
 		User: UserView{
 			Username:    account.Username,
 			DisplayName: account.DisplayName,

@@ -1,164 +1,338 @@
 {{define "profile.html"}}
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{.Title}} - Stegodon</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background: #f5f5f5;
-            padding: 20px;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        h2 {
-            color: #34495e;
-            margin-top: 30px;
-            margin-bottom: 15px;
-            font-size: 1.5em;
-        }
-        .post {
-            border-bottom: 1px solid #ecf0f1;
-            padding: 20px 0;
-        }
-        .post:last-child {
-            border-bottom: none;
-        }
-        .post-meta {
-            color: #7f8c8d;
-            font-size: 0.9em;
-            margin-bottom: 8px;
-        }
-        .post-time {
-            color: #95a5a6;
-        }
-        .post-content {
-            color: #2c3e50;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-        .pagination {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #ecf0f1;
-        }
-        .pagination a, .pagination span {
-            padding: 8px 16px;
-            background: #3498db;
-            color: white;
-            text-decoration: none;
-            border-radius: 4px;
-        }
-        .pagination a:hover {
-            background: #2980b9;
-        }
-        .pagination span {
-            background: #95a5a6;
-            cursor: not-allowed;
-        }
-        .user-profile {
-            background: #ecf0f1;
-            padding: 20px;
-            border-radius: 6px;
-            margin-bottom: 30px;
-        }
-        .user-profile h2 {
-            margin-top: 0;
-        }
-        .user-info {
-            margin-top: 10px;
-        }
-        .user-info p {
-            margin: 5px 0;
-            color: #555;
-        }
-        .back-link {
-            display: inline-block;
-            margin-bottom: 20px;
-            color: #3498db;
-            text-decoration: none;
-        }
-        .back-link:hover {
-            text-decoration: underline;
-        }
-        .empty-state {
-            text-align: center;
-            padding: 40px;
-            color: #95a5a6;
-            font-style: italic;
-        }
-    </style>
-</head>
-<body>
-<div class="container">
-    <a href="/" class="back-link">← Back to timeline</a>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>{{.Title}} - Stegodon</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                font-family:
+                    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                    sans-serif;
+                line-height: 1.6;
+                color: #333;
+                background: #f5f5f5;
+                height: 100vh;
+                overflow: hidden;
+            }
+            .layout {
+                display: flex;
+                height: 100vh;
+            }
+            .sidebar {
+                width: 350px;
+                background: #2c3e50;
+                color: #ecf0f1;
+                padding: 30px;
+                overflow-y: auto;
+                position: fixed;
+                height: 100vh;
+                left: 0;
+                top: 0;
+            }
+            .sidebar h1 {
+                color: #3498db;
+                margin-bottom: 20px;
+                font-size: 2em;
+            }
+            .info-box {
+                background: rgba(52, 152, 219, 0.1);
+                padding: 20px;
+                border-radius: 6px;
+                margin-bottom: 20px;
+                border-left: 4px solid #3498db;
+            }
+            .info-box h3 {
+                color: #3498db;
+                margin-bottom: 10px;
+                font-size: 1.2em;
+            }
+            .info-box code {
+                background: #34495e;
+                color: #2ecc71;
+                padding: 4px 8px;
+                border-radius: 3px;
+                font-family: monospace;
+                display: block;
+                margin: 10px 0;
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+                white-space: pre-wrap;
+            }
+            .info-box a {
+                color: #3498db;
+                text-decoration: none;
+                font-weight: 500;
+            }
+            .info-box a:hover {
+                text-decoration: underline;
+            }
+            .main-content {
+                margin-left: 350px;
+                flex: 1;
+                background: white;
+                overflow-y: auto;
+                height: 100vh;
+            }
+            .content-wrapper {
+                max-width: 1200px;
+                padding: 30px;
+            }
+            .back-link {
+                display: inline-block;
+                margin-bottom: 20px;
+                color: #3498db;
+                text-decoration: none;
+                font-weight: 500;
+            }
+            .back-link:hover {
+                text-decoration: underline;
+            }
+            .user-profile {
+                background: #ecf0f1;
+                padding: 20px;
+                border-radius: 8px;
+                margin-bottom: 30px;
+                border-left: 4px solid #3498db;
+            }
+            .user-profile h2 {
+                color: #2c3e50;
+                margin-top: 0;
+                padding-bottom: none;
+                border-bottom: none;
+                margin-bottom: 15px;
+            }
+            .user-info {
+                margin-top: 10px;
+            }
+            .user-info p {
+                margin: 5px 0;
+                color: #555;
+            }
+            .user-info strong {
+                color: #2c3e50;
+            }
+            h2 {
+                color: #2c3e50;
+                margin-bottom: 20px;
+                font-size: 1.8em;
+                border-bottom: 3px solid #3498db;
+                padding-bottom: 10px;
+            }
+            .post {
+                border-bottom: 1px solid #ecf0f1;
+                padding: 20px 0;
+            }
+            .post:last-child {
+                border-bottom: none;
+            }
+            .post-meta {
+                color: #7f8c8d;
+                font-size: 0.9em;
+                margin-bottom: 8px;
+            }
+            .post-time {
+                color: #95a5a6;
+            }
+            .post-content {
+                color: #2c3e50;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+            }
+            .pagination {
+                display: flex;
+                justify-content: space-between;
+                margin-top: 30px;
+                padding-top: 20px;
+                border-top: 1px solid #ecf0f1;
+            }
+            .pagination a,
+            .pagination span {
+                padding: 10px 20px;
+                background: #3498db;
+                color: white;
+                text-decoration: none;
+                border-radius: 4px;
+                font-weight: 500;
+            }
+            .pagination a:hover {
+                background: #2980b9;
+            }
+            .pagination span {
+                background: #95a5a6;
+                cursor: not-allowed;
+            }
+            .empty-state {
+                text-align: center;
+                padding: 60px 20px;
+                color: #95a5a6;
+                font-style: italic;
+            }
+            .scroll-up {
+                display: none;
+            }
+            @media (max-width: 768px) {
+                body {
+                    overflow: auto;
+                }
+                .layout {
+                    flex-direction: column;
+                    height: auto;
+                    overflow: visible;
+                }
+                .sidebar {
+                    width: 100%;
+                    position: sticky;
+                    top: 0;
+                    height: auto;
+                    z-index: 100;
+                    transition: all 0.3s ease;
+                }
+                .sidebar.minimized {
+                    padding: 15px 30px;
+                    cursor: pointer;
+                }
+                .sidebar.minimized .info-box {
+                    display: none;
+                }
+                .sidebar.minimized h1 {
+                    font-size: 1.5em;
+                    margin-bottom: 0;
+                    display: inline-block;
+                }
+                .sidebar.minimized .scroll-up {
+                    display: inline-block;
+                    float: right;
+                    color: #3498db;
+                    font-size: 1.5em;
+                    line-height: 1.5em;
+                }
+                .main-content {
+                    margin-left: 0;
+                    height: auto;
+                    overflow: visible;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="layout">
+            <div class="sidebar">
+                <h1>🦣 stegodon</h1>
+                <span class="scroll-up">↑</span>
 
-    <div class="user-profile">
-        <h2>@{{.User.Username}}</h2>
-        <div class="user-info">
-            {{if .User.DisplayName}}
-            <p><strong>Display Name:</strong> {{.User.DisplayName}}</p>
-            {{end}}
-            {{if .User.Summary}}
-            <p><strong>Bio:</strong> {{.User.Summary}}</p>
-            {{end}}
-            <p><strong>Joined:</strong> {{.User.JoinedAgo}}</p>
-        </div>
-    </div>
+                <div class="info-box">
+                    <h3>connect to this server</h3>
+                    <p>Connect via SSH to start posting:</p>
+                    <code>ssh -p {{.SSHPort}} {{.Host}}</code>
+                    <p style="margin-top: 15px">
+                        On first connection, you'll be prompted to choose a
+                        username. After that, you can create posts, follow
+                        users, and explore the federated timeline.
+                    </p>
+                    <p style="margin-top: 15px">
+                        On federated services like Mastodon people now can
+                        follow you, when searching for:
+                    </p>
+                    <code>@yourusername@{{.Host}}</code>
+                </div>
 
-    <h2>Posts ({{.TotalPosts}})</h2>
-
-    {{if .Posts}}
-        {{range .Posts}}
-        <div class="post">
-            <div class="post-meta">
-                <span class="post-time">{{.TimeAgo}}</span>
+                <div class="info-box">
+                    <h3>features</h3>
+                    <p>• Create and read posts</p>
+                    <p>• Follow local and remote users</p>
+                    <p>• ActivityPub federation</p>
+                    <p>• <a href="/feed">RSS feeds</a></p>
+                </div>
             </div>
-            <div class="post-content">{{.Message}}</div>
-        </div>
-        {{end}}
 
-        {{if or .HasPrev .HasNext}}
-        <div class="pagination">
-            <div>
-                {{if .HasPrev}}
-                <a href="/u/{{$.User.Username}}?page={{.PrevPage}}">← Previous</a>
-                {{else}}
-                <span>← Previous</span>
-                {{end}}
-            </div>
-            <div>
-                {{if .HasNext}}
-                <a href="/u/{{$.User.Username}}?page={{.NextPage}}">Next →</a>
-                {{else}}
-                <span>Next →</span>
-                {{end}}
+            <div class="main-content">
+                <div class="content-wrapper">
+                    <a href="/" class="back-link">← back to timeline</a>
+
+                    <div class="user-profile">
+                        <h2>@{{.User.Username}}</h2>
+                        <div class="user-info">
+                            {{if .User.DisplayName}}
+                            <p>
+                                <strong>display name:</strong>
+                                {{.User.DisplayName}}
+                            </p>
+                            {{end}} {{if .User.Summary}}
+                            <p><strong>bio:</strong> {{.User.Summary}}</p>
+                            {{end}}
+                            <p><strong>joined:</strong> {{.User.JoinedAgo}}</p>
+                        </div>
+                    </div>
+
+                    <h2>posts ({{.TotalPosts}})</h2>
+
+                    {{if .Posts}} {{range .Posts}}
+                    <div class="post">
+                        <div class="post-meta">
+                            <span class="post-time">{{.TimeAgo}}</span>
+                        </div>
+                        <div class="post-content">{{.Message}}</div>
+                    </div>
+                    {{end}} {{if or .HasPrev .HasNext}}
+                    <div class="pagination">
+                        <div>
+                            {{if .HasPrev}}
+                            <a href="/u/{{$.User.Username}}?page={{.PrevPage}}"
+                                >← previous</a
+                            >
+                            {{else}}
+                            <span>← previous</span>
+                            {{end}}
+                        </div>
+                        <div>
+                            {{if .HasNext}}
+                            <a href="/u/{{$.User.Username}}?page={{.NextPage}}"
+                                >next →</a
+                            >
+                            {{else}}
+                            <span>next →</span>
+                            {{end}}
+                        </div>
+                    </div>
+                    {{end}} {{else}}
+                    <div class="empty-state">no posts yet.</div>
+                    {{end}}
+                </div>
             </div>
         </div>
-        {{end}}
-    {{else}}
-        <div class="empty-state">
-            No posts yet.
-        </div>
-    {{end}}
-</div>
-</body>
+        <script>
+            // Mobile scroll handler
+            if (window.innerWidth <= 768) {
+                const sidebar = document.querySelector(".sidebar");
+
+                window.addEventListener("scroll", () => {
+                    const currentScroll = window.pageYOffset;
+
+                    if (currentScroll > 100) {
+                        sidebar.classList.add("minimized");
+                    } else {
+                        sidebar.classList.remove("minimized");
+                    }
+                });
+
+                // Click minimized header to scroll to top
+                sidebar.addEventListener("click", () => {
+                    if (sidebar.classList.contains("minimized")) {
+                        window.scrollTo({
+                            top: 0,
+                            behavior: "smooth",
+                        });
+                    }
+                });
+            }
+        </script>
+    </body>
 </html>
 {{end}}
