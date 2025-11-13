@@ -10,6 +10,7 @@ import (
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
+	"github.com/google/uuid"
 	"log"
 )
 
@@ -32,24 +33,26 @@ var (
 )
 
 type Model struct {
-	Posts  []domain.Note
-	Offset int // Pagination offset
-	Width  int
-	Height int
+	AccountId uuid.UUID
+	Posts     []domain.Note
+	Offset    int // Pagination offset
+	Width     int
+	Height    int
 }
 
-func InitialModel(width, height int) Model {
+func InitialModel(accountId uuid.UUID, width, height int) Model {
 	return Model{
-		Posts:  []domain.Note{},
-		Offset: 0,
-		Width:  width,
-		Height: height,
+		AccountId: accountId,
+		Posts:     []domain.Note{},
+		Offset:    0,
+		Width:     width,
+		Height:    height,
 	}
 }
 
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
-		loadLocalPosts(),
+		loadLocalPosts(m.AccountId),
 		tickRefresh(),
 	)
 }
@@ -68,7 +71,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case refreshTickMsg:
 		// Reload posts and schedule next refresh
-		return m, tea.Batch(loadLocalPosts(), tickRefresh())
+		return m, tea.Batch(loadLocalPosts(m.AccountId), tickRefresh())
 
 	case postsLoadedMsg:
 		m.Posts = msg.posts
@@ -129,11 +132,11 @@ type postsLoadedMsg struct {
 	posts []domain.Note
 }
 
-// loadLocalPosts loads recent posts from all local users
-func loadLocalPosts() tea.Cmd {
+// loadLocalPosts loads recent posts from followed local users (plus own posts)
+func loadLocalPosts(accountId uuid.UUID) tea.Cmd {
 	return func() tea.Msg {
 		database := db.GetDB()
-		err, notes := database.ReadLocalTimelineNotes(50)
+		err, notes := database.ReadLocalTimelineNotes(accountId, 50)
 		if err != nil {
 			log.Printf("Failed to load local timeline: %v", err)
 			return postsLoadedMsg{posts: []domain.Note{}}

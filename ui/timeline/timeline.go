@@ -14,6 +14,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/ui/common"
+	"github.com/google/uuid"
 )
 
 var (
@@ -49,11 +50,12 @@ var (
 )
 
 type Model struct {
-	Posts    []FederatedPost
-	Offset   int // Pagination offset
-	Selected int // Currently selected post index
-	Width    int
-	Height   int
+	AccountId uuid.UUID
+	Posts     []FederatedPost
+	Offset    int // Pagination offset
+	Selected  int // Currently selected post index
+	Width     int
+	Height    int
 }
 
 type FederatedPost struct {
@@ -63,19 +65,20 @@ type FederatedPost struct {
 	ObjectURI string // URL to the original post
 }
 
-func InitialModel(width, height int) Model {
+func InitialModel(accountId uuid.UUID, width, height int) Model {
 	return Model{
-		Posts:    []FederatedPost{},
-		Offset:   0,
-		Selected: 0,
-		Width:    width,
-		Height:   height,
+		AccountId: accountId,
+		Posts:     []FederatedPost{},
+		Offset:    0,
+		Selected:  0,
+		Width:     width,
+		Height:    height,
 	}
 }
 
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
-		loadFederatedPosts(),
+		loadFederatedPosts(m.AccountId),
 		tickRefresh(),
 	)
 }
@@ -94,7 +97,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case refreshTickMsg:
 		// Reload posts and schedule next refresh
-		return m, tea.Batch(loadFederatedPosts(), tickRefresh())
+		return m, tea.Batch(loadFederatedPosts(m.AccountId), tickRefresh())
 
 	case postsLoadedMsg:
 		m.Posts = msg.posts
@@ -192,11 +195,11 @@ type postsLoadedMsg struct {
 	posts []FederatedPost
 }
 
-// loadFederatedPosts loads recent federated activities
-func loadFederatedPosts() tea.Cmd {
+// loadFederatedPosts loads recent federated activities from followed remote users
+func loadFederatedPosts(accountId uuid.UUID) tea.Cmd {
 	return func() tea.Msg {
 		database := db.GetDB()
-		err, activities := database.ReadFederatedActivities(20)
+		err, activities := database.ReadFederatedActivities(accountId, 20)
 		if err != nil {
 			log.Printf("Failed to load federated activities: %v", err)
 			return postsLoadedMsg{posts: []FederatedPost{}}

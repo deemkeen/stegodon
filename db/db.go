@@ -77,6 +77,13 @@ const (
 	sqlSelectLocalTimelineNotes = `SELECT notes.id, accounts.username, notes.message, notes.created_at, notes.edited_at FROM notes
 														INNER JOIN accounts ON accounts.id = notes.user_id
 														ORDER BY notes.created_at DESC LIMIT ?`
+	sqlSelectLocalTimelineNotesByFollows = `SELECT notes.id, accounts.username, notes.message, notes.created_at, notes.edited_at FROM notes
+														INNER JOIN accounts ON accounts.id = notes.user_id
+														WHERE notes.user_id = ? OR notes.user_id IN (
+															SELECT target_account_id FROM follows
+															WHERE account_id = ? AND accepted = 1 AND is_local = 1
+														)
+														ORDER BY notes.created_at DESC LIMIT ?`
 )
 
 func (db *DB) CreateAccount(s ssh.Session, username string) (error, bool) {
@@ -668,6 +675,13 @@ func (db *DB) DeleteFollowByURI(uri string) error {
 	})
 }
 
+func (db *DB) DeleteFollowByAccountIds(accountId, targetAccountId uuid.UUID) error {
+	return db.wrapTransaction(func(tx *sql.Tx) error {
+		_, err := tx.Exec(sqlDeleteLocalFollow, accountId.String(), targetAccountId.String())
+		return err
+	})
+}
+
 func (db *DB) AcceptFollowByURI(uri string) error {
 	return db.wrapTransaction(func(tx *sql.Tx) error {
 		_, err := tx.Exec("UPDATE follows SET accepted = 1 WHERE uri = ?", uri)
@@ -770,10 +784,16 @@ func (db *DB) ReadActivityByObjectURI(objectURI string) (error, *domain.Activity
 // ReadFederatedActivities returns recent Create activities from remote actors
 const (
 	sqlSelectFederatedActivities = `SELECT id, activity_uri, activity_type, actor_uri, object_uri, raw_json, processed, local, created_at FROM activities WHERE activity_type = 'Create' AND local = 0 ORDER BY created_at DESC LIMIT ?`
+	sqlSelectFederatedActivitiesByFollows = `SELECT a.id, a.activity_uri, a.activity_type, a.actor_uri, a.object_uri, a.raw_json, a.processed, a.local, a.created_at
+		FROM activities a
+		INNER JOIN remote_accounts ra ON ra.actor_uri = a.actor_uri
+		INNER JOIN follows f ON f.target_account_id = ra.id
+		WHERE a.activity_type = 'Create' AND a.local = 0 AND f.account_id = ? AND f.accepted = 1 AND f.is_local = 0
+		ORDER BY a.created_at DESC LIMIT ?`
 )
 
-func (db *DB) ReadFederatedActivities(limit int) (error, *[]domain.Activity) {
-	rows, err := db.db.Query(sqlSelectFederatedActivities, limit)
+func (db *DB) ReadFederatedActivities(accountId uuid.UUID, limit int) (error, *[]domain.Activity) {
+	rows, err := db.db.Query(sqlSelectFederatedActivitiesByFollows, accountId.String(), limit)
 	if err != nil {
 		return err, nil
 	}
@@ -862,8 +882,8 @@ func (db *DB) DeleteDelivery(id uuid.UUID) error {
 
 // Follower queries
 const (
-	sqlSelectFollowersByAccountId  = `SELECT id, account_id, target_account_id, uri, accepted, created_at FROM follows WHERE target_account_id = ? AND accepted = 1`
-	sqlSelectFollowingByAccountId = `SELECT id, account_id, target_account_id, uri, accepted, created_at FROM follows WHERE account_id = ? AND accepted = 1`
+	sqlSelectFollowersByAccountId  = `SELECT id, account_id, target_account_id, uri, accepted, created_at, is_local FROM follows WHERE target_account_id = ? AND accepted = 1`
+	sqlSelectFollowingByAccountId = `SELECT id, account_id, target_account_id, uri, accepted, created_at, is_local FROM follows WHERE account_id = ? AND accepted = 1`
 )
 
 func (db *DB) ReadFollowersByAccountId(accountId uuid.UUID) (error, *[]domain.Follow) {
@@ -877,12 +897,14 @@ func (db *DB) ReadFollowersByAccountId(accountId uuid.UUID) (error, *[]domain.Fo
 	for rows.Next() {
 		var follow domain.Follow
 		var idStr, accountIdStr, targetIdStr string
-		if err := rows.Scan(&idStr, &accountIdStr, &targetIdStr, &follow.URI, &follow.Accepted, &follow.CreatedAt); err != nil {
+		var isLocal int
+		if err := rows.Scan(&idStr, &accountIdStr, &targetIdStr, &follow.URI, &follow.Accepted, &follow.CreatedAt, &isLocal); err != nil {
 			return err, &followers
 		}
 		follow.Id, _ = uuid.Parse(idStr)
 		follow.AccountId, _ = uuid.Parse(accountIdStr)
 		follow.TargetAccountId, _ = uuid.Parse(targetIdStr)
+		follow.IsLocal = isLocal == 1
 		followers = append(followers, follow)
 	}
 	if err = rows.Err(); err != nil {
@@ -903,12 +925,14 @@ func (db *DB) ReadFollowingByAccountId(accountId uuid.UUID) (error, *[]domain.Fo
 	for rows.Next() {
 		var follow domain.Follow
 		var idStr, accountIdStr, targetIdStr string
-		if err := rows.Scan(&idStr, &accountIdStr, &targetIdStr, &follow.URI, &follow.Accepted, &follow.CreatedAt); err != nil {
+		var isLocal int
+		if err := rows.Scan(&idStr, &accountIdStr, &targetIdStr, &follow.URI, &follow.Accepted, &follow.CreatedAt, &isLocal); err != nil {
 			return err, &following
 		}
 		follow.Id, _ = uuid.Parse(idStr)
 		follow.AccountId, _ = uuid.Parse(accountIdStr)
 		follow.TargetAccountId, _ = uuid.Parse(targetIdStr)
+		follow.IsLocal = isLocal == 1
 		following = append(following, follow)
 	}
 	if err = rows.Err(); err != nil {
@@ -939,9 +963,9 @@ func (db *DB) ReadAllAccounts() (error, *[]domain.Account) {
 	return nil, &accounts
 }
 
-// ReadLocalTimelineNotes returns recent notes from all local users for the local timeline
-func (db *DB) ReadLocalTimelineNotes(limit int) (error, *[]domain.Note) {
-	rows, err := db.db.Query(sqlSelectLocalTimelineNotes, limit)
+// ReadLocalTimelineNotes returns recent notes from local users that the given account follows (plus their own posts)
+func (db *DB) ReadLocalTimelineNotes(accountId uuid.UUID, limit int) (error, *[]domain.Note) {
+	rows, err := db.db.Query(sqlSelectLocalTimelineNotesByFollows, accountId.String(), accountId.String(), limit)
 	if err != nil {
 		return err, nil
 	}

@@ -89,18 +89,38 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			// Unfollow the selected account
 			if len(m.Following) > 0 && m.Selected < len(m.Following) {
 				selectedFollow := m.Following[m.Selected]
-
-				// Get remote account details for display name
 				database := db.GetDB()
-				err, remoteAcc := database.ReadRemoteAccountById(selectedFollow.TargetAccountId)
-				displayName := "user"
-				if err == nil && remoteAcc != nil {
-					displayName = fmt.Sprintf("@%s@%s", remoteAcc.Username, remoteAcc.Domain)
+
+				var displayName string
+
+				if selectedFollow.IsLocal {
+					// Local follow - get local account details
+					err, localAcc := database.ReadAccById(selectedFollow.TargetAccountId)
+					if err == nil && localAcc != nil {
+						displayName = localAcc.Username
+					} else {
+						displayName = "user"
+					}
+				} else {
+					// Remote follow - get remote account details
+					err, remoteAcc := database.ReadRemoteAccountById(selectedFollow.TargetAccountId)
+					if err == nil && remoteAcc != nil {
+						displayName = fmt.Sprintf("@%s@%s", remoteAcc.Username, remoteAcc.Domain)
+					} else {
+						displayName = "user"
+					}
 				}
 
 				// Delete the follow
 				go func() {
-					err := database.DeleteFollowByURI(selectedFollow.URI)
+					var err error
+					if selectedFollow.IsLocal {
+						// For local follows, delete by account IDs
+						err = database.DeleteFollowByAccountIds(m.AccountId, selectedFollow.TargetAccountId)
+					} else {
+						// For remote follows, delete by URI
+						err = database.DeleteFollowByURI(selectedFollow.URI)
+					}
 					if err != nil {
 						log.Printf("Unfollow failed: %v", err)
 					}
@@ -133,25 +153,38 @@ func (m Model) View() string {
 		displayCount := min(len(m.Following), 10)
 		for i := 0; i < displayCount; i++ {
 			follow := m.Following[i]
-
-			// Get remote account details
 			database := db.GetDB()
-			err, remoteAcc := database.ReadRemoteAccountById(follow.TargetAccountId)
-			if err != nil {
-				log.Printf("Failed to read remote account: %v", err)
-				continue
-			}
 
-			displayName := remoteAcc.DisplayName
-			if displayName == "" {
-				displayName = remoteAcc.Username
-			}
+			var userText string
 
-			userText := fmt.Sprintf("• %s (@%s@%s)",
-				displayName,
-				remoteAcc.Username,
-				remoteAcc.Domain,
-			)
+			if follow.IsLocal {
+				// Local follow - look up in accounts table
+				err, localAcc := database.ReadAccById(follow.TargetAccountId)
+				if err != nil {
+					log.Printf("Failed to read local account: %v", err)
+					continue
+				}
+
+				userText = fmt.Sprintf("• %s (local)", localAcc.Username)
+			} else {
+				// Remote follow - look up in remote_accounts table
+				err, remoteAcc := database.ReadRemoteAccountById(follow.TargetAccountId)
+				if err != nil {
+					log.Printf("Failed to read remote account: %v", err)
+					continue
+				}
+
+				displayName := remoteAcc.DisplayName
+				if displayName == "" {
+					displayName = remoteAcc.Username
+				}
+
+				userText = fmt.Sprintf("• %s (@%s@%s)",
+					displayName,
+					remoteAcc.Username,
+					remoteAcc.Domain,
+				)
+			}
 
 			if i == m.Selected {
 				s.WriteString("→ " + selectedStyle.Render(userText))

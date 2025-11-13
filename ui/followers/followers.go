@@ -86,26 +86,40 @@ func (m Model) View() string {
 
 		for i := start; i < end; i++ {
 			follow := m.Followers[i]
-
-			// Get remote account details
 			database := db.GetDB()
-			err, remoteAcc := database.ReadRemoteAccountById(follow.AccountId)
-			if err != nil {
-				log.Printf("Failed to read remote account: %v", err)
-				continue
+
+			var displayText string
+
+			if follow.IsLocal {
+				// Local follower - look up in accounts table
+				err, localAcc := database.ReadAccById(follow.AccountId)
+				if err != nil {
+					log.Printf("Failed to read local account: %v", err)
+					continue
+				}
+
+				displayText = fmt.Sprintf("• %s (local)", localAcc.Username)
+			} else {
+				// Remote follower - look up in remote_accounts table
+				err, remoteAcc := database.ReadRemoteAccountById(follow.AccountId)
+				if err != nil {
+					log.Printf("Failed to read remote account: %v", err)
+					continue
+				}
+
+				displayName := remoteAcc.DisplayName
+				if displayName == "" {
+					displayName = remoteAcc.Username
+				}
+
+				displayText = fmt.Sprintf("• %s (@%s@%s)",
+					displayName,
+					remoteAcc.Username,
+					remoteAcc.Domain,
+				)
 			}
 
-			displayName := remoteAcc.DisplayName
-			if displayName == "" {
-				displayName = remoteAcc.Username
-			}
-
-			s.WriteString(itemStyle.Render(fmt.Sprintf(
-				"• %s (@%s@%s)",
-				displayName,
-				remoteAcc.Username,
-				remoteAcc.Domain,
-			)))
+			s.WriteString(itemStyle.Render(displayText))
 			s.WriteString("\n")
 		}
 	}

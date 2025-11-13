@@ -69,8 +69,8 @@ func NewModel(acc domain.Account, width int, height int) MainModel {
 	followModel := followuser.InitialModel(acc.Id)
 	followersModel := followers.InitialModel(acc.Id, width, height)
 	followingModel := following.InitialModel(acc.Id, width, height)
-	timelineModel := timeline.InitialModel(width, height)
-	localTimelineModel := localtimeline.InitialModel(width, height)
+	timelineModel := timeline.InitialModel(acc.Id, width, height)
+	localTimelineModel := localtimeline.InitialModel(acc.Id, width, height)
 	localUsersModel := localusers.InitialModel(acc.Id, width, height)
 
 	m := MainModel{state: common.CreateUserView}
