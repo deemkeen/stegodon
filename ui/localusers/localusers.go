@@ -83,14 +83,38 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				m.Selected--
 			}
 		case "down", "j":
-			if m.Selected < len(m.Users)-1 {
+			// Count non-current-user entries
+			maxSelection := 0
+			for _, user := range m.Users {
+				if user.Id != m.AccountId {
+					maxSelection++
+				}
+			}
+			if m.Selected < maxSelection-1 {
 				m.Selected++
 			}
 		case "enter", "f":
-			if len(m.Users) > 0 && m.Selected < len(m.Users) {
-				selectedUser := m.Users[m.Selected]
+			if len(m.Users) > 0 {
+				// Find the actual user at the selected display position
+				// Skip the current user when counting
+				displayIndex := 0
+				var selectedUser *domain.Account
+				for i := range m.Users {
+					if m.Users[i].Id == m.AccountId {
+						continue
+					}
+					if displayIndex == m.Selected {
+						selectedUser = &m.Users[i]
+						break
+					}
+					displayIndex++
+				}
 
-				// Don't allow following yourself
+				if selectedUser == nil {
+					return m, nil
+				}
+
+				// Don't allow following yourself (shouldn't happen but double-check)
 				if selectedUser.Id == m.AccountId {
 					m.Error = "You can't follow yourself!"
 					m.Status = ""
@@ -141,8 +165,19 @@ func (m Model) View() string {
 	if len(m.Users) == 0 {
 		s.WriteString(emptyStyle.Render("No other local users yet."))
 	} else {
-		for i, user := range m.Users {
-			// Don't show the current user
+		// First, show the current user at the top
+		for _, user := range m.Users {
+			if user.Id == m.AccountId {
+				s.WriteString("  " + userStyle.Render(fmt.Sprintf("@%s (you)", user.Username)))
+				s.WriteString("\n")
+				break
+			}
+		}
+
+		// Then show all other users
+		displayIndex := 0
+		for _, user := range m.Users {
+			// Skip the current user as we already displayed them
 			if user.Id == m.AccountId {
 				continue
 			}
@@ -154,12 +189,13 @@ func (m Model) View() string {
 
 			userText := fmt.Sprintf("@%s%s", user.Username, followStatus)
 
-			if i == m.Selected {
+			if displayIndex == m.Selected {
 				s.WriteString("→ " + selectedStyle.Render(userText))
 			} else {
 				s.WriteString("  " + userStyle.Render(userText))
 			}
 			s.WriteString("\n")
+			displayIndex++
 		}
 	}
 
