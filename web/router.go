@@ -76,15 +76,6 @@ func Router(conf *util.AppConfig) error {
 
 		g.GET("/users/:actor", func(c *gin.Context) {
 
-			data, err := c.GetRawData()
-			if err != nil {
-				return
-			}
-
-			log.Println("RAW REQUEST #####")
-			log.Println(string(data))
-			log.Println("END RAW REQUEST #####")
-
 			c.Header("Content-Type", "application/activity+json; charset=utf-8")
 			err, actor := GetActor(c.Param("actor"), conf)
 			if err != nil {
