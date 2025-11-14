@@ -15,12 +15,17 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/render"
 	"github.com/google/uuid"
+	"golang.org/x/time/rate"
 )
 
 func Router(conf *util.AppConfig) error {
 	log.Printf("Starting RSS Feed server on %s:%d", conf.Conf.Host, conf.Conf.HttpPort)
 	g := gin.Default()
 	g.Use(gzip.Gzip(gzip.DefaultCompression))
+
+	// Global rate limiter: 10 requests per second per IP, burst of 20
+	globalLimiter := NewRateLimiter(rate.Limit(10), 20)
+	g.Use(RateLimitMiddleware(globalLimiter))
 
 	// Load HTML templates
 	g.LoadHTMLGlob("web/templates/*")
@@ -67,6 +72,12 @@ func Router(conf *util.AppConfig) error {
 
 	// Endpoints for the ActivityPub functionality, WIP!
 	if conf.Conf.WithAp {
+		// Stricter rate limit for ActivityPub endpoints: 5 req/sec per IP
+		apLimiter := NewRateLimiter(rate.Limit(5), 10)
+
+		// Max 1MB request body size for ActivityPub activities
+		maxBodySize := MaxBytesMiddleware(1 * 1024 * 1024) // 1MB
+
 		// Serve individual notes as ActivityPub objects
 		g.GET("/notes/:id", func(c *gin.Context) {
 			c.Header("Content-Type", "application/activity+json; charset=utf-8")
@@ -97,7 +108,7 @@ func Router(conf *util.AppConfig) error {
 			}
 		})
 
-		g.POST("/inbox", func(c *gin.Context) {
+		g.POST("/inbox", RateLimitMiddleware(apLimiter), maxBodySize, func(c *gin.Context) {
 			log.Println("POST /inbox (shared inbox)")
 			// Shared inbox - extract target username from activity object
 			body, err := c.GetRawData()
@@ -213,7 +224,7 @@ func Router(conf *util.AppConfig) error {
 			activitypub.HandleInbox(c.Writer, req, targetUsername, conf)
 		})
 
-		g.POST("/users/:actor/inbox", func(c *gin.Context) {
+		g.POST("/users/:actor/inbox", RateLimitMiddleware(apLimiter), maxBodySize, func(c *gin.Context) {
 			actor := c.Param("actor")
 			log.Printf("POST /users/%s/inbox", actor)
 			activitypub.HandleInbox(c.Writer, c.Request, actor, conf)
