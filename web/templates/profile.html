@@ -17,7 +17,7 @@
                     sans-serif;
                 line-height: 1.6;
                 color: #e0e0e0;
-                background: #1a1a1a;
+                background: #000;
                 height: 100vh;
                 overflow: hidden;
             }
@@ -25,52 +25,82 @@
                 display: flex;
                 height: 100vh;
             }
+            .sidebar-header {
+                margin-bottom: 30px;
+            }
             .sidebar {
                 width: 350px;
-                background: #2a2a2a;
+                background: #111;
                 color: #e0e0e0;
-                padding: 20px;
+                padding: 30px;
                 overflow-y: auto;
                 position: fixed;
                 height: 100vh;
                 left: 0;
                 top: 0;
+                border-right: 1px solid #333;
             }
             .sidebar h1 {
-                color: #7d56f4;
-                margin-bottom: 15px;
-                font-size: 2em;
+                color: #00ff7f;
+                margin-bottom: 20px;
+                font-size: 1.8em;
+                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
             }
             .sidebar h1 .emoji {
                 filter: grayscale(100%) sepia(100%) saturate(1000%)
-                    hue-rotate(240deg) brightness(0.9);
+                    hue-rotate(90deg) brightness(1.2);
             }
             .info-box {
-                background: rgba(125, 86, 244, 0.1);
-                padding: 15px;
-                border-radius: 6px;
+                border: 1px solid #333;
+                background: #111;
                 margin-bottom: 15px;
-                border-left: 4px solid #7d56f4;
+                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
             }
             .info-box h3 {
-                color: #7d56f4;
-                margin-bottom: 10px;
-                font-size: 1.2em;
+                background: #181818;
+                border-bottom: 1px solid #333;
+                padding: 6px 10px;
+                font-size: 13px;
+                color: #00ff7f;
+                margin: 0;
+                font-weight: 600;
+            }
+            .info-box-content {
+                background: #000;
+                padding: 10px;
+                font-size: 14px;
+                line-height: 1.4;
+                color: #e5e5e5;
+            }
+            .info-box-content p {
+                margin: 5px 0;
+                padding-left: 1.8em;
+                position: relative;
+            }
+            .info-box-content p::before {
+                content: "•";
+                position: absolute;
+                left: 0;
+                top: 0;
+                color: #00ff7f;
             }
             .info-box code {
-                background: #1a1a1a;
+                background: #0a0a0a;
                 color: #5fafff;
                 padding: 4px 8px;
                 border-radius: 3px;
-                font-family: monospace;
+                font-family:
+                    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+                    "Liberation Mono", "Courier New", monospace;
                 display: block;
                 margin: 10px 0;
                 word-wrap: break-word;
                 overflow-wrap: break-word;
                 white-space: pre-wrap;
+                border: 1px solid #333;
             }
             .info-box a {
-                color: #7d56f4;
+                color: #5fafff;
                 text-decoration: none;
                 font-weight: 500;
             }
@@ -80,7 +110,7 @@
             .main-content {
                 margin-left: 350px;
                 flex: 1;
-                background: #0f0f0f;
+                background: #000;
                 overflow-y: auto;
                 height: 100vh;
             }
@@ -88,98 +118,164 @@
                 max-width: 1200px;
                 padding: 30px;
             }
-            .back-link {
-                display: inline-block;
+            .profile-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
                 margin-bottom: 20px;
-                color: #7d56f4;
+                border-bottom: 2px solid #333;
+                padding-bottom: 30px;
+                max-width: 800px;
+            }
+            .profile-header h2 {
+                margin: 0;
+                border: none;
+                padding: 0;
+            }
+            .back-link {
+                color: #5fafff;
                 text-decoration: none;
                 font-weight: 500;
+                font-family:
+                    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+                    "Liberation Mono", "Courier New", monospace;
             }
             .back-link:hover {
                 text-decoration: underline;
             }
             .user-profile {
-                background: rgba(125, 86, 244, 0.1);
-                padding: 20px;
-                border-radius: 8px;
+                font-family:
+                    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+                    "Liberation Mono", "Courier New", monospace;
                 margin-bottom: 30px;
-                border-left: 4px solid #7d56f4;
+                max-width: 800px;
             }
-            .user-profile h2 {
-                color: #7d56f4;
-                margin-top: 0;
-                padding-bottom: none;
-                border-bottom: none;
-                margin-bottom: 15px;
-            }
+
             .user-info {
-                margin-top: 10px;
+                background: #000;
+                padding: 10px;
+                font-size: 17px;
+                line-height: 3;
+                color: #e5e5e5;
             }
             .user-info p {
-                margin: 5px 0;
+                margin: 0 0 5px 0;
+                padding-left: 1.8em;
+                position: relative;
                 color: #ccc;
                 word-wrap: break-word;
                 overflow-wrap: break-word;
                 word-break: break-word;
             }
+            .user-info p::before {
+                position: absolute;
+                left: 0;
+                top: 0;
+                color: #00ff7f;
+            }
             .user-info strong {
-                color: #e0e0e0;
+                color: #5fafff;
             }
             h2 {
-                color: #7d56f4;
+                color: #00ff7f;
                 margin-bottom: 20px;
                 font-size: 1.8em;
-                border-bottom: 3px solid #7d56f4;
+                border-bottom: 2px solid #333;
                 padding-bottom: 10px;
             }
             .post {
-                border-bottom: 1px solid #2a2a2a;
-                padding: 20px 0;
+                border: 1px solid #333;
+                background: #111;
+                font-family:
+                    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+                    "Liberation Mono", "Courier New", monospace;
+                margin-bottom: 20px;
+                max-width: 800px;
             }
             .post:last-child {
-                border-bottom: none;
+                margin-bottom: 20px;
             }
             .post-meta {
-                color: #888;
-                font-size: 0.9em;
-                margin-bottom: 8px;
+                background: #181818;
+                border-bottom: 1px solid #333;
+                padding: 6px 10px;
+                font-size: 13px;
+                color: #ccc;
             }
-            .post-time {
-                color: #666;
+            .post-caption {
+                font-weight: 600;
+                color: #00ff7f;
+                text-decoration: none;
             }
             .post-content {
-                color: #e0e0e0;
+                background: #000;
+                padding: 10px;
+                font-size: 14px;
+                line-height: 1;
+                color: #e5e5e5;
                 white-space: pre-wrap;
                 word-wrap: break-word;
             }
+            .post-time {
+                margin: 0;
+                padding: 0 0 10px 0;
+                line-height: 0.8;
+                color: #666;
+                font-size: 14px;
+                font-style: italic;
+            }
+            .post-time::before {
+                content: "# ";
+            }
+            .post-text {
+                margin: 0;
+                position: relative;
+                padding-left: 1.8em;
+            }
+            .post-text::before {
+                content: "$";
+                position: absolute;
+                left: 0;
+                top: 0;
+                color: #5fafff;
+            }
             .pagination {
                 display: flex;
-                justify-content: space-between;
+                justify-content: normal;
                 margin-top: 30px;
                 padding-top: 20px;
-                border-top: 1px solid #2a2a2a;
+                border-top: 1px solid #333;
             }
             .pagination a,
             .pagination span {
                 padding: 10px 20px;
-                background: #7d56f4;
-                color: white;
+                background: #181818;
+                color: #00ff7f;
                 text-decoration: none;
                 border-radius: 4px;
                 font-weight: 500;
+                border: 1px solid #333;
+                font-family:
+                    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+                    "Liberation Mono", "Courier New", monospace;
             }
             .pagination a:hover {
-                background: #6941d4;
+                background: #222;
+                border-color: #00ff7f;
             }
             .pagination span {
-                background: #444;
+                background: #0a0a0a;
+                color: #666;
                 cursor: not-allowed;
             }
             .empty-state {
                 text-align: center;
                 padding: 60px 20px;
-                color: #95a5a6;
+                color: #666;
                 font-style: italic;
+                font-family:
+                    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+                    "Liberation Mono", "Courier New", monospace;
             }
             .scroll-up {
                 display: none;
@@ -227,7 +323,7 @@
                 }
                 .sidebar .toggle-btn {
                     display: inline-block;
-                    color: #7d56f4;
+                    color: #00ff7f;
                     font-size: 1.5em;
                     cursor: pointer;
                     flex-shrink: 0;
@@ -255,34 +351,34 @@
 
                 <div class="info-box">
                     <h3>ssh-first fediverse blog</h3>
-                    <p>Connect via SSH to start posting:</p>
-                    <code>ssh -p {{.SSHPort}} {{.Host}}</code>
-                    <p style="margin-top: 15px">
-                        On first connection, you'll be prompted to choose a
-                        username. After that, you can create posts, follow
-                        users, and explore the federated timeline.
-                    </p>
-                    <p style="margin-top: 15px">
-                        On federated services like Mastodon people now can
-                        follow you, when searching for:
-                    </p>
-                    <code>@YourUser@YourSslDomain.com</code>
+                    <div class="info-box-content">
+                        <p>Connect via SSH to start posting:</p>
+                        <code>ssh -p {{.SSHPort}} {{.Host}}</code>
+                        <p style="margin-top: 15px">
+                            On first connection, you'll be prompted to choose a
+                            username. After that, you can create posts, follow
+                            users, and explore the federated timeline.
+                        </p>
+                        <p style="margin-top: 15px">
+                            On federated services like Mastodon people now can
+                            follow you, when searching for:
+                        </p>
+                        <code>@YourUser@YourSslDomain.com</code>
+                    </div>
                 </div>
 
                 <div class="info-box">
                     <h3>features</h3>
-                    <p>• Create and read posts</p>
-                    <p>• Follow local and remote users</p>
-                    <p>• ActivityPub federation</p>
-                    <p>• <a href="/feed">RSS feeds</a></p>
+                    <div class="info-box-content">
+                        <p>Create and read posts</p>
+                        <p>Follow local and remote users</p>
+                        <p>ActivityPub federation</p>
+                        <p><a href="/feed">RSS feeds</a></p>
+                    </div>
                 </div>
 
                 <div class="info-box">
                     <h3>
-                        <a
-                            href="https://github.com/deemkeen/stegodon"
-                            style="color: #7d56f4; text-decoration: none"
-                        >
                             <svg
                                 style="
                                     width: 1.2em;
@@ -300,22 +396,30 @@
                             github
                         </a>
                     </h3>
-                    <p>
-                        Source and Documentation available on
-                        <a href="https://github.com/deemkeen/stegodon"
-                            >Github</a
-                        >
-                    </p>
+                    <div class="info-box-content">
+                        <p>
+                            Source and Documentation available on
+                            <a href="https://github.com/deemkeen/stegodon"
+                                >Github</a
+                            >
+                        </p>
+                    </div>
                 </div>
             </div>
 
             <div class="main-content">
                 <div class="content-wrapper">
-                    <a href="/" class="back-link">← back to timeline</a>
+                    <div class="profile-header">
+                        <h2>@{{.User.Username}}</h2>
+                        <a href="/" class="back-link">← back to timeline</a>
+                    </div>
 
                     <div class="user-profile">
-                        <h2>@{{.User.Username}}</h2>
                         <div class="user-info">
+                            <p>
+                                <strong>posts:</strong>
+                                {{.TotalPosts}}
+                            </p>
                             {{if .User.DisplayName}}
                             <p>
                                 <strong>display name:</strong>
@@ -328,14 +432,14 @@
                         </div>
                     </div>
 
-                    <h2>posts ({{.TotalPosts}})</h2>
-
                     {{if .Posts}} {{range .Posts}}
                     <div class="post">
                         <div class="post-meta">
-                            <span class="post-time">{{.TimeAgo}}</span>
+                            <span class="post-caption">{{.TimeAgo}}</span>
                         </div>
-                        <div class="post-content">{{.Message}}</div>
+                        <div class="post-content">
+                            <p class="post-text">{{.Message}}</p>
+                        </div>
                     </div>
                     {{end}} {{if or .HasPrev .HasNext}}
                     <div class="pagination">
