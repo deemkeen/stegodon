@@ -644,3 +644,137 @@ func TestReadLocalTimelineNotes(t *testing.T) {
 		t.Errorf("Expected 3 notes (limited), got %d", len(*notes))
 	}
 }
+
+func TestDeleteAccount(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.db.Close()
+
+	// Create a test account
+	userId := uuid.New()
+	createTestAccount(t, db, userId, "alice", "pubkey", "webpub", "webpriv")
+
+	// Create notes for the user
+	_, err := db.CreateNote(userId, "Test note 1")
+	if err != nil {
+		t.Fatalf("Failed to create note 1: %v", err)
+	}
+	_, err = db.CreateNote(userId, "Test note 2")
+	if err != nil {
+		t.Fatalf("Failed to create note 2: %v", err)
+	}
+
+	// Create a second user for follow relationships
+	user2Id := uuid.New()
+	createTestAccount(t, db, user2Id, "bob", "pubkey2", "webpub2", "webpriv2")
+
+	// Create local follow relationships (alice follows bob, bob follows alice)
+	err = db.CreateLocalFollow(userId, user2Id)
+	if err != nil {
+		t.Fatalf("Failed to create follow: %v", err)
+	}
+	err = db.CreateLocalFollow(user2Id, userId)
+	if err != nil {
+		t.Fatalf("Failed to create reverse follow: %v", err)
+	}
+
+	// Create an activity for the user
+	activity := &domain.Activity{
+		Id:           uuid.New(),
+		ActivityURI:  "https://example.com/activities/alice",
+		ActivityType: "Create",
+		ActorURI:     "https://example.com/users/alice",
+		ObjectURI:    "https://example.com/notes/123",
+		RawJSON:      `{"type":"Create"}`,
+		Processed:    true,
+		CreatedAt:    time.Now(),
+		Local:        true,
+	}
+	err = db.CreateActivity(activity)
+	if err != nil {
+		t.Fatalf("Failed to create activity: %v", err)
+	}
+
+	// Verify data exists before deletion
+	err, acc := db.ReadAccById(userId)
+	if err != nil || acc == nil {
+		t.Fatalf("Account should exist before deletion")
+	}
+
+	err, notes := db.ReadNotesByUserId(userId)
+	if err != nil || len(*notes) != 2 {
+		t.Fatalf("Expected 2 notes before deletion, got %d", len(*notes))
+	}
+
+	// Delete the account
+	err = db.DeleteAccount(userId)
+	if err != nil {
+		t.Fatalf("DeleteAccount failed: %v", err)
+	}
+
+	// Verify account was deleted
+	err, acc = db.ReadAccById(userId)
+	if err != sql.ErrNoRows {
+		t.Errorf("Account should not exist after deletion, got: %v", acc)
+	}
+
+	// Verify notes were deleted
+	err, notes = db.ReadNotesByUserId(userId)
+	if err != nil || len(*notes) != 0 {
+		t.Errorf("Expected 0 notes after deletion, got %d", len(*notes))
+	}
+
+	// Verify follows were deleted (both directions)
+	err, following := db.ReadFollowingByAccountId(userId)
+	if err != nil || len(*following) != 0 {
+		t.Errorf("Expected 0 following relationships after deletion, got %d", len(*following))
+	}
+
+	err, followers := db.ReadFollowersByAccountId(userId)
+	if err != nil || len(*followers) != 0 {
+		t.Errorf("Expected 0 follower relationships after deletion, got %d", len(*followers))
+	}
+
+	// Note: Activities are NOT deleted (they remain as historical record)
+	// This matches ActivityPub behavior
+
+	// Verify bob's account still exists (shouldn't be affected)
+	err, bob := db.ReadAccById(user2Id)
+	if err != nil || bob == nil {
+		t.Errorf("Bob's account should still exist after alice deletion")
+	}
+}
+
+func TestDeleteAccountNonExistent(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.db.Close()
+
+	// Try to delete a non-existent account
+	nonExistentId := uuid.New()
+	err := db.DeleteAccount(nonExistentId)
+	// Should not error even if account doesn't exist (idempotent delete)
+	if err != nil {
+		t.Errorf("Deleting non-existent account should not error: %v", err)
+	}
+}
+
+func TestDeleteAccountWithNoData(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.db.Close()
+
+	// Create a user with no notes, follows, activities, etc.
+	userId := uuid.New()
+	createTestAccount(t, db, userId, "lonely", "pubkey", "webpub", "webpriv")
+
+	// Delete the account
+	err := db.DeleteAccount(userId)
+	if err != nil {
+		t.Fatalf("DeleteAccount failed for account with no data: %v", err)
+	}
+
+	// Verify account was deleted
+	err, acc := db.ReadAccById(userId)
+	if err != sql.ErrNoRows {
+		t.Errorf("Account should not exist after deletion, got: %v", acc)
+	}
+}
+

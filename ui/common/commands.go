@@ -19,6 +19,7 @@ const (
 	FederatedTimelineView // View federated posts
 	LocalTimelineView     // View local posts from all local users
 	LocalUsersView        // Browse and follow local users
+	DeleteAccountView     // Delete account with confirmation
 )
 
 // EditNoteMsg is sent when user wants to edit an existing note

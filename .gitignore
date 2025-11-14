@@ -1,9 +1,9 @@
 /.ssh/
 /.idea/
 /go_build_*
-/*.db
-/*.db-shm
-/*.db-wal
+*.db
+*.db-shm
+*.db-wal
 /stegodon
 .DS_Store
 .ngrok_domain

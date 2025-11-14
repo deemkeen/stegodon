@@ -11,6 +11,7 @@ import (
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
 	"github.com/deemkeen/stegodon/ui/createuser"
+	"github.com/deemkeen/stegodon/ui/deleteaccount"
 	"github.com/deemkeen/stegodon/ui/followers"
 	"github.com/deemkeen/stegodon/ui/following"
 	"github.com/deemkeen/stegodon/ui/followuser"
@@ -47,6 +48,7 @@ type MainModel struct {
 	timelineModel      timeline.Model
 	localTimelineModel localtimeline.Model
 	localUsersModel    localusers.Model
+	deleteAccountModel deleteaccount.Model
 }
 
 func updateUserModelCmd(acc *domain.Account) tea.Cmd {
@@ -74,6 +76,7 @@ func NewModel(acc domain.Account, width int, height int) MainModel {
 	timelineModel := timeline.InitialModel(acc.Id, width, height)
 	localTimelineModel := localtimeline.InitialModel(acc.Id, width, height)
 	localUsersModel := localusers.InitialModel(acc.Id, width, height)
+	deleteAccountModel := deleteaccount.InitialModel(&acc)
 
 	m := MainModel{state: common.CreateUserView}
 	m.newUserModel = createuser.InitialModel()
@@ -85,6 +88,7 @@ func NewModel(acc domain.Account, width int, height int) MainModel {
 	m.timelineModel = timelineModel
 	m.localTimelineModel = localTimelineModel
 	m.localUsersModel = localUsersModel
+	m.deleteAccountModel = deleteAccountModel
 	m.headerModel = headerModel
 	m.account = acc
 	m.width = width
@@ -166,6 +170,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = common.LocalTimelineView
 		case common.LocalUsersView:
 			m.state = common.LocalUsersView
+		case common.DeleteAccountView:
+			m.state = common.DeleteAccountView
 		case common.UpdateNoteList:
 			m.listModel = listnotes.NewPager(m.account.Id, m.width, m.height)
 			// Reload the notes after creating a new pager
@@ -210,6 +216,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case common.FollowingView:
 				m.state = common.LocalUsersView
 			case common.LocalUsersView:
+				m.state = common.DeleteAccountView
+			case common.DeleteAccountView:
 				m.state = common.CreateNoteView
 			}
 			// Reload data when switching to certain views
@@ -225,7 +233,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			oldState := m.state
 			switch m.state {
 			case common.CreateNoteView:
-				m.state = common.LocalUsersView
+				m.state = common.DeleteAccountView
 			case common.ListNotesView:
 				m.state = common.CreateNoteView
 			case common.FederatedTimelineView:
@@ -240,6 +248,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.state = common.FollowersView
 			case common.LocalUsersView:
 				m.state = common.FollowingView
+			case common.DeleteAccountView:
+				m.state = common.LocalUsersView
 			}
 			// Reload data when switching to certain views
 			if oldState != m.state {
@@ -313,8 +323,16 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.localTimelineModel, cmd = m.localTimelineModel.Update(msg)
 		case common.LocalUsersView:
 			m.localUsersModel, cmd = m.localUsersModel.Update(msg)
+		case common.DeleteAccountView:
+			m.deleteAccountModel, cmd = m.deleteAccountModel.Update(msg)
 		}
 		cmds = append(cmds, cmd)
+	} else {
+		// For non-keyboard messages, route to delete account model if in that view
+		if m.state == common.DeleteAccountView {
+			m.deleteAccountModel, cmd = m.deleteAccountModel.Update(msg)
+			cmds = append(cmds, cmd)
+		}
 	}
 
 	return m, tea.Batch(cmds...)
@@ -412,6 +430,14 @@ func (m MainModel) View() string {
 		Margin(1).
 		Render(m.localUsersModel.View())
 
+	deleteAccountStyleStr := lipgloss.NewStyle().
+		MaxHeight(availableHeight).
+		Height(availableHeight).
+		Width(rightPanelWidth).
+		MaxWidth(rightPanelWidth).
+		Margin(1).
+		Render(m.deleteAccountModel.View())
+
 	if m.state == common.CreateUserView {
 		s = createuser.Style.Width(m.width).Render(m.newUserModel.View())
 		return s
@@ -453,6 +479,10 @@ func (m MainModel) View() string {
 			s += lipgloss.JoinHorizontal(lipgloss.Top,
 				modelStyle.Render(createStyleStr),
 				focusedModelStyle.Render(localUsersStyleStr))
+		case common.DeleteAccountView:
+			s += lipgloss.JoinHorizontal(lipgloss.Top,
+				modelStyle.Render(createStyleStr),
+				focusedModelStyle.Render(deleteAccountStyleStr))
 		}
 
 		// Help text
@@ -472,6 +502,8 @@ func (m MainModel) View() string {
 			viewCommands = "↑/↓: scroll"
 		case common.LocalUsersView:
 			viewCommands = "↑/↓: select • enter: toggle follow"
+		case common.DeleteAccountView:
+			viewCommands = "y: confirm • n/esc: cancel"
 		default:
 			viewCommands = " "
 		}
@@ -516,6 +548,8 @@ func (m MainModel) currentFocusedModel() string {
 		return "local timeline"
 	case common.LocalUsersView:
 		return "local users"
+	case common.DeleteAccountView:
+		return "delete account"
 	default:
 		return "create user"
 	}

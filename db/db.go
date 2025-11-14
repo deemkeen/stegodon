@@ -983,6 +983,49 @@ func (db *DB) ReadAllAccounts() (error, *[]domain.Account) {
 	return nil, &accounts
 }
 
+// DeleteAccount deletes a local account and all associated data (notes, follows, activities)
+func (db *DB) DeleteAccount(accountId uuid.UUID) error {
+	return db.wrapTransaction(func(tx *sql.Tx) error {
+		// Delete all notes by this user
+		_, err := tx.Exec("DELETE FROM notes WHERE user_id = ?", accountId.String())
+		if err != nil {
+			return fmt.Errorf("failed to delete notes: %w", err)
+		}
+
+		// Delete all follows where this user is the follower or target
+		_, err = tx.Exec("DELETE FROM follows WHERE account_id = ? OR target_account_id = ?",
+			accountId.String(), accountId.String())
+		if err != nil {
+			return fmt.Errorf("failed to delete follows: %w", err)
+		}
+
+		// Delete all likes by this user
+		_, err = tx.Exec("DELETE FROM likes WHERE account_id = ?", accountId.String())
+		if err != nil {
+			return fmt.Errorf("failed to delete likes: %w", err)
+		}
+
+		// Delete all delivery queue items for this user (if table exists)
+		_, err = tx.Exec("DELETE FROM delivery_queue WHERE account_id = ?", accountId.String())
+		if err != nil {
+			// Table might not exist in older schemas, log but don't fail
+			log.Printf("Warning: failed to delete delivery queue items (table may not exist): %v", err)
+		}
+
+		// Note: We don't delete activities because they're linked by actor_uri (string) not account_id
+		// Activities will remain as a historical record even after account deletion
+		// This matches ActivityPub behavior where activities persist after account deletion
+
+		// Finally, delete the account itself
+		_, err = tx.Exec("DELETE FROM accounts WHERE id = ?", accountId.String())
+		if err != nil {
+			return fmt.Errorf("failed to delete account: %w", err)
+		}
+
+		return nil
+	})
+}
+
 // ReadLocalTimelineNotes returns recent notes from local users that the given account follows (plus their own posts)
 func (db *DB) ReadLocalTimelineNotes(accountId uuid.UUID, limit int) (error, *[]domain.Note) {
 	rows, err := db.db.Query(sqlSelectLocalTimelineNotesByFollows, accountId.String(), accountId.String(), limit)
