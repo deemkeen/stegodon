@@ -16,8 +16,8 @@
                     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
                     sans-serif;
                 line-height: 1.6;
-                color: #333;
-                background: #f5f5f5;
+                color: #e0e0e0;
+                background: #1a1a1a;
                 height: 100vh;
                 overflow: hidden;
             }
@@ -27,8 +27,8 @@
             }
             .sidebar {
                 width: 350px;
-                background: #2c3e50;
-                color: #ecf0f1;
+                background: #2a2a2a;
+                color: #e0e0e0;
                 padding: 30px;
                 overflow-y: auto;
                 position: fixed;
@@ -37,25 +37,29 @@
                 top: 0;
             }
             .sidebar h1 {
-                color: #3498db;
+                color: #7d56f4;
                 margin-bottom: 20px;
                 font-size: 2em;
             }
+            .sidebar h1 .emoji {
+                filter: grayscale(100%) sepia(100%) saturate(1000%)
+                    hue-rotate(240deg) brightness(0.9);
+            }
             .info-box {
-                background: rgba(52, 152, 219, 0.1);
+                background: rgba(125, 86, 244, 0.1);
                 padding: 20px;
                 border-radius: 6px;
                 margin-bottom: 20px;
-                border-left: 4px solid #3498db;
+                border-left: 4px solid #7d56f4;
             }
             .info-box h3 {
-                color: #3498db;
+                color: #7d56f4;
                 margin-bottom: 10px;
                 font-size: 1.2em;
             }
             .info-box code {
-                background: #34495e;
-                color: #2ecc71;
+                background: #1a1a1a;
+                color: #5fafff;
                 padding: 4px 8px;
                 border-radius: 3px;
                 font-family: monospace;
@@ -66,7 +70,7 @@
                 white-space: pre-wrap;
             }
             .info-box a {
-                color: #3498db;
+                color: #7d56f4;
                 text-decoration: none;
                 font-weight: 500;
             }
@@ -76,7 +80,7 @@
             .main-content {
                 margin-left: 350px;
                 flex: 1;
-                background: white;
+                background: #0f0f0f;
                 overflow-y: auto;
                 height: 100vh;
             }
@@ -87,7 +91,7 @@
             .back-link {
                 display: inline-block;
                 margin-bottom: 20px;
-                color: #3498db;
+                color: #7d56f4;
                 text-decoration: none;
                 font-weight: 500;
             }
@@ -95,14 +99,14 @@
                 text-decoration: underline;
             }
             .user-profile {
-                background: #ecf0f1;
+                background: rgba(125, 86, 244, 0.1);
                 padding: 20px;
                 border-radius: 8px;
                 margin-bottom: 30px;
-                border-left: 4px solid #3498db;
+                border-left: 4px solid #7d56f4;
             }
             .user-profile h2 {
-                color: #2c3e50;
+                color: #7d56f4;
                 margin-top: 0;
                 padding-bottom: none;
                 border-bottom: none;
@@ -113,35 +117,35 @@
             }
             .user-info p {
                 margin: 5px 0;
-                color: #555;
+                color: #ccc;
             }
             .user-info strong {
-                color: #2c3e50;
+                color: #e0e0e0;
             }
             h2 {
-                color: #2c3e50;
+                color: #7d56f4;
                 margin-bottom: 20px;
                 font-size: 1.8em;
-                border-bottom: 3px solid #3498db;
+                border-bottom: 3px solid #7d56f4;
                 padding-bottom: 10px;
             }
             .post {
-                border-bottom: 1px solid #ecf0f1;
+                border-bottom: 1px solid #2a2a2a;
                 padding: 20px 0;
             }
             .post:last-child {
                 border-bottom: none;
             }
             .post-meta {
-                color: #7f8c8d;
+                color: #888;
                 font-size: 0.9em;
                 margin-bottom: 8px;
             }
             .post-time {
-                color: #95a5a6;
+                color: #666;
             }
             .post-content {
-                color: #2c3e50;
+                color: #e0e0e0;
                 white-space: pre-wrap;
                 word-wrap: break-word;
             }
@@ -150,22 +154,22 @@
                 justify-content: space-between;
                 margin-top: 30px;
                 padding-top: 20px;
-                border-top: 1px solid #ecf0f1;
+                border-top: 1px solid #2a2a2a;
             }
             .pagination a,
             .pagination span {
                 padding: 10px 20px;
-                background: #3498db;
+                background: #7d56f4;
                 color: white;
                 text-decoration: none;
                 border-radius: 4px;
                 font-weight: 500;
             }
             .pagination a:hover {
-                background: #2980b9;
+                background: #6941d4;
             }
             .pagination span {
-                background: #95a5a6;
+                background: #444;
                 cursor: not-allowed;
             }
             .empty-state {
@@ -192,7 +196,6 @@
                     top: 0;
                     height: auto;
                     z-index: 100;
-                    transition: all 0.3s ease;
                 }
                 .sidebar.minimized {
                     padding: 15px 30px;
@@ -224,7 +227,7 @@
     <body>
         <div class="layout">
             <div class="sidebar">
-                <h1>🦣 stegodon</h1>
+                <h1><span class="emoji">🦣</span> stegodon</h1>
                 <span class="scroll-up">↑</span>
 
                 <div class="info-box">
