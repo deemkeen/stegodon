@@ -31,6 +31,11 @@ func setupTestDB(t *testing.T) *DB {
 	// Add edited_at column which might be missing from base table
 	db.db.Exec(`ALTER TABLE notes ADD COLUMN edited_at timestamp`)
 
+	// Add ActivityPub profile fields to accounts table
+	db.db.Exec(`ALTER TABLE accounts ADD COLUMN display_name varchar(255)`)
+	db.db.Exec(`ALTER TABLE accounts ADD COLUMN summary text`)
+	db.db.Exec(`ALTER TABLE accounts ADD COLUMN avatar_url text`)
+
 	// Create ActivityPub tables
 	db.db.Exec(`CREATE TABLE IF NOT EXISTS remote_accounts(
 		id uuid NOT NULL PRIMARY KEY,
@@ -189,7 +194,7 @@ func TestUpdateLoginById(t *testing.T) {
 	createTestAccount(t, db, id, oldUsername, "pubkey", "webpub", "webpriv")
 
 	// Update username
-	err := db.UpdateLoginById(newUsername, id)
+	err := db.UpdateLoginById(newUsername, "Alice Test", "Test bio", id)
 	if err != nil {
 		t.Fatalf("UpdateLoginById failed: %v", err)
 	}
@@ -412,8 +417,8 @@ func TestReadAllAccounts(t *testing.T) {
 	createTestAccount(t, db, user2Id, "bob", "pubkey2", "webpub2", "webpriv2")
 
 	// Update to set first_time_login = 0
-	db.UpdateLoginById("alice", user1Id)
-	db.UpdateLoginById("bob", user2Id)
+	db.UpdateLoginById("alice", "Alice", "Alice's bio", user1Id)
+	db.UpdateLoginById("bob", "Bob", "Bob's bio", user2Id)
 
 	// Read all accounts
 	err, accounts := db.ReadAllAccounts()
@@ -476,7 +481,7 @@ func TestAccountFirstTimeLogin(t *testing.T) {
 	}
 
 	// Update username (which sets FirstTimeLogin to FALSE)
-	err = db.UpdateLoginById("updateduser", id)
+	err = db.UpdateLoginById("updateduser", "Updated User", "Updated bio", id)
 	if err != nil {
 		t.Fatalf("UpdateLoginById failed: %v", err)
 	}

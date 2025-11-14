@@ -52,7 +52,7 @@ type MainModel struct {
 func updateUserModelCmd(acc *domain.Account) tea.Cmd {
 	return func() tea.Msg {
 		acc.FirstTimeLogin = domain.FALSE
-		err := db.GetDB().UpdateLoginById(acc.Username, acc.Id)
+		err := db.GetDB().UpdateLoginById(acc.Username, acc.DisplayName, acc.Summary, acc.Id)
 		if err != nil {
 			log.Printf("User %s could not be updated!", acc.Username)
 		}
@@ -248,8 +248,23 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "enter":
 			if m.state == common.CreateUserView {
+				// Check which step we're on
+				if m.newUserModel.Step < 2 {
+					// Still in username or display name step, let createuser handle it
+					m.newUserModel, cmd = m.newUserModel.Update(msg)
+					return m, cmd
+				}
+				// Step 2 (bio) - save all info
 				m.state = common.CreateNoteView
 				m.account.Username = m.newUserModel.TextInput.Value()
+				m.account.DisplayName = m.newUserModel.DisplayName.Value()
+				m.account.Summary = m.newUserModel.Bio.Value()
+
+				// Use username as display name if not provided
+				if m.account.DisplayName == "" {
+					m.account.DisplayName = m.account.Username
+				}
+
 				m.headerModel = header.Model{Width: m.width, Acc: &m.account}
 				return m, updateUserModelCmd(&m.account)
 			}

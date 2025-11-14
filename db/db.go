@@ -41,11 +41,11 @@ const (
                         web_private_key text
                         )`
 	sqlInsertUser            = `INSERT INTO accounts(id, username, publickey, web_public_key, web_private_key, created_at) VALUES (?, ?, ?, ?, ?, ?)`
-	sqlUpdateLoginUser       = `UPDATE accounts SET first_time_login = 0, username = ? WHERE publickey = ?`
-	sqlUpdateLoginUserById   = `UPDATE accounts SET first_time_login = 0, username = ? WHERE id = ?`
-	sqlSelectUserByPublicKey = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key FROM accounts WHERE publickey = ?`
-	sqlSelectUserById        = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key FROM accounts WHERE id = ?`
-	sqlSelectUserByUsername  = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key FROM accounts WHERE username = ?`
+	sqlUpdateLoginUser       = `UPDATE accounts SET first_time_login = 0, username = ?, display_name = ?, summary = ? WHERE publickey = ?`
+	sqlUpdateLoginUserById   = `UPDATE accounts SET first_time_login = 0, username = ?, display_name = ?, summary = ? WHERE id = ?`
+	sqlSelectUserByPublicKey = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key, display_name, summary, avatar_url FROM accounts WHERE publickey = ?`
+	sqlSelectUserById        = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key, display_name, summary, avatar_url FROM accounts WHERE id = ?`
+	sqlSelectUserByUsername  = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key, display_name, summary, avatar_url FROM accounts WHERE username = ?`
 
 	//Notes
 	sqlCreateNotesTable = `CREATE TABLE IF NOT EXISTS notes(
@@ -73,7 +73,7 @@ const (
                                                             ORDER BY notes.created_at DESC`
 
 	// Local users and local timeline queries
-	sqlSelectAllAccounts        = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key FROM accounts WHERE first_time_login = 0 ORDER BY username ASC`
+	sqlSelectAllAccounts        = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key, display_name, summary, avatar_url FROM accounts WHERE first_time_login = 0 ORDER BY username ASC`
 	sqlSelectLocalTimelineNotes = `SELECT notes.id, accounts.username, notes.message, notes.created_at, notes.edited_at FROM notes
 														INNER JOIN accounts ON accounts.id = notes.user_id
 														ORDER BY notes.created_at DESC LIMIT ?`
@@ -148,9 +148,9 @@ func (db *DB) DeleteNoteById(noteId uuid.UUID) error {
 	})
 }
 
-func (db *DB) UpdateLoginByPkHash(username string, pkHash string) error {
+func (db *DB) UpdateLoginByPkHash(username string, displayName string, summary string, pkHash string) error {
 	return db.wrapTransaction(func(tx *sql.Tx) error {
-		err := db.updateLoginUser(tx, username, pkHash)
+		err := db.updateLoginUser(tx, username, displayName, summary, pkHash)
 		if err != nil {
 			return err
 		}
@@ -158,9 +158,9 @@ func (db *DB) UpdateLoginByPkHash(username string, pkHash string) error {
 	})
 }
 
-func (db *DB) UpdateLoginById(username string, id uuid.UUID) error {
+func (db *DB) UpdateLoginById(username string, displayName string, summary string, id uuid.UUID) error {
 	return db.wrapTransaction(func(tx *sql.Tx) error {
-		err := db.updateLoginUserById(tx, username, id)
+		err := db.updateLoginUserById(tx, username, displayName, summary, id)
 		if err != nil {
 			return err
 		}
@@ -171,41 +171,57 @@ func (db *DB) UpdateLoginById(username string, id uuid.UUID) error {
 func (db *DB) ReadAccBySession(s ssh.Session) (error, *domain.Account) {
 	publicKeyToString := util.PublicKeyToString(s.PublicKey())
 	var tempAcc domain.Account
+	var displayName, summary, avatarURL sql.NullString
 	row := db.db.QueryRow(sqlSelectUserByPublicKey, util.PkToHash(publicKeyToString))
-	err := row.Scan(&tempAcc.Id, &tempAcc.Username, &tempAcc.Publickey, &tempAcc.CreatedAt, &tempAcc.FirstTimeLogin, &tempAcc.WebPublicKey, &tempAcc.WebPrivateKey)
+	err := row.Scan(&tempAcc.Id, &tempAcc.Username, &tempAcc.Publickey, &tempAcc.CreatedAt, &tempAcc.FirstTimeLogin, &tempAcc.WebPublicKey, &tempAcc.WebPrivateKey, &displayName, &summary, &avatarURL)
 	if err == sql.ErrNoRows {
 		return err, nil
 	}
+	tempAcc.DisplayName = displayName.String
+	tempAcc.Summary = summary.String
+	tempAcc.AvatarURL = avatarURL.String
 	return err, &tempAcc
 }
 
 func (db *DB) ReadAccByPkHash(pkHash string) (error, *domain.Account) {
 	row := db.db.QueryRow(sqlSelectUserByPublicKey, pkHash)
 	var tempAcc domain.Account
-	err := row.Scan(&tempAcc.Id, &tempAcc.Username, &tempAcc.Publickey, &tempAcc.CreatedAt, &tempAcc.FirstTimeLogin, &tempAcc.WebPublicKey, &tempAcc.WebPrivateKey)
+	var displayName, summary, avatarURL sql.NullString
+	err := row.Scan(&tempAcc.Id, &tempAcc.Username, &tempAcc.Publickey, &tempAcc.CreatedAt, &tempAcc.FirstTimeLogin, &tempAcc.WebPublicKey, &tempAcc.WebPrivateKey, &displayName, &summary, &avatarURL)
 	if err == sql.ErrNoRows {
 		return err, nil
 	}
+	tempAcc.DisplayName = displayName.String
+	tempAcc.Summary = summary.String
+	tempAcc.AvatarURL = avatarURL.String
 	return err, &tempAcc
 }
 
 func (db *DB) ReadAccById(id uuid.UUID) (error, *domain.Account) {
 	row := db.db.QueryRow(sqlSelectUserById, id)
 	var tempAcc domain.Account
-	err := row.Scan(&tempAcc.Id, &tempAcc.Username, &tempAcc.Publickey, &tempAcc.CreatedAt, &tempAcc.FirstTimeLogin, &tempAcc.WebPublicKey, &tempAcc.WebPrivateKey)
+	var displayName, summary, avatarURL sql.NullString
+	err := row.Scan(&tempAcc.Id, &tempAcc.Username, &tempAcc.Publickey, &tempAcc.CreatedAt, &tempAcc.FirstTimeLogin, &tempAcc.WebPublicKey, &tempAcc.WebPrivateKey, &displayName, &summary, &avatarURL)
 	if err == sql.ErrNoRows {
 		return err, nil
 	}
+	tempAcc.DisplayName = displayName.String
+	tempAcc.Summary = summary.String
+	tempAcc.AvatarURL = avatarURL.String
 	return err, &tempAcc
 }
 
 func (db *DB) ReadAccByUsername(username string) (error, *domain.Account) {
 	row := db.db.QueryRow(sqlSelectUserByUsername, username)
 	var tempAcc domain.Account
-	err := row.Scan(&tempAcc.Id, &tempAcc.Username, &tempAcc.Publickey, &tempAcc.CreatedAt, &tempAcc.FirstTimeLogin, &tempAcc.WebPublicKey, &tempAcc.WebPrivateKey)
+	var displayName, summary, avatarURL sql.NullString
+	err := row.Scan(&tempAcc.Id, &tempAcc.Username, &tempAcc.Publickey, &tempAcc.CreatedAt, &tempAcc.FirstTimeLogin, &tempAcc.WebPublicKey, &tempAcc.WebPrivateKey, &displayName, &summary, &avatarURL)
 	if err == sql.ErrNoRows {
 		return err, nil
 	}
+	tempAcc.DisplayName = displayName.String
+	tempAcc.Summary = summary.String
+	tempAcc.AvatarURL = avatarURL.String
 	return err, &tempAcc
 }
 
@@ -454,13 +470,13 @@ func (db *DB) deleteNote(tx *sql.Tx, noteId uuid.UUID) error {
 	return err
 }
 
-func (db *DB) updateLoginUser(tx *sql.Tx, username string, pkHash string) error {
-	_, err := tx.Exec(sqlUpdateLoginUser, username, pkHash)
+func (db *DB) updateLoginUser(tx *sql.Tx, username string, displayName string, summary string, pkHash string) error {
+	_, err := tx.Exec(sqlUpdateLoginUser, username, displayName, summary, pkHash)
 	return err
 }
 
-func (db *DB) updateLoginUserById(tx *sql.Tx, username string, id uuid.UUID) error {
-	_, err := tx.Exec(sqlUpdateLoginUserById, username, id)
+func (db *DB) updateLoginUserById(tx *sql.Tx, username string, displayName string, summary string, id uuid.UUID) error {
+	_, err := tx.Exec(sqlUpdateLoginUserById, username, displayName, summary, id)
 	return err
 }
 
@@ -952,9 +968,13 @@ func (db *DB) ReadAllAccounts() (error, *[]domain.Account) {
 	var accounts []domain.Account
 	for rows.Next() {
 		var acc domain.Account
-		if err := rows.Scan(&acc.Id, &acc.Username, &acc.Publickey, &acc.CreatedAt, &acc.FirstTimeLogin, &acc.WebPublicKey, &acc.WebPrivateKey); err != nil {
+		var displayName, summary, avatarURL sql.NullString
+		if err := rows.Scan(&acc.Id, &acc.Username, &acc.Publickey, &acc.CreatedAt, &acc.FirstTimeLogin, &acc.WebPublicKey, &acc.WebPrivateKey, &displayName, &summary, &avatarURL); err != nil {
 			return err, &accounts
 		}
+		acc.DisplayName = displayName.String
+		acc.Summary = summary.String
+		acc.AvatarURL = avatarURL.String
 		accounts = append(accounts, acc)
 	}
 	if err = rows.Err(); err != nil {

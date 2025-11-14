@@ -30,6 +30,17 @@ func GetActor(actor string, conf *util.AppConfig) (error, string) {
 
 	username := acc.Username
 	pubKey := strings.Replace(acc.WebPublicKey, "\n", "\\n", -1)
+
+	// Use DisplayName if available, otherwise use username
+	displayName := acc.DisplayName
+	if displayName == "" {
+		displayName = username
+	}
+
+	// Escape any quotes in summary for JSON
+	summary := strings.Replace(acc.Summary, "\"", "\\\"", -1)
+	summary = strings.Replace(summary, "\n", "\\n", -1)
+
 	return nil, fmt.Sprintf(
 		`{
 					"@context": [
@@ -41,6 +52,7 @@ func GetActor(actor string, conf *util.AppConfig) (error, string) {
 					"type": "Person",
 					"preferredUsername": "%s",
 					"name" : "%s",
+					"summary": "%s",
 					"inbox": "%s",
 					"outbox": "%s",
 					"followers": "%s",
@@ -58,7 +70,8 @@ func GetActor(actor string, conf *util.AppConfig) (error, string) {
 					}
 				}`,
 		getIRI(conf.Conf.SslDomain, username, id),
-		username, username, getIRI(conf.Conf.SslDomain, username, inbox),
+		username, displayName, summary,
+		getIRI(conf.Conf.SslDomain, username, inbox),
 		getIRI(conf.Conf.SslDomain, username, outbox),
 		getIRI(conf.Conf.SslDomain, username, followers),
 		getIRI(conf.Conf.SslDomain, username, following),

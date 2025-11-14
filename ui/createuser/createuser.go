@@ -16,8 +16,11 @@ var (
 )
 
 type Model struct {
-	TextInput textinput.Model
-	Err       util.ErrMsg
+	TextInput   textinput.Model
+	DisplayName textinput.Model
+	Bio         textinput.Model
+	Step        int // 0=username, 1=display name, 2=bio
+	Err         util.ErrMsg
 }
 
 func (m Model) Init() tea.Cmd {
@@ -31,18 +34,67 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case util.ErrMsg:
 		m.Err = msg
 		return m, nil
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "enter":
+			if m.Step == 0 {
+				// Move to display name
+				m.Step = 1
+				m.DisplayName.Focus()
+				m.TextInput.Blur()
+				return m, nil
+			} else if m.Step == 1 {
+				// Move to bio
+				m.Step = 2
+				m.Bio.Focus()
+				m.DisplayName.Blur()
+				return m, nil
+			}
+			// Step 2 (bio) - form submission handled by parent
+		}
 	}
 
-	m.TextInput, cmd = m.TextInput.Update(msg)
+	// Update the active input
+	switch m.Step {
+	case 0:
+		m.TextInput, cmd = m.TextInput.Update(msg)
+	case 1:
+		m.DisplayName, cmd = m.DisplayName.Update(msg)
+	case 2:
+		m.Bio, cmd = m.Bio.Update(msg)
+	}
+
 	return m, cmd
 }
 
 func (m Model) View() string {
+	var prompt string
+	var input string
+	var help string
+
+	switch m.Step {
+	case 0:
+		prompt = "You don't have a username yet, please choose wisely!"
+		input = m.TextInput.View()
+		help = "(enter to continue, ctrl-c to quit)"
+	case 1:
+		prompt = fmt.Sprintf("Username: %s\n\nChoose your display name (optional):", m.TextInput.Value())
+		input = m.DisplayName.View()
+		help = "(enter to continue, leave empty to skip)"
+	case 2:
+		prompt = fmt.Sprintf("Username: %s\nDisplay name: %s\n\nWrite a short bio (optional):",
+			m.TextInput.Value(),
+			m.DisplayName.Value())
+		input = m.Bio.View()
+		help = "(enter to save profile, ctrl-c to quit)"
+	}
+
 	return fmt.Sprintf(
-		"Logging into STEGODON v%s\n\nYou don't have a username yet, please choose wisely!\n\n%s\n\n%s",
+		"Logging into STEGODON v%s\n\n%s\n\n%s\n\n%s",
 		util.GetVersion(),
-		m.TextInput.View(),
-		"(enter to save, ctrl-c to quit)",
+		prompt,
+		input,
+		help,
 	) + "\n"
 }
 
@@ -53,8 +105,21 @@ func InitialModel() Model {
 	ti.CharLimit = 15
 	ti.Width = 20
 
+	displayName := textinput.New()
+	displayName.Placeholder = "Elon Musk"
+	displayName.CharLimit = 50
+	displayName.Width = 50
+
+	bio := textinput.New()
+	bio.Placeholder = "CEO of X, Tesla, SpaceX..."
+	bio.CharLimit = 200
+	bio.Width = 60
+
 	return Model{
-		TextInput: ti,
-		Err:       nil,
+		TextInput:   ti,
+		DisplayName: displayName,
+		Bio:         bio,
+		Step:        0,
+		Err:         nil,
 	}
 }
