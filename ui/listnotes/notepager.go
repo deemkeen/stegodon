@@ -34,8 +34,8 @@ var (
 			Italic(true)
 
 	confirmDeleteStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("196")).
-			Bold(true)
+				Foreground(lipgloss.Color("196")).
+				Bold(true)
 
 	// Inverted styles for selected notes (light text on dark background)
 	selectedTimeStyle = lipgloss.NewStyle().
@@ -53,12 +53,12 @@ var (
 )
 
 type Model struct {
-	Notes           []domain.Note
-	Offset          int
-	Selected        int  // Currently selected note index
-	width           int
-	height          int
-	userId          uuid.UUID
+	Notes            []domain.Note
+	Offset           int
+	Selected         int // Currently selected note index
+	width            int
+	height           int
+	userId           uuid.UUID
 	confirmingDelete bool      // True when showing delete confirmation
 	deleteTargetId   uuid.UUID // ID of note pending deletion
 }
@@ -309,12 +309,12 @@ func truncate(s string, maxLen int) string {
 
 func NewPager(userId uuid.UUID, width int, height int) Model {
 	return Model{
-		Notes:           []domain.Note{},
-		Offset:          0,
-		Selected:        0,
-		width:           width,
-		height:          height,
-		userId:          userId,
+		Notes:            []domain.Note{},
+		Offset:           0,
+		Selected:         0,
+		width:            width,
+		height:           height,
+		userId:           userId,
 		confirmingDelete: false,
 		deleteTargetId:   uuid.Nil,
 	}

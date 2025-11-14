@@ -25,17 +25,22 @@ func GetRSS(conf *util.AppConfig, username string) (string, error) {
 
 	if username != "" {
 		err, notes = db.GetDB().ReadNotesByUsername(username)
-		if err != nil || *notes == nil {
+		if err != nil {
 			log.Println(fmt.Sprintf("Could not get notes from %s!", username), err)
 			return "", errors.New("error retrieving notes by username")
 		}
 		title = fmt.Sprintf("Stegodon Notes - %s", username)
-		createdBy = (*notes)[0].CreatedBy
-		email = fmt.Sprintf("%s@stegodon", (*notes)[0].CreatedBy)
+		createdBy = username
+		email = fmt.Sprintf("%s@stegodon", username)
 		link = fmt.Sprintf("%s?username=%s", link, username)
+		// If notes exist, use the actual createdBy from first note
+		if notes != nil && len(*notes) > 0 {
+			createdBy = (*notes)[0].CreatedBy
+			email = fmt.Sprintf("%s@stegodon", (*notes)[0].CreatedBy)
+		}
 	} else {
 		err, notes = db.GetDB().ReadAllNotes()
-		if err != nil || *notes == nil {
+		if err != nil {
 			log.Println("Could not get notes!", err)
 			return "", errors.New("error retrieving notes")
 		}
@@ -53,17 +58,19 @@ func GetRSS(conf *util.AppConfig, username string) (string, error) {
 	}
 
 	var feedItems []*feeds.Item
-	for _, note := range *notes {
-		email := fmt.Sprintf("%s@stegodon", note.CreatedBy)
-		feedItems = append(feedItems,
-			&feeds.Item{
-				Id:      note.Id.String(),
-				Title:   note.CreatedAt.Format(util.DateTimeFormat()),
-				Link:    &feeds.Link{Href: fmt.Sprintf("http://%s:%d/feed/%s", conf.Conf.Host, conf.Conf.HttpPort, note.Id)},
-				Content: note.Message,
-				Author:  &feeds.Author{Name: note.CreatedBy, Email: email},
-				Created: note.CreatedAt,
-			})
+	if notes != nil {
+		for _, note := range *notes {
+			email := fmt.Sprintf("%s@stegodon", note.CreatedBy)
+			feedItems = append(feedItems,
+				&feeds.Item{
+					Id:      note.Id.String(),
+					Title:   note.CreatedAt.Format(util.DateTimeFormat()),
+					Link:    &feeds.Link{Href: fmt.Sprintf("http://%s:%d/feed/%s", conf.Conf.Host, conf.Conf.HttpPort, note.Id)},
+					Content: note.Message,
+					Author:  &feeds.Author{Name: note.CreatedBy, Email: email},
+					Created: note.CreatedAt,
+				})
+		}
 	}
 
 	feed.Items = feedItems

@@ -190,8 +190,8 @@ func handleFollowActivity(body []byte, username string, remoteActor *domain.Remo
 	// - TargetAccountId = local account (being followed)
 	followRecord := &domain.Follow{
 		Id:              uuid.New(),
-		AccountId:       remoteActor.Id,      // The follower
-		TargetAccountId: localAccount.Id,     // The target being followed
+		AccountId:       remoteActor.Id,  // The follower
+		TargetAccountId: localAccount.Id, // The target being followed
 		URI:             follow.ID,
 		Accepted:        true, // Auto-accept for now
 		CreatedAt:       time.Now(),

@@ -18,12 +18,12 @@ type Note struct {
 	CreatedAt time.Time
 	EditedAt  *time.Time // When the note was last edited (nil if never edited)
 	// ActivityPub fields
-	Visibility     string  // "public", "unlisted", "followers", "direct"
-	InReplyToURI   string  // URI of the note this is replying to
-	ObjectURI      string  // ActivityPub object URI
-	Federated      bool    // Whether to federate this note
-	Sensitive      bool    // Contains sensitive content
-	ContentWarning string  // Content warning text
+	Visibility     string // "public", "unlisted", "followers", "direct"
+	InReplyToURI   string // URI of the note this is replying to
+	ObjectURI      string // ActivityPub object URI
+	Federated      bool   // Whether to federate this note
+	Sensitive      bool   // Contains sensitive content
+	ContentWarning string // Content warning text
 }
 
 func (note *Note) ToString() string {

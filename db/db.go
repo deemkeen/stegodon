@@ -73,7 +73,7 @@ const (
                                                             ORDER BY notes.created_at DESC`
 
 	// Local users and local timeline queries
-	sqlSelectAllAccounts = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key FROM accounts WHERE first_time_login = 0 ORDER BY username ASC`
+	sqlSelectAllAccounts        = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key FROM accounts WHERE first_time_login = 0 ORDER BY username ASC`
 	sqlSelectLocalTimelineNotes = `SELECT notes.id, accounts.username, notes.message, notes.created_at, notes.edited_at FROM notes
 														INNER JOIN accounts ON accounts.id = notes.user_id
 														ORDER BY notes.created_at DESC LIMIT ?`
@@ -495,10 +495,10 @@ func (db *DB) wrapTransaction(f func(tx *sql.Tx) error) error {
 
 // Remote Accounts queries
 const (
-	sqlInsertRemoteAccount       = `INSERT INTO remote_accounts(id, username, domain, actor_uri, display_name, summary, inbox_uri, outbox_uri, public_key_pem, avatar_url, last_fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	sqlSelectRemoteAccountByURI  = `SELECT id, username, domain, actor_uri, display_name, summary, inbox_uri, outbox_uri, public_key_pem, avatar_url, last_fetched_at FROM remote_accounts WHERE actor_uri = ?`
-	sqlSelectRemoteAccountById   = `SELECT id, username, domain, actor_uri, display_name, summary, inbox_uri, outbox_uri, public_key_pem, avatar_url, last_fetched_at FROM remote_accounts WHERE id = ?`
-	sqlUpdateRemoteAccount       = `UPDATE remote_accounts SET display_name = ?, summary = ?, inbox_uri = ?, outbox_uri = ?, public_key_pem = ?, avatar_url = ?, last_fetched_at = ? WHERE actor_uri = ?`
+	sqlInsertRemoteAccount      = `INSERT INTO remote_accounts(id, username, domain, actor_uri, display_name, summary, inbox_uri, outbox_uri, public_key_pem, avatar_url, last_fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	sqlSelectRemoteAccountByURI = `SELECT id, username, domain, actor_uri, display_name, summary, inbox_uri, outbox_uri, public_key_pem, avatar_url, last_fetched_at FROM remote_accounts WHERE actor_uri = ?`
+	sqlSelectRemoteAccountById  = `SELECT id, username, domain, actor_uri, display_name, summary, inbox_uri, outbox_uri, public_key_pem, avatar_url, last_fetched_at FROM remote_accounts WHERE id = ?`
+	sqlUpdateRemoteAccount      = `UPDATE remote_accounts SET display_name = ?, summary = ?, inbox_uri = ?, outbox_uri = ?, public_key_pem = ?, avatar_url = ?, last_fetched_at = ? WHERE actor_uri = ?`
 )
 
 func (db *DB) CreateRemoteAccount(acc *domain.RemoteAccount) error {
@@ -592,13 +592,13 @@ func (db *DB) UpdateRemoteAccount(acc *domain.RemoteAccount) error {
 
 // Follow queries
 const (
-	sqlInsertFollow         = `INSERT INTO follows(id, account_id, target_account_id, uri, accepted, created_at, is_local) VALUES (?, ?, ?, ?, ?, ?, ?)`
-	sqlSelectFollowByURI    = `SELECT id, account_id, target_account_id, uri, accepted, created_at FROM follows WHERE uri = ?`
-	sqlDeleteFollowByURI    = `DELETE FROM follows WHERE uri = ?`
+	sqlInsertFollow                  = `INSERT INTO follows(id, account_id, target_account_id, uri, accepted, created_at, is_local) VALUES (?, ?, ?, ?, ?, ?, ?)`
+	sqlSelectFollowByURI             = `SELECT id, account_id, target_account_id, uri, accepted, created_at FROM follows WHERE uri = ?`
+	sqlDeleteFollowByURI             = `DELETE FROM follows WHERE uri = ?`
 	sqlSelectLocalFollowsByAccountId = `SELECT id, account_id, target_account_id, uri, accepted, created_at FROM follows WHERE account_id = ? AND is_local = 1 AND accepted = 1`
-	sqlDeleteLocalFollow    = `DELETE FROM follows WHERE account_id = ? AND target_account_id = ? AND is_local = 1`
-	sqlCheckLocalFollow     = `SELECT COUNT(*) FROM follows WHERE account_id = ? AND target_account_id = ? AND is_local = 1`
-	sqlSelectFollowByAccountIds = `SELECT id, account_id, target_account_id, uri, accepted, created_at FROM follows WHERE account_id = ? AND target_account_id = ? AND accepted = 1`
+	sqlDeleteLocalFollow             = `DELETE FROM follows WHERE account_id = ? AND target_account_id = ? AND is_local = 1`
+	sqlCheckLocalFollow              = `SELECT COUNT(*) FROM follows WHERE account_id = ? AND target_account_id = ? AND is_local = 1`
+	sqlSelectFollowByAccountIds      = `SELECT id, account_id, target_account_id, uri, accepted, created_at FROM follows WHERE account_id = ? AND target_account_id = ? AND accepted = 1`
 )
 
 func (db *DB) CreateFollow(follow *domain.Follow) error {
@@ -691,8 +691,8 @@ func (db *DB) AcceptFollowByURI(uri string) error {
 
 // Activity queries
 const (
-	sqlInsertActivity = `INSERT INTO activities(id, activity_uri, activity_type, actor_uri, object_uri, raw_json, processed, local, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	sqlUpdateActivity = `UPDATE activities SET raw_json = ?, processed = ?, object_uri = ? WHERE id = ?`
+	sqlInsertActivity      = `INSERT INTO activities(id, activity_uri, activity_type, actor_uri, object_uri, raw_json, processed, local, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	sqlUpdateActivity      = `UPDATE activities SET raw_json = ?, processed = ?, object_uri = ? WHERE id = ?`
 	sqlSelectActivityByURI = `SELECT id, activity_uri, activity_type, actor_uri, object_uri, raw_json, processed, local, created_at FROM activities WHERE activity_uri = ?`
 )
 
@@ -783,7 +783,7 @@ func (db *DB) ReadActivityByObjectURI(objectURI string) (error, *domain.Activity
 
 // ReadFederatedActivities returns recent Create activities from remote actors
 const (
-	sqlSelectFederatedActivities = `SELECT id, activity_uri, activity_type, actor_uri, object_uri, raw_json, processed, local, created_at FROM activities WHERE activity_type = 'Create' AND local = 0 ORDER BY created_at DESC LIMIT ?`
+	sqlSelectFederatedActivities          = `SELECT id, activity_uri, activity_type, actor_uri, object_uri, raw_json, processed, local, created_at FROM activities WHERE activity_type = 'Create' AND local = 0 ORDER BY created_at DESC LIMIT ?`
 	sqlSelectFederatedActivitiesByFollows = `SELECT a.id, a.activity_uri, a.activity_type, a.actor_uri, a.object_uri, a.raw_json, a.processed, a.local, a.created_at
 		FROM activities a
 		INNER JOIN remote_accounts ra ON ra.actor_uri = a.actor_uri
@@ -823,10 +823,10 @@ func (db *DB) ReadFederatedActivities(accountId uuid.UUID, limit int) (error, *[
 
 // Delivery Queue queries
 const (
-	sqlInsertDeliveryQueue = `INSERT INTO delivery_queue(id, inbox_uri, activity_json, attempts, next_retry_at, created_at) VALUES (?, ?, ?, ?, ?, ?)`
+	sqlInsertDeliveryQueue     = `INSERT INTO delivery_queue(id, inbox_uri, activity_json, attempts, next_retry_at, created_at) VALUES (?, ?, ?, ?, ?, ?)`
 	sqlSelectPendingDeliveries = `SELECT id, inbox_uri, activity_json, attempts, next_retry_at, created_at FROM delivery_queue WHERE next_retry_at <= ? ORDER BY created_at ASC LIMIT ?`
-	sqlUpdateDeliveryAttempt = `UPDATE delivery_queue SET attempts = ?, next_retry_at = ? WHERE id = ?`
-	sqlDeleteDelivery = `DELETE FROM delivery_queue WHERE id = ?`
+	sqlUpdateDeliveryAttempt   = `UPDATE delivery_queue SET attempts = ?, next_retry_at = ? WHERE id = ?`
+	sqlDeleteDelivery          = `DELETE FROM delivery_queue WHERE id = ?`
 )
 
 func (db *DB) EnqueueDelivery(item *domain.DeliveryQueueItem) error {
@@ -882,7 +882,7 @@ func (db *DB) DeleteDelivery(id uuid.UUID) error {
 
 // Follower queries
 const (
-	sqlSelectFollowersByAccountId  = `SELECT id, account_id, target_account_id, uri, accepted, created_at, is_local FROM follows WHERE target_account_id = ? AND accepted = 1`
+	sqlSelectFollowersByAccountId = `SELECT id, account_id, target_account_id, uri, accepted, created_at, is_local FROM follows WHERE target_account_id = ? AND accepted = 1`
 	sqlSelectFollowingByAccountId = `SELECT id, account_id, target_account_id, uri, accepted, created_at, is_local FROM follows WHERE account_id = ? AND accepted = 1`
 )
 
@@ -998,15 +998,14 @@ func (db *DB) ReadLocalTimelineNotes(accountId uuid.UUID, limit int) (error, *[]
 	return nil, &notes
 }
 
-
 // CreateLocalFollow creates a local-only follow relationship
 func (db *DB) CreateLocalFollow(followerAccountId, targetAccountId uuid.UUID) error {
 	follow := &domain.Follow{
 		Id:              uuid.New(),
 		AccountId:       followerAccountId,
 		TargetAccountId: targetAccountId,
-		URI:             "", // No URI for local follows
-		Accepted:        true,  // Auto-accept for local follows
+		URI:             "",   // No URI for local follows
+		Accepted:        true, // Auto-accept for local follows
 		IsLocal:         true,
 		CreatedAt:       time.Now(),
 	}
@@ -1114,4 +1113,3 @@ func (db *DB) DeleteFollowsByRemoteAccountId(remoteAccountId uuid.UUID) error {
 	}
 	return nil
 }
-

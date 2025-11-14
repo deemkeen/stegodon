@@ -2,7 +2,6 @@ package writenote
 
 import (
 	"fmt"
-	"time"
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -13,18 +12,19 @@ import (
 	"github.com/deemkeen/stegodon/util"
 	"github.com/google/uuid"
 	"log"
+	"time"
 )
 
 const MaxLetters = 150
 
 type Model struct {
-	Textarea        textarea.Model
-	Err             util.ErrMsg
-	userId          uuid.UUID
-	lettersLeft     int
-	width           int
-	isEditing       bool      // True when editing an existing note
-	editingNoteId   uuid.UUID // ID of note being edited
+	Textarea          textarea.Model
+	Err               util.ErrMsg
+	userId            uuid.UUID
+	lettersLeft       int
+	width             int
+	isEditing         bool      // True when editing an existing note
+	editingNoteId     uuid.UUID // ID of note being edited
 	originalCreatedAt time.Time // Original creation time (preserved during edit)
 }
 
@@ -37,13 +37,13 @@ func InitialNote(contentWidth int, userId uuid.UUID) Model {
 	ti.SetWidth(30)
 
 	return Model{
-		Textarea:        ti,
-		Err:             nil,
-		userId:          userId,
-		lettersLeft:     MaxLetters,
-		width:           width,
-		isEditing:       false,
-		editingNoteId:   uuid.Nil,
+		Textarea:          ti,
+		Err:               nil,
+		userId:            userId,
+		lettersLeft:       MaxLetters,
+		width:             width,
+		isEditing:         false,
+		editingNoteId:     uuid.Nil,
 		originalCreatedAt: time.Time{},
 	}
 }

@@ -108,12 +108,12 @@ func GetNoteObject(noteId uuid.UUID, conf *util.AppConfig) (error, string) {
 
 	// Build the Note object
 	noteObj := map[string]interface{}{
-		"@context":      "https://www.w3.org/ns/activitystreams",
-		"id":            noteURI,
-		"type":          "Note",
-		"attributedTo":  actorURI,
-		"content":       note.Message,
-		"published":     note.CreatedAt.Format(time.RFC3339),
+		"@context":     "https://www.w3.org/ns/activitystreams",
+		"id":           noteURI,
+		"type":         "Note",
+		"attributedTo": actorURI,
+		"content":      note.Message,
+		"published":    note.CreatedAt.Format(time.RFC3339),
 		"to": []string{
 			"https://www.w3.org/ns/activitystreams#Public",
 		},

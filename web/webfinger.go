@@ -95,4 +95,3 @@ func ResolveWebFinger(username, domain string) (string, error) {
 
 	return "", fmt.Errorf("no ActivityPub actor found in webfinger response")
 }
-

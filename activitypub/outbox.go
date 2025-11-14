@@ -97,10 +97,10 @@ func SendCreate(note *domain.Note, localAccount *domain.Account, conf *util.AppC
 	createID := fmt.Sprintf("https://%s/activities/%s", conf.Conf.SslDomain, uuid.New().String())
 
 	create := map[string]interface{}{
-		"@context": "https://www.w3.org/ns/activitystreams",
-		"id":       createID,
-		"type":     "Create",
-		"actor":    actorURI,
+		"@context":  "https://www.w3.org/ns/activitystreams",
+		"id":        createID,
+		"type":      "Create",
+		"actor":     actorURI,
 		"published": note.CreatedAt.Format(time.RFC3339),
 		"to": []string{
 			"https://www.w3.org/ns/activitystreams#Public",
@@ -147,12 +147,12 @@ func SendCreate(note *domain.Note, localAccount *domain.Account, conf *util.AppC
 
 		// Queue for delivery
 		queueItem := &domain.DeliveryQueueItem{
-			Id:          uuid.New(),
-			InboxURI:    remoteActor.InboxURI,
+			Id:           uuid.New(),
+			InboxURI:     remoteActor.InboxURI,
 			ActivityJSON: mustMarshal(create),
-			Attempts:    0,
-			NextRetryAt: time.Now(),
-			CreatedAt:   time.Now(),
+			Attempts:     0,
+			NextRetryAt:  time.Now(),
+			CreatedAt:    time.Now(),
 		}
 
 		if err := database.EnqueueDelivery(queueItem); err != nil {
@@ -225,12 +225,12 @@ func SendUpdate(note *domain.Note, localAccount *domain.Account, conf *util.AppC
 		}
 
 		queueItem := &domain.DeliveryQueueItem{
-			Id:          uuid.New(),
-			InboxURI:    remoteActor.InboxURI,
+			Id:           uuid.New(),
+			InboxURI:     remoteActor.InboxURI,
 			ActivityJSON: mustMarshal(update),
-			Attempts:    0,
-			NextRetryAt: time.Now(),
-			CreatedAt:   time.Now(),
+			Attempts:     0,
+			NextRetryAt:  time.Now(),
+			CreatedAt:    time.Now(),
 		}
 
 		if err := database.EnqueueDelivery(queueItem); err != nil {
@@ -249,10 +249,10 @@ func SendDelete(noteId uuid.UUID, localAccount *domain.Account, conf *util.AppCo
 	deleteID := fmt.Sprintf("https://%s/activities/%s", conf.Conf.SslDomain, uuid.New().String())
 
 	deleteActivity := map[string]interface{}{
-		"@context": "https://www.w3.org/ns/activitystreams",
-		"id":       deleteID,
-		"type":     "Delete",
-		"actor":    actorURI,
+		"@context":  "https://www.w3.org/ns/activitystreams",
+		"id":        deleteID,
+		"type":      "Delete",
+		"actor":     actorURI,
 		"published": time.Now().Format(time.RFC3339),
 		"to": []string{
 			"https://www.w3.org/ns/activitystreams#Public",
@@ -285,12 +285,12 @@ func SendDelete(noteId uuid.UUID, localAccount *domain.Account, conf *util.AppCo
 		}
 
 		queueItem := &domain.DeliveryQueueItem{
-			Id:          uuid.New(),
-			InboxURI:    remoteActor.InboxURI,
+			Id:           uuid.New(),
+			InboxURI:     remoteActor.InboxURI,
 			ActivityJSON: mustMarshal(deleteActivity),
-			Attempts:    0,
-			NextRetryAt: time.Now(),
-			CreatedAt:   time.Now(),
+			Attempts:     0,
+			NextRetryAt:  time.Now(),
+			CreatedAt:    time.Now(),
 		}
 
 		if err := database.EnqueueDelivery(queueItem); err != nil {

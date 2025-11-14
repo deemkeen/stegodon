@@ -471,7 +471,7 @@ func (m MainModel) View() string {
 			Align(lipgloss.Center)
 
 		// Calculate remaining vertical space and add it before footer
-		currentContentHeight := availableHeight + 2 // panels + header
+		currentContentHeight := availableHeight + 2            // panels + header
 		remainingHeight := m.height - currentContentHeight - 1 // -1 for footer itself
 
 		if remainingHeight > 0 {
