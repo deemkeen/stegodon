@@ -29,7 +29,7 @@
                 width: 350px;
                 background: #2a2a2a;
                 color: #e0e0e0;
-                padding: 30px;
+                padding: 20px;
                 overflow-y: auto;
                 position: fixed;
                 height: 100vh;
@@ -38,7 +38,7 @@
             }
             .sidebar h1 {
                 color: #7d56f4;
-                margin-bottom: 20px;
+                margin-bottom: 15px;
                 font-size: 2em;
             }
             .sidebar h1 .emoji {
@@ -47,9 +47,9 @@
             }
             .info-box {
                 background: rgba(125, 86, 244, 0.1);
-                padding: 20px;
+                padding: 15px;
                 border-radius: 6px;
-                margin-bottom: 20px;
+                margin-bottom: 15px;
                 border-left: 4px solid #7d56f4;
             }
             .info-box h3 {
@@ -155,9 +155,13 @@
             .scroll-up {
                 display: none;
             }
+            .toggle-btn {
+                display: none;
+            }
             @media (max-width: 768px) {
                 body {
                     overflow: auto;
+                    overflow-y: scroll;
                 }
                 .layout {
                     flex-direction: column;
@@ -170,25 +174,39 @@
                     top: 0;
                     height: auto;
                     z-index: 100;
+                    padding: 15px 30px;
+                }
+                .sidebar-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 15px;
+                }
+                .sidebar.minimized .sidebar-header {
+                    margin-bottom: 0;
+                }
+                .sidebar h1 {
+                    margin-bottom: 0;
+                    flex: 1;
+                    font-size: 1.5em;
                 }
                 .sidebar.minimized {
-                    padding: 15px 30px;
                     cursor: pointer;
                 }
                 .sidebar.minimized .info-box {
                     display: none;
                 }
-                .sidebar.minimized h1 {
-                    font-size: 1.5em;
-                    margin-bottom: 0;
+                .sidebar .toggle-btn {
                     display: inline-block;
-                }
-                .sidebar.minimized .scroll-up {
-                    display: inline-block;
-                    float: right;
-                    color: #3498db;
+                    color: #7d56f4;
                     font-size: 1.5em;
-                    line-height: 1.5em;
+                    cursor: pointer;
+                    flex-shrink: 0;
+                    padding-left: 15px;
+                    user-select: none;
+                    -webkit-user-select: none;
+                    -moz-user-select: none;
+                    -ms-user-select: none;
                 }
                 .main-content {
                     margin-left: 0;
@@ -200,9 +218,11 @@
     </head>
     <body>
         <div class="layout">
-            <div class="sidebar">
-                <h1><span class="emoji">🦣</span> stegodon</h1>
-                <span class="scroll-up">↑</span>
+            <div class="sidebar minimized">
+                <div class="sidebar-header">
+                    <h1><span class="emoji">🦣</span> stegodon</h1>
+                    <span class="toggle-btn">☰</span>
+                </div>
 
                 <div class="info-box">
                     <h3>ssh-first fediverse blog</h3>
@@ -226,6 +246,18 @@
                     <p>• Follow local and remote users</p>
                     <p>• ActivityPub federation</p>
                     <p>• <a href="/feed">RSS feeds</a></p>
+                </div>
+
+                <div class="info-box">
+                    <h3>
+                        <a href="https://github.com/deemkeen/stegodon" style="color: #7d56f4; text-decoration: none;">
+                            <svg style="width: 1.2em; height: 1.2em; vertical-align: middle; margin-right: 8px;" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                            </svg>
+                            github
+                        </a>
+                    </h3>
+                    <p>Source and Documentation available on <a href="https://github.com/deemkeen/stegodon">Github</a></p>
                 </div>
             </div>
 
@@ -269,27 +301,21 @@
             </div>
         </div>
         <script>
-            // Mobile scroll handler
-            if (window.innerWidth <= 768) {
-                const sidebar = document.querySelector(".sidebar");
+            // Mobile toggle handler
+            const sidebar = document.querySelector(".sidebar");
+            const toggleBtn = document.querySelector(".toggle-btn");
 
-                window.addEventListener("scroll", () => {
-                    const currentScroll = window.pageYOffset;
-
-                    if (currentScroll > 100) {
-                        sidebar.classList.add("minimized");
-                    } else {
-                        sidebar.classList.remove("minimized");
-                    }
+            if (toggleBtn) {
+                // Toggle sidebar on button click
+                toggleBtn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    sidebar.classList.toggle("minimized");
                 });
 
-                // Click minimized header to scroll to top
-                sidebar.addEventListener("click", () => {
-                    if (sidebar.classList.contains("minimized")) {
-                        window.scrollTo({
-                            top: 0,
-                            behavior: "smooth",
-                        });
+                // Close sidebar when clicking outside (only on mobile)
+                document.addEventListener("click", (e) => {
+                    if (window.innerWidth <= 768 && !sidebar.contains(e.target) && !sidebar.classList.contains("minimized")) {
+                        sidebar.classList.add("minimized");
                     }
                 });
             }
