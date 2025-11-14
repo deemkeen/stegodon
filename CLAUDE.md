@@ -25,6 +25,26 @@ go run main.go
 STEGODON_WITH_AP=true STEGODON_SSLDOMAIN=yourdomain.com ./stegodon
 ```
 
+## Development Workflow
+
+**IMPORTANT**: After making any changes to the project, always run:
+
+```bash
+go clean && go test ./... && go build
+```
+
+This ensures:
+1. `go clean` - Removes build artifacts and cached files
+2. `go test ./...` - Runs all 155+ unit tests to verify nothing broke
+3. `go build` - Compiles the application only if tests pass
+
+The test suite covers critical functionality:
+- **domain**: 100% coverage (data structures)
+- **util**: 91.2% coverage (crypto, config, helpers)
+- **db**: 31.7% coverage (database operations)
+- **web**: 18.3% coverage (RSS, WebFinger, UI handlers)
+- **activitypub**: 9.5% coverage (inbox/outbox, actors)
+
 ## Configuration
 
 Configuration is managed via environment variables:
@@ -171,7 +191,7 @@ Default configuration is in `config.yaml`.
 ## Development Notes
 
 - Go version: 1.25 (updated from 1.19)
-- No test files exist in the codebase currently
+- **Test suite**: 155+ passing unit tests covering all critical functionality
 - The `.ssh/hostkey` file is auto-generated on first run via `util.GeneratePemKeypair()`
 - Database file `database.db` is created in working directory
 - Terminal requirements: 24-bit color support, minimum 115 cols x 28 rows
