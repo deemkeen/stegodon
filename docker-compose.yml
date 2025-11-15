@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   stegodon:
-    build: .
+    image: ghcr.io/deemkeen/stegodon:latest
+    # To build locally instead, comment out the line above and uncomment:
+    # build: .
     container_name: stegodon
     restart: unless-stopped
 

@@ -17,16 +17,17 @@ Built with Go and [Charm Tools](https://github.com/charmbracelet).
 
 ## Quick Start
 
-**Binary:**
+**Docker (Recommended):**
 ```bash
-# Download the binary (or build from source)
-chmod +x stegodon
-./stegodon
+docker pull ghcr.io/deemkeen/stegodon:latest
+docker-compose up -d
 ```
 
-**Docker:**
+**Binary:**
 ```bash
-docker-compose up -d
+# Download the binary from GitHub Releases
+chmod +x stegodon
+./stegodon
 ```
 
 **Connect via SSH:**

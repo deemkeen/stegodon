@@ -6,10 +6,14 @@ This guide explains how to run stegodon using Docker and Docker Compose.
 
 ### Using Docker Compose (Recommended)
 
+stegodon images are automatically built and published to GitHub Container Registry on every commit.
+
 1. **Start stegodon:**
    ```bash
    docker-compose up -d
    ```
+
+   This pulls the latest image from `ghcr.io/deemkeen/stegodon:latest`.
 
 2. **Connect via SSH:**
    ```bash
@@ -28,9 +32,9 @@ This guide explains how to run stegodon using Docker and Docker Compose.
 
 ### Using Docker CLI
 
-1. **Build the image:**
+1. **Pull the image:**
    ```bash
-   docker build -t stegodon .
+   docker pull ghcr.io/deemkeen/stegodon:latest
    ```
 
 2. **Run the container:**
@@ -40,13 +44,29 @@ This guide explains how to run stegodon using Docker and Docker Compose.
      -p 23232:23232 \
      -p 9999:9999 \
      -v stegodon-data:/home/stegodon/.config/stegodon \
-     stegodon
+     ghcr.io/deemkeen/stegodon:latest
    ```
 
 3. **Connect via SSH:**
    ```bash
    ssh root@localhost -p 23232
    ```
+
+### Building Locally (Optional)
+
+If you prefer to build the image yourself:
+
+```bash
+# Edit docker-compose.yml: comment out 'image:' and uncomment 'build: .'
+docker-compose build
+docker-compose up -d
+```
+
+Or with Docker CLI:
+```bash
+docker build -t stegodon .
+docker run -d --name stegodon -p 23232:23232 -p 9999:9999 stegodon
+```
 
 ## Configuration
 
