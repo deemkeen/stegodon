@@ -10,9 +10,10 @@ import (
 )
 
 var (
-	Style = lipgloss.NewStyle().Height(35).
+	Style = lipgloss.NewStyle().Height(25).Width(80).
 		Align(lipgloss.Center, lipgloss.Center).
-		BorderStyle(lipgloss.ThickBorder())
+		BorderStyle(lipgloss.ThickBorder()).
+		Margin(0, 3)
 )
 
 type Model struct {
@@ -98,6 +99,19 @@ func (m Model) View() string {
 	) + "\n"
 }
 
+// ViewWithWidth renders the view with proper width accounting for border and margins
+func (m Model) ViewWithWidth(termWidth, termHeight int) string {
+	// Account for border (2 chars) and margins already defined in Style (6 chars total)
+	// Total to subtract: 2 (border) + 6 (margins) = 8
+	contentWidth := termWidth - 8
+	if contentWidth < 40 {
+		contentWidth = 40 // Minimum width
+	}
+
+	bordered := Style.Width(contentWidth).Render(m.View())
+	return lipgloss.Place(termWidth, termHeight, lipgloss.Center, lipgloss.Center, bordered)
+}
+
 func InitialModel() Model {
 	ti := textinput.New()
 	ti.Placeholder = "ElonMusk666"
@@ -106,7 +120,7 @@ func InitialModel() Model {
 	ti.Width = 20
 
 	displayName := textinput.New()
-	displayName.Placeholder = "Elon Musk"
+	displayName.Placeholder = "John Doe"
 	displayName.CharLimit = 50
 	displayName.Width = 50
 

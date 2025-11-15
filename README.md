@@ -1,9 +1,8 @@
-![screenshot](./screenshot.png)
+![demo](./demo.gif)
 
 # stegodon
 
-**stegodon** is a federated blog TUI application written in Golang, using the wonderful [Charm Tools](https://github.com/charmbracelet).
-Users connect via SSH and can create notes in a clean terminal interface. Notes can be subscribed to via RSS and federate to the Fediverse via ActivityPub (Mastodon, Pleroma, etc.).
+**stegodon** is a ssh-first fediverse multi-user blog written in Go using [Charm Tools](https://github.com/charmbracelet). Users connect via SSH and create notes in a terminal interface. Notes can be subscribed to via RSS and federate via ActivityPub to the Fediverse (Mastodon, Pleroma, etc.) and optionally viewed in a web browser.
 
 ## Features
 
@@ -12,11 +11,13 @@ Users connect via SSH and can create notes in a clean terminal interface. Notes 
   - Arrow key navigation with selection highlighting
   - Character limit (150 chars) with counter
   - Timestamps with "(edited)" indicators
+  - Markdown link support `[text](url)` with clickable links
 
 - **RSS Feeds**
   - Per-user RSS feeds
   - Aggregated feed for all users
   - Individual note feeds by UUID
+  - Clickable Markdown links in RSS content
 
 - **ActivityPub Federation**
   - Follow/unfollow remote users via WebFinger
@@ -27,6 +28,7 @@ Users connect via SSH and can create notes in a clean terminal interface. Notes 
   - HTTP signature authentication (RSA-SHA256)
   - Reliable delivery with exponential backoff retry
   - Actor caching with 24-hour TTL
+  - Clickable Markdown links in federated posts
 
 - **Multi-User Support**
   - SSH public key authentication
@@ -42,6 +44,7 @@ Users connect via SSH and can create notes in a clean terminal interface. Notes 
   - Terminal-themed aesthetic with green-on-black styling
   - SEO optimized with Open Graph and Twitter Card meta tags
   - Responsive pagination for post history
+  - Clickable Markdown links in web UI
 
 ## Installation
 
@@ -92,6 +95,30 @@ You will be authenticated with your SSH public key. On your first login, you'll 
 **Your ActivityPub profile:**
 - Actor: `https://yourdomain.com/users/<username>`
 - WebFinger: `https://yourdomain.com/.well-known/webfinger?resource=acct:<username>@yourdomain.com`
+
+### Markdown Links
+
+**stegodon** supports Markdown-style links in notes: `[text](url)`
+
+**In the TUI:**
+- Links appear in green with underline
+- On terminals with OSC 8 support (Ghostty, iTerm2, Kitty..), links are clickable with the mouse
+- Works in Notes List (view 2) and Local Timeline (view 8)
+
+**In the Web UI:**
+- Links are rendered as clickable HTML anchors
+- Styled in blue with underline and hover effect
+- Accessible on home page and user profile pages
+
+**In Federation:**
+- Links are converted to HTML `<a>` tags in ActivityPub activities
+- Clickable in Mastodon, Pleroma, and other fediverse clients
+- Included in Create, Update, and Outbox activities
+
+**Example:**
+```
+Check out [stegodon on GitHub](https://github.com/deemkeen/stegodon)!
+```
 
 ### Multi-User Setup
 
@@ -152,6 +179,7 @@ STEGODON_CLOSED=true ./stegodon
 For optimal results, use a terminal with:
 - True Color (24-bit) support
 - At least 115 columns × 28 rows
+- OSC 8 hyperlink support for clickable links (optional: Ghostty, iTerm2, Kitty, etc.)
 
 ## ActivityPub Implementation
 

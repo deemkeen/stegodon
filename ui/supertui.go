@@ -488,7 +488,7 @@ func (m MainModel) View() string {
 		Render(m.deleteAccountModel.View())
 
 	if m.state == common.CreateUserView {
-		s = createuser.Style.Width(m.width).Render(m.newUserModel.View())
+		s = m.newUserModel.ViewWithWidth(m.width, m.height)
 		return s
 	} else {
 		navContainer := lipgloss.NewStyle().Render(m.headerModel.View())
