@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.25-alpine AS builder
+FROM golang:1.25-alpine3.21 AS builder
 
 # Install build dependencies (gcc, musl-dev for CGO/SQLite)
 RUN apk add --no-cache git gcc musl-dev
@@ -20,7 +20,7 @@ COPY . .
 RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o stegodon .
 
 # Final stage
-FROM alpine:latest
+FROM alpine:3.21
 
 # Install runtime dependencies
 RUN apk add --no-cache ca-certificates sqlite
