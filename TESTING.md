@@ -6,8 +6,8 @@ This guide explains how to test stegodon's ActivityPub federation features with 
 
 ### Prerequisites
 
-- stegodon built and ready to run (`go build`)
-- ngrok installed (already installed at `/opt/homebrew/bin/ngrok`)
+- stegodon binary (download or build with `go build`)
+- ngrok installed (or use alternative tunneling service)
 - A Mastodon or Pleroma account for testing
 
 ### Step 1: Start ngrok Tunnel
@@ -43,8 +43,13 @@ You should see:
 ```
 Configuration:
 ...
+Created default config file at ~/.config/stegodon/config.yaml
+Using database at: ~/.config/stegodon/database.db
+Using SSH host key at: ~/.config/stegodon/.ssh/stegodonhostkey
 Starting SSH server on 127.0.0.1:23232
 ```
+
+**Note:** On first run, stegodon creates `~/.config/stegodon/` with default config, database, and SSH keys.
 
 ### Step 3: Connect via SSH and Create an Account
 
@@ -56,16 +61,16 @@ ssh localhost -p 23232
 
 On first connection:
 1. You'll be prompted to choose a username (e.g., `alice`)
-2. Navigate the TUI with Tab or number keys:
-   - **1** or Tab to "Write Note"
-   - **2** for "List Notes"
-   - **3** for "Follow User"
-   - **4** for "Followers"
-   - **5** for "Federated Timeline"
+2. Navigate the TUI with **Tab** (forward) or **Shift+Tab** (backward):
+   - "Write Note"
+   - "List Notes"
+   - "Follow User"
+   - "Followers"
+   - "Federated Timeline"
 
 ### Step 4: Create a Test Post
 
-1. Press **1** to open "Write Note"
+1. Press **Tab** to cycle to "Write Note" view
 2. Type a test message: "Hello from stegodon!"
 3. Press **Ctrl+S** to save
 
@@ -101,23 +106,23 @@ Sent Accept activity to ...
 #### Check Followers List
 
 In your SSH session:
-1. Press **4** to view "Followers"
+1. Press **Tab** to cycle to "Followers" view
 2. You should see your Mastodon account listed
 
 #### Test Incoming Posts
 
 From your Mastodon account, follow yourself from stegodon:
-1. In stegodon SSH session, press **3** (Follow User)
+1. In stegodon SSH session, press **Tab** to cycle to "Follow User" view
 2. Enter: `yourname@mastodon.social`
 3. Press Enter
 
 Then post from Mastodon and check:
-1. Press **5** in stegodon (Federated Timeline)
+1. Press **Tab** to cycle to "Federated Timeline" view in stegodon
 2. Your Mastodon post should appear
 
 ### Step 7: Test Outgoing Posts
 
-1. Create another note in stegodon (Press **1**, write, **Ctrl+S**)
+1. Create another note in stegodon (cycle to "Write Note" view, write, **Ctrl+S**)
 2. Check your Mastodon home timeline
 3. Your stegodon post should appear in your feed
 
@@ -155,8 +160,8 @@ Expected response:
 
 **Check delivery queue:**
 ```bash
-# In your stegodon directory
-sqlite3 database.db "SELECT * FROM delivery_queue ORDER BY created_at DESC LIMIT 10;"
+# Database is in ~/.config/stegodon/ by default
+sqlite3 ~/.config/stegodon/database.db "SELECT * FROM delivery_queue ORDER BY created_at DESC LIMIT 10;"
 ```
 
 If queue is stuck:
@@ -185,17 +190,17 @@ Some ngrok plans show an interstitial page. If you see this:
 ### Database locked errors
 
 If you see `database is locked`:
-- Only run one stegodon instance per database.db
-- Check WAL mode is enabled: `sqlite3 database.db "PRAGMA journal_mode;"`
+- Only run one stegodon instance per database
+- Check WAL mode is enabled: `sqlite3 ~/.config/stegodon/database.db "PRAGMA journal_mode;"`
 - Should return `wal2` or `wal`
 
 ## Advanced Testing
 
 ### Testing Multiple Local Instances
 
-To run multiple stegodon instances simultaneously:
+To run multiple stegodon instances simultaneously, each needs its own data directory:
 
-1. **Instance 1:**
+1. **Instance 1 (default location):**
    ```bash
    # Terminal 1: ngrok for instance 1
    ngrok http 9999
@@ -204,21 +209,41 @@ To run multiple stegodon instances simultaneously:
    STEGODON_WITH_AP=true STEGODON_SSLDOMAIN=abc123.ngrok-free.app ./stegodon
    ```
 
-2. **Instance 2:**
+2. **Instance 2 (custom directory):**
    ```bash
-   # Terminal 3: Create new directory
-   mkdir ../stegodon-instance2
-   cp stegodon ../stegodon-instance2/
-   cd ../stegodon-instance2
+   # Terminal 3: Create data directory for instance 2
+   mkdir -p ~/stegodon-instance2/.config/stegodon
 
    # Terminal 4: ngrok for instance 2 (different port)
    ngrok http 9998
 
-   # Terminal 5: Run instance 2
+   # Terminal 5: Run instance 2 with custom config location
+   # Use HOME to point to custom data directory
+   HOME=~/stegodon-instance2 \
    STEGODON_WITH_AP=true \
    STEGODON_SSLDOMAIN=xyz789.ngrok-free.app \
    STEGODON_SSHPORT=23233 \
    STEGODON_HTTPPORT=9998 \
+   ./stegodon
+   ```
+
+**Alternative:** Use local config files (backwards compatibility):
+   ```bash
+   # Create separate directories
+   mkdir instance2 && cd instance2
+   cp ../stegodon .
+
+   # Create local config.yaml to override defaults
+   cat > config.yaml <<EOF
+   conf:
+     host: 127.0.0.1
+     sshPort: 23233
+     httpPort: 9998
+     sslDomain: xyz789.ngrok-free.app
+     withAp: true
+   EOF
+
+   # Run instance 2 (will use local config.yaml and create local database.db)
    ./stegodon
    ```
 
@@ -236,21 +261,23 @@ Watch HTTP traffic in ngrok's web interface:
 
 ### Database Inspection
 
-Useful queries:
+Useful queries (adjust path if using custom data directory):
 
 ```bash
 # View all remote accounts you've discovered
-sqlite3 database.db "SELECT username, domain, actor_uri FROM remote_accounts;"
+sqlite3 ~/.config/stegodon/database.db "SELECT username, domain, actor_uri FROM remote_accounts;"
 
 # View all follows
-sqlite3 database.db "SELECT * FROM follows;"
+sqlite3 ~/.config/stegodon/database.db "SELECT * FROM follows;"
 
 # View recent activities
-sqlite3 database.db "SELECT activity_type, actor_uri, created_at FROM activities ORDER BY created_at DESC LIMIT 10;"
+sqlite3 ~/.config/stegodon/database.db "SELECT activity_type, actor_uri, created_at FROM activities ORDER BY created_at DESC LIMIT 10;"
 
 # Check delivery queue status
-sqlite3 database.db "SELECT inbox_uri, attempts, next_retry_at FROM delivery_queue;"
+sqlite3 ~/.config/stegodon/database.db "SELECT inbox_uri, attempts, next_retry_at FROM delivery_queue;"
 ```
+
+**For local config instances:** Replace `~/.config/stegodon/database.db` with `./database.db`
 
 ## Alternative Tunneling Services
 

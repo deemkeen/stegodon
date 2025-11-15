@@ -3,6 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish/logging"
 	"github.com/deemkeen/stegodon/activitypub"
@@ -10,11 +16,6 @@ import (
 	"github.com/deemkeen/stegodon/middleware"
 	"github.com/deemkeen/stegodon/util"
 	"github.com/deemkeen/stegodon/web"
-	"log"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
 	"github.com/charmbracelet/wish"
 )
@@ -29,7 +30,9 @@ func main() {
 	fmt.Println("Configuration: ")
 	fmt.Println(util.PrettyPrint(conf))
 
-	util.GeneratePemKeypair()
+	// Resolve SSH host key path (local first, then user config dir)
+	sshKeyPath := util.ResolveFilePathWithSubdir(".ssh", "stegodonhostkey")
+	log.Printf("Using SSH host key at: %s", sshKeyPath)
 
 	// Run ActivityPub migrations
 	log.Println("Running database migrations...")
@@ -46,7 +49,7 @@ func main() {
 
 	s, err := wish.NewServer(
 		wish.WithAddress(fmt.Sprintf("%s:%d", conf.Conf.Host, conf.Conf.SshPort)),
-		wish.WithHostKeyPath(".ssh/hostkey"),
+		wish.WithHostKeyPath(sshKeyPath),
 		wish.WithPublicKeyAuth(publicKeyHandler),
 		//wish.WithAuthorizedKeys(".ssh"),
 		wish.WithMiddleware(

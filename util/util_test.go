@@ -1,7 +1,6 @@
 package util
 
 import (
-	"os"
 	"testing"
 )
 
@@ -60,31 +59,20 @@ func TestPkToHashDifferentInputs(t *testing.T) {
 }
 
 func TestGetVersion(t *testing.T) {
-	// Create a temporary version.txt file
-	content := "v1.0.0-test"
-	err := os.WriteFile("version.txt", []byte(content), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create test version.txt: %v", err)
-	}
-	defer os.Remove("version.txt")
-
+	// GetVersion now uses embedded version.txt
+	// The embedded version should be "1.0.0"
 	version := GetVersion()
-	if version != content {
-		t.Errorf("Expected version '%s', got '%s'", content, version)
+	expected := "1.0.0"
+
+	if version != expected {
+		t.Errorf("Expected version '%s', got '%s'", expected, version)
 	}
 }
 
 func TestGetNameAndVersion(t *testing.T) {
-	// Create a temporary version.txt file
-	content := "v1.0.0"
-	err := os.WriteFile("version.txt", []byte(content), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create test version.txt: %v", err)
-	}
-	defer os.Remove("version.txt")
-
+	// GetNameAndVersion now uses embedded version.txt
 	result := GetNameAndVersion()
-	expected := "stegodon / v1.0.0"
+	expected := "stegodon / 1.0.0"
 
 	if result != expected {
 		t.Errorf("Expected '%s', got '%s'", expected, result)

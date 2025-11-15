@@ -219,14 +219,14 @@ func TestPostViewStructure(t *testing.T) {
 func TestPaginationLogic(t *testing.T) {
 	// Test pagination calculations
 	tests := []struct {
-		name          string
-		page          int
-		postsPerPage  int
-		totalPosts    int
-		wantStart     int
-		wantEnd       int
-		wantHasPrev   bool
-		wantHasNext   bool
+		name         string
+		page         int
+		postsPerPage int
+		totalPosts   int
+		wantStart    int
+		wantEnd      int
+		wantHasPrev  bool
+		wantHasNext  bool
 	}{
 		{
 			name:         "first page with more posts",

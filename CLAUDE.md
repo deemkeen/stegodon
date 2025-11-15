@@ -62,7 +62,14 @@ Configuration is managed via environment variables:
 - `STEGODON_SINGLE` - Enable single-user mode (default: false)
 - `STEGODON_CLOSED` - Close registration for new users (default: false)
 
-Default configuration is in `config.yaml`.
+**File Locations** (as of single-binary distribution):
+- Configuration file: Checked in order:
+  1. `./config.yaml` (local directory, for backwards compatibility)
+  2. `~/.config/stegodon/config.yaml` (user config directory)
+  3. Embedded defaults (if neither file exists, a default config.yaml is created in ~/.config/stegodon/)
+- Database: `~/.config/stegodon/database.db` (or `./database.db` if it exists locally)
+- SSH host key: `~/.config/stegodon/.ssh/stegodonhostkey` (or `./.ssh/stegodonhostkey` if it exists locally)
+- Templates and version: Embedded in the binary
 
 **For ActivityPub to work**, you must:
 1. Set `STEGODON_WITH_AP=true`
@@ -105,12 +112,12 @@ Default configuration is in `config.yaml`.
    - Built with [bubbletea](https://github.com/charmbracelet/bubbletea) MVC pattern
    - **5-view navigation system**:
      - `createuser.Model`: First-time username selection
-     - `writenote.Model`: Note creation interface (key 1)
-     - `listnotes.Model`: Local notes viewing with pagination (key 2)
-     - `followuser.Model`: Follow remote ActivityPub users (key 3)
-     - `followers.Model`: View followers list (key 4)
-     - `timeline.Model`: Federated timeline from followed accounts (key 5)
-   - **Hybrid navigation**: Tab cycles through views, number keys 1-5 jump directly
+     - `writenote.Model`: Note creation interface
+     - `listnotes.Model`: Local notes viewing with pagination
+     - `followuser.Model`: Follow remote ActivityPub users
+     - `followers.Model`: View followers list
+     - `timeline.Model`: Federated timeline from followed accounts
+  - **Navigation**: Tab cycles forward, Shift+Tab cycles backward
    - State machine driven by `common.SessionState` enum
 
 4. **Database Layer** (`db/db.go`):
@@ -173,7 +180,7 @@ Default configuration is in `config.yaml`.
 7. HTTP POST sent to remote inboxes with signed requests
 
 **ActivityPub Federation (Following Users):**
-1. User enters `user@domain.com` in follow view (key 3)
+1. User enters `user@domain.com` in follow view
 2. WebFinger resolves to ActivityPub actor URI
 3. `activitypub.SendFollow()` sends Follow activity to remote inbox
 4. Remote server sends Accept activity back
@@ -184,7 +191,7 @@ Default configuration is in `config.yaml`.
 1. Remote server POSTs Create activity to `/users/:actor/inbox`
 2. HTTP signature verified against remote actor's public key
 3. Activity parsed and stored in `activities` table
-4. Federated timeline view (key 5) displays recent Create activities
+4. Federated timeline view displays recent Create activities
 5. Posts shown with actor name, content, and relative timestamp
 
 ### Directory Structure
@@ -216,8 +223,9 @@ Default configuration is in `config.yaml`.
 
 - Go version: 1.25 (updated from 1.19)
 - **Test suite**: 155+ passing unit tests covering all critical functionality
-- The `.ssh/hostkey` file is auto-generated on first run via `util.GeneratePemKeypair()`
-- Database file `database.db` is created in working directory
+- **Single Binary Distribution**: All static assets (config, templates, version) are embedded in the binary
+- SSH host key is auto-generated on first run by the Wish SSH library
+- User data stored in `~/.config/stegodon/` (config, database, SSH key)
 - Terminal requirements: 24-bit color support, minimum 115 cols x 28 rows
 - Public keys are hashed with SHA256 before storage for privacy
 
@@ -226,6 +234,11 @@ Default configuration is in `config.yaml`.
 The project has been fully updated with ActivityPub federation support:
 - **SSH Migration**: Migrated from `gliderlabs/ssh` to `charmbracelet/ssh` (required by newer wish versions)
 - **Charm Tools**: Updated to latest stable releases (bubbletea v1.3.10, bubbles v0.21.0, lipgloss v1.1.0, wish v1.4.7)
+- **Single Binary Distribution** (November 2025):
+  - Embedded all static assets (config.yaml, HTML templates, version.txt) using Go's `embed` package
+  - User data centralized in `~/.config/stegodon/` directory
+  - Backwards compatible: checks local directory first for existing installations
+  - Default config auto-created on first run if missing
 - **ActivityPub Implementation**: Full Fediverse integration (6 phases over 8 weeks)
   - Phase 1: Database foundation with 5 new tables
   - Phase 2: HTTP signatures and actor discovery
@@ -234,7 +247,7 @@ The project has been fully updated with ActivityPub federation support:
   - Phase 5: Federated timeline and followers list
   - Phase 6: Polish and configuration fixes
 - **Database Optimization**: WAL mode with connection pooling for concurrent access
-- **Navigation Enhancement**: Hybrid Tab + number keys (1-5) navigation system
+- **Navigation Enhancement**: Tab + Shift+Tab
 
 ## ActivityPub Features
 

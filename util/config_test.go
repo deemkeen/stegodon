@@ -116,12 +116,18 @@ conf:
 }
 
 func TestReadConfMissingFile(t *testing.T) {
-	// Ensure config.yaml doesn't exist
+	// Ensure config.yaml doesn't exist in current directory
 	os.Remove("config.yaml")
 
-	_, err := ReadConf()
-	if err == nil {
-		t.Error("Expected error when config file is missing")
+	// Now ReadConf should succeed using embedded defaults
+	conf, err := ReadConf()
+	if err != nil {
+		t.Errorf("Expected no error when config file is missing (should use embedded defaults), got: %v", err)
+	}
+
+	// Verify we got default values
+	if conf.Conf.Host != "127.0.0.1" {
+		t.Errorf("Expected default host '127.0.0.1', got '%s'", conf.Conf.Host)
 	}
 }
 

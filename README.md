@@ -2,235 +2,110 @@
 
 # stegodon
 
-**stegodon** is a ssh-first fediverse multi-user blog written in Go using [Charm Tools](https://github.com/charmbracelet). Users connect via SSH and create notes in a terminal interface. Notes can be subscribed to via RSS and federate via ActivityPub to the Fediverse (Mastodon, Pleroma, etc.) and optionally viewed in a web browser.
+**stegodon** is an SSH-first federated blogging platform. Users connect via SSH to create notes in a terminal interface. Notes federate to the Fediverse via ActivityPub and are available through RSS feeds and a web interface.
+
+Built with Go and [Charm Tools](https://github.com/charmbracelet).
 
 ## Features
 
-- **Note Management**
-  - Create, edit, and delete notes with visual confirmation
-  - Arrow key navigation with selection highlighting
-  - Character limit (150 chars) with counter
-  - Timestamps with "(edited)" indicators
-  - Markdown link support `[text](url)` with clickable links
+- **SSH-First TUI** - Connect via SSH, authenticate with your public key, create notes in a beautiful terminal interface
+- **ActivityPub Federation** - Follow/unfollow users, federate posts to Mastodon/Pleroma with HTTP signatures
+- **RSS Feeds** - Per-user and aggregated feeds with full content
+- **Web Interface** - Browse posts with terminal-themed design and SEO optimization
+- **Multi-User** - Admin panel, user management, single-user mode, closed registration
+- **Markdown Links** - Clickable links in TUI (OSC 8), web UI, and federation: `[text](url)`
 
-- **RSS Feeds**
-  - Per-user RSS feeds
-  - Aggregated feed for all users
-  - Individual note feeds by UUID
-  - Clickable Markdown links in RSS content
+## Quick Start
 
-- **ActivityPub Federation**
-  - Follow/unfollow remote users via WebFinger
-  - Automatic follow request acceptance
-  - Federate posts to all followers
-  - Receive posts from followed accounts
-  - Edit and delete federation with Update/Delete activities
-  - HTTP signature authentication (RSA-SHA256)
-  - Reliable delivery with exponential backoff retry
-  - Actor caching with 24-hour TTL
-  - Clickable Markdown links in federated posts
-
-- **Multi-User Support**
-  - SSH public key authentication
-  - Per-user accounts with unique usernames
-  - RSA keypairs for ActivityPub signing
-  - Federated timeline and followers list
-  - Admin panel for user management (mute/kick users)
-  - Single-user mode (restrict to one user)
-  - Closed registration mode (prevent new registrations)
-
-- **Web Interface**
-  - Browse user profiles and posts
-  - Terminal-themed aesthetic with green-on-black styling
-  - SEO optimized with Open Graph and Twitter Card meta tags
-  - Responsive pagination for post history
-  - Clickable Markdown links in web UI
-
-## Installation
-
-1. Clone the repository: `git clone https://github.com/deemkeen/stegodon`
-2. Install dependencies: `go get -d`
-3. Build the application: `go build`
-4. Start the server: `./stegodon`
-
-## Usage
-
-### Basic Usage
-
-Once the server is started, open an SSH session via `ssh 127.0.0.1 -p 23232` to access the application.
-You will be authenticated with your SSH public key. On your first login, you'll be prompted to choose a username.
-
-**Navigation:**
-- `Tab`: Cycle through views
-- Number keys: Jump directly to views (1: New Note, 2: Notes List, 3: Follow User, 4: Followers, 5: Federated Timeline, 6: Delete Account, 7: Admin Panel)
-- `↑/↓` or `j/k`: Navigate items in lists
-- `u`: Edit selected note (in Notes List view)
-- `d`: Delete selected note with confirmation (in Notes List view)
-- `m`: Mute user (in Admin Panel, if admin)
-- `k`: Kick/delete user (in Admin Panel, if admin)
-- `Ctrl+S`: Save/post note
-- `Ctrl+C` or `q`: Quit
-
-### RSS Feeds
-
-- Personal feed: `http://127.0.0.1:9999/feed?username=<youruser>`
-- Aggregated feed (all users): `http://127.0.0.1:9999/feed`
-- Individual note: `http://127.0.0.1:9999/feed/<note-uuid>`
-
-### ActivityPub Federation
-
-**stegodon** can federate with Mastodon, Pleroma, and other ActivityPub-compatible servers.
-
-**To enable ActivityPub:**
-1. Set `STEGODON_WITH_AP=true`
-2. Set `STEGODON_SSLDOMAIN` to your public domain (e.g., `yourdomain.com`)
-3. Ensure your domain is publicly accessible with HTTPS
-4. Proxy the HTTP port through a reverse proxy with TLS (e.g., nginx, caddy)
-
-**Following users:**
-1. Press `3` or Tab to "Follow User" view
-2. Enter remote user in format: `username@domain.com` or `@username@domain.com`
-3. Your follow request will be sent automatically
-
-**Your ActivityPub profile:**
-- Actor: `https://yourdomain.com/users/<username>`
-- WebFinger: `https://yourdomain.com/.well-known/webfinger?resource=acct:<username>@yourdomain.com`
-
-### Markdown Links
-
-**stegodon** supports Markdown-style links in notes: `[text](url)`
-
-**In the TUI:**
-- Links appear in green with underline
-- On terminals with OSC 8 support (Ghostty, iTerm2, Kitty..), links are clickable with the mouse
-- Works in Notes List (view 2) and Local Timeline (view 8)
-
-**In the Web UI:**
-- Links are rendered as clickable HTML anchors
-- Styled in blue with underline and hover effect
-- Accessible on home page and user profile pages
-
-**In Federation:**
-- Links are converted to HTML `<a>` tags in ActivityPub activities
-- Clickable in Mastodon, Pleroma, and other fediverse clients
-- Included in Create, Update, and Outbox activities
-
-**Example:**
-```
-Check out [stegodon on GitHub](https://github.com/deemkeen/stegodon)!
+**Download and run:**
+```bash
+# Download the binary (or build from source)
+chmod +x stegodon
+./stegodon
 ```
 
-### Multi-User Setup
+**Connect via SSH:**
+```bash
+ssh 127.0.0.1 -p 23232
+```
 
-**stegodon** can be used as a multi-user system when exposed to the internet. Each user gets a dedicated account, accessible with their personal SSH key.
+On first login, choose your username. All data is stored in `~/.config/stegodon/`.
 
-**Admin Features:**
-- The first user to register automatically becomes an admin
-- Admins can access the admin panel (press `7` or Tab to view)
-- Mute users to block their login and delete their content
-- Kick users to permanently delete accounts and all associated data
+## Navigation
 
-**Registration Control:**
-- Use single-user mode (`STEGODON_SINGLE=true`) for personal blogs
-- Use closed registration (`STEGODON_CLOSED=true`) for invite-only instances
-- Default mode allows unlimited user registration
+- **Tab** - Cycle through views
+- **Shift+Tab** - Cycle through views in reverse order
+- **↑/↓** or **j/k** - Navigate lists
+- **u** - Edit note (in list)
+- **d** - Delete note with confirmation
+- **Ctrl+S** - Save/post note
+- **Ctrl+C** or **q** - Quit
 
 ## Configuration
 
-Configuration is managed via environment variables:
-
-- **STEGODON_HOST** - Server IP (default: `127.0.0.1`)
-- **STEGODON_SSHPORT** - SSH login port (default: `23232`)
-- **STEGODON_HTTPPORT** - HTTP port (default: `9999`)
-- **STEGODON_SSLDOMAIN** - **Required for ActivityPub** - Your public domain (default: `example.com`)
-- **STEGODON_WITH_AP** - Enable ActivityPub functionality (default: `false`)
-- **STEGODON_SINGLE** - Enable single-user mode (default: `false`)
-- **STEGODON_CLOSED** - Close registration for new users (default: `false`)
-
-Default configuration is in `config.yaml`.
-
-### Single-User Mode
-
-Set `STEGODON_SINGLE=true` to restrict registration to only one user. After the first user registers, additional SSH connection attempts will be rejected with a friendly message. Useful for personal blogs.
+Environment variables override embedded defaults:
 
 ```bash
-STEGODON_SINGLE=true ./stegodon
+# Basic settings
+STEGODON_HOST=127.0.0.1          # Server IP
+STEGODON_SSHPORT=23232            # SSH port
+STEGODON_HTTPPORT=9999            # HTTP port
+
+# ActivityPub federation
+STEGODON_WITH_AP=true             # Enable federation
+STEGODON_SSLDOMAIN=yourdomain.com # Your public domain (required for ActivityPub)
+
+# Access control
+STEGODON_SINGLE=true              # Single-user mode
+STEGODON_CLOSED=true              # Closed registration
 ```
 
-### Closed Registration
+**File locations:**
+- Config: `./config.yaml` → `~/.config/stegodon/config.yaml` → embedded defaults
+- Database: `./database.db` → `~/.config/stegodon/database.db`
+- SSH key: `./.ssh/stegodonhostkey` → `~/.config/stegodon/.ssh/stegodonhostkey`
 
-Set `STEGODON_CLOSED=true` to completely close registration. All new user registration attempts will be rejected. Existing users can continue to log in normally. Useful for invite-only instances or maintenance periods.
+## ActivityPub Setup
+
+1. Set `STEGODON_WITH_AP=true` and `STEGODON_SSLDOMAIN=yourdomain.com`
+2. Make your server publicly accessible with HTTPS
+3. Proxy HTTP port (9999) through nginx/caddy with TLS
+4. Follow users: Go to the "Follow" view, enter `username@domain.com`
+
+**Your profile:** `https://yourdomain.com/users/<username>`
+
+## RSS Feeds
+
+- Personal: `http://localhost:9999/feed?username=<user>`
+- Aggregated: `http://localhost:9999/feed`
+- Single note: `http://localhost:9999/feed/<uuid>`
+
+## Building from Source
 
 ```bash
-STEGODON_CLOSED=true ./stegodon
+git clone https://github.com/deemkeen/stegodon
+cd stegodon
+go build
+./stegodon
 ```
+
+**Requirements:**
+- Go 1.25+
+- Terminal with 24-bit color, 115×28 minimum
+- OSC 8 support for clickable links (optional: Ghostty, iTerm2, Kitty)
 
 ## Tech Stack
 
-- **SSH Server**: [wish](https://github.com/charmbracelet/wish) - SSH server with middleware
-- **TUI Framework**: [bubbletea](https://github.com/charmbracelet/bubbletea) - Terminal UI framework
-- **Styling**: [lipgloss](https://github.com/charmbracelet/lipgloss) - Style definitions for terminal UIs
-- **HTTP Router**: [gin](https://github.com/gin-gonic/gin) - Web framework
-- **Database**: SQLite with WAL mode for concurrency
-- **ActivityPub**: Custom implementation with HTTP signatures
+- **SSH:** [wish](https://github.com/charmbracelet/wish)
+- **TUI:** [bubbletea](https://github.com/charmbracelet/bubbletea), [lipgloss](https://github.com/charmbracelet/lipgloss)
+- **Web:** [gin](https://github.com/gin-gonic/gin)
+- **Database:** SQLite with WAL mode
+- **Federation:** Custom ActivityPub implementation with HTTP signatures
 
-### Requirements
+## License
 
-For optimal results, use a terminal with:
-- True Color (24-bit) support
-- At least 115 columns × 28 rows
-- OSC 8 hyperlink support for clickable links (optional: Ghostty, iTerm2, Kitty, etc.)
-
-## ActivityPub Implementation
-
-**Supported Activities:**
-- Follow/Accept/Undo (full support)
-- Create (send and receive)
-- Update (send and receive)
-- Delete (send and receive)
-- Like (receive only, display pending)
-
-**Endpoints:**
-- `GET /users/:actor` - Actor profile (application/activity+json)
-- `GET /.well-known/webfinger` - WebFinger discovery
-- `GET /notes/:id` - Individual note objects
-- `POST /inbox` - Shared inbox
-- `POST /users/:actor/inbox` - Personal inbox
-- `GET /users/:actor/outbox` - Outbox collection
-- `GET /users/:actor/followers` - Followers collection
-- `GET /users/:actor/following` - Following collection
-
-**Features:**
-- HTTP signature verification (RSA-SHA256)
-- Delivery queue with retry logic
-- Remote actor caching (24h TTL)
-- WebFinger discovery
-
-## Database
-
-All data is persisted in a local SQLite database (`database.db`) with the following tables:
-
-- `accounts` - User accounts with SSH key hashes, RSA keypairs, and admin/muted status
-- `notes` - User notes with timestamps, edit history, and visibility settings
-- `remote_accounts` - Cached remote ActivityPub actors
-- `follows` - Follow relationships (local and remote)
-- `followers` - Follower relationships
-- `activities` - Received ActivityPub activities
-- `likes` - Like activities
-- `delivery_queue` - Outgoing activity delivery queue
-
-The database uses WAL mode for concurrent access. The first user to register automatically becomes an admin. Admins can access the admin panel (view 7) to manage users.
-
-The database can be deleted to wipe all data and start fresh.
-
-## Version
-
-Current version: **1.0.0**
-
-## LICENSE
-
-MIT
+MIT - See LICENSE file
 
 ## Contributing
 
-Contributions are welcome! Please open a pull request or issue on the GitHub repository.
+Contributions welcome! Open an issue or pull request on [GitHub](https://github.com/deemkeen/stegodon).

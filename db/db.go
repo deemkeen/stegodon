@@ -389,8 +389,12 @@ func (db *DB) ReadAllNotes() (error, *[]domain.Note) {
 
 func GetDB() *DB {
 	dbOnce.Do(func() {
+		// Resolve database path (local first, then user config dir)
+		dbPath := util.ResolveFilePath("database.db")
+		log.Printf("Using database at: %s", dbPath)
+
 		// Open database connection
-		db, err := sql.Open("sqlite", "database.db")
+		db, err := sql.Open("sqlite", dbPath)
 		if err != nil {
 			panic(err)
 		}

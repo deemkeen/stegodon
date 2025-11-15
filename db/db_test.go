@@ -1113,4 +1113,3 @@ func TestCountAccounts(t *testing.T) {
 		t.Errorf("Expected 3 accounts, got %d", count)
 	}
 }
-

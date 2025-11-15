@@ -2,8 +2,10 @@ package web
 
 import (
 	"bytes"
+	"embed"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io"
 	"log"
 	"strings"
@@ -18,6 +20,9 @@ import (
 	"golang.org/x/time/rate"
 )
 
+//go:embed templates/*.html
+var embeddedTemplates embed.FS
+
 func Router(conf *util.AppConfig) error {
 	log.Printf("Starting RSS Feed server on %s:%d", conf.Conf.Host, conf.Conf.HttpPort)
 	g := gin.Default()
@@ -27,8 +32,12 @@ func Router(conf *util.AppConfig) error {
 	globalLimiter := NewRateLimiter(rate.Limit(10), 20)
 	g.Use(RateLimitMiddleware(globalLimiter))
 
-	// Load HTML templates
-	g.LoadHTMLGlob("web/templates/*")
+	// Load HTML templates from embedded filesystem
+	tmpl, err := template.ParseFS(embeddedTemplates, "templates/*.html")
+	if err != nil {
+		return fmt.Errorf("failed to parse embedded templates: %w", err)
+	}
+	g.SetHTMLTemplate(tmpl)
 
 	// Web UI routes
 	g.GET("/", func(c *gin.Context) {
@@ -279,7 +288,7 @@ func Router(conf *util.AppConfig) error {
 		})
 
 	}
-	err := g.Run(fmt.Sprintf(":%d", conf.Conf.HttpPort))
+	err = g.Run(fmt.Sprintf(":%d", conf.Conf.HttpPort))
 	if err != nil {
 		return err
 	}

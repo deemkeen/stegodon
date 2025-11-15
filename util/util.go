@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
+	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
@@ -14,11 +15,13 @@ import (
 	"html"
 	"log"
 	rnd "math/rand"
-	"os"
 	"regexp"
 	"strings"
 	"time"
 )
+
+//go:embed version.txt
+var embeddedVersion string
 
 type RsaKeyPair struct {
 	Private string
@@ -41,11 +44,7 @@ func PkToHash(pk string) string {
 }
 
 func GetVersion() string {
-	content, err := os.ReadFile("version.txt")
-	if err != nil {
-		log.Fatal(err)
-	}
-	return string(content)
+	return strings.TrimSpace(embeddedVersion)
 }
 
 func GetNameAndVersion() string {

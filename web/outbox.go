@@ -114,7 +114,7 @@ func getOutboxPage(actor string, page int, conf *util.AppConfig) (error, string)
 }
 
 // makeNoteActivities converts domain.Note objects to ActivityPub Create activities
-func makeNoteActivities(notes []domain.Note, actor string, conf *util.AppConfig) []interface{}{
+func makeNoteActivities(notes []domain.Note, actor string, conf *util.AppConfig) []interface{} {
 	activities := make([]interface{}, 0, len(notes))
 	baseURL := fmt.Sprintf("https://%s", conf.Conf.SslDomain)
 

@@ -1,14 +1,19 @@
 package util
 
 import (
+	_ "embed"
 	"fmt"
 	"gopkg.in/yaml.v3"
+	"log"
 	"os"
 	"strconv"
 )
 
 const Name = "stegodon"
 const ConfigFileName = "config.yaml"
+
+//go:embed config_default.yaml
+var embeddedConfig []byte
 
 type AppConfig struct {
 	Conf struct {
@@ -26,14 +31,35 @@ func ReadConf() (*AppConfig, error) {
 
 	c := &AppConfig{}
 
-	buf, err := os.ReadFile(ConfigFileName)
+	// Try to resolve config file path (local first, then user dir)
+	configPath := ResolveFilePath(ConfigFileName)
+
+	var buf []byte
+	var err error
+
+	// Try to read from resolved path
+	buf, err = os.ReadFile(configPath)
 	if err != nil {
-		return nil, err
+		// If file doesn't exist, use embedded config and create user config file
+		log.Printf("Config file not found at %s, using embedded defaults", configPath)
+		buf = embeddedConfig
+
+		// Try to write default config to user config directory
+		configDir, dirErr := GetConfigDir()
+		if dirErr == nil {
+			userConfigPath := configDir + "/" + ConfigFileName
+			writeErr := os.WriteFile(userConfigPath, embeddedConfig, 0644)
+			if writeErr != nil {
+				log.Printf("Warning: could not write default config to %s: %v", userConfigPath, writeErr)
+			} else {
+				log.Printf("Created default config file at %s", userConfigPath)
+			}
+		}
 	}
 
 	err = yaml.Unmarshal(buf, c)
 	if err != nil {
-		return nil, fmt.Errorf("in file %q: %w", ConfigFileName, err)
+		return nil, fmt.Errorf("in config file: %w", err)
 	}
 
 	envHost := os.Getenv("STEGODON_HOST")
@@ -80,5 +106,5 @@ func ReadConf() (*AppConfig, error) {
 		c.Conf.Closed = true
 	}
 
-	return c, err
+	return c, nil
 }
