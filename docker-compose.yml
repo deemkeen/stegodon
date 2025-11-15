@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  stegodon:
+    build: .
+    container_name: stegodon
+    restart: unless-stopped
+
+    ports:
+      - "23232:23232"  # SSH port
+      - "9999:9999"    # HTTP port
+
+    environment:
+      - STEGODON_HOST=0.0.0.0
+      - STEGODON_SSHPORT=23232
+      - STEGODON_HTTPPORT=9999
+      # Uncomment and configure for ActivityPub federation
+      # - STEGODON_WITH_AP=true
+      # - STEGODON_SSLDOMAIN=yourdomain.com
+      # Uncomment for single-user mode
+      # - STEGODON_SINGLE=true
+      # Uncomment for closed registration
+      # - STEGODON_CLOSED=true
+
+    volumes:
+      # Persist data directory
+      - stegodon-data:/home/stegodon/.config/stegodon
+
+    # Optional: CPU and memory limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+volumes:
+  stegodon-data:
+    driver: local

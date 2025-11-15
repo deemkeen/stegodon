@@ -1,0 +1,38 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+demo.gif
+demo.tape
+
+# Test files
+*_test.go
+
+# Build artifacts
+stegodon
+*.db
+*.db-shm
+*.db-wal
+
+# Local config and data
+config.yaml
+database.db
+.ssh/
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore

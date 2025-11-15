@@ -1,6 +1,6 @@
 ![demo](./demo.gif)
 
-# stegodon
+# 🦣 stegodon
 
 **stegodon** is an SSH-first federated blogging platform. Users connect via SSH to create notes in a terminal interface. Notes federate to the Fediverse via ActivityPub and are available through RSS feeds and a web interface.
 
@@ -17,11 +17,16 @@ Built with Go and [Charm Tools](https://github.com/charmbracelet).
 
 ## Quick Start
 
-**Download and run:**
+**Binary:**
 ```bash
 # Download the binary (or build from source)
 chmod +x stegodon
 ./stegodon
+```
+
+**Docker:**
+```bash
+docker-compose up -d
 ```
 
 **Connect via SSH:**
@@ -29,7 +34,9 @@ chmod +x stegodon
 ssh 127.0.0.1 -p 23232
 ```
 
-On first login, choose your username. All data is stored in `~/.config/stegodon/`.
+On first login, choose your username. All data is stored in `~/.config/stegodon/` (or Docker volume).
+
+See [DOCKER.md](DOCKER.md) for complete Docker deployment guide.
 
 ## Navigation
 
