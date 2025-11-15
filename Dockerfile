@@ -1,11 +1,8 @@
 # Build stage
-FROM golang:1.25-bookworm AS builder
+FROM golang:1.25-alpine3.21 AS builder
 
-# Install build dependencies (gcc for CGO/SQLite)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libc6-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Install build dependencies (gcc, musl-dev for CGO/SQLite)
+RUN apk add --no-cache git gcc musl-dev
 
 # Set working directory
 WORKDIR /build
@@ -23,18 +20,14 @@ COPY . .
 RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o stegodon .
 
 # Final stage
-FROM debian:bookworm-slim
+FROM alpine:3.21
 
 # Install runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    sqlite3 \
-    wget \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache ca-certificates sqlite wget
 
 # Create non-root user
-RUN groupadd -g 1000 stegodon && \
-    useradd -u 1000 -g stegodon -m -s /bin/bash stegodon
+RUN addgroup -g 1000 stegodon && \
+    adduser -D -u 1000 -G stegodon stegodon
 
 # Set working directory
 WORKDIR /home/stegodon

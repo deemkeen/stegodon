@@ -13,8 +13,9 @@ permissions:
   packages: write
 
 jobs:
-  docker:
+  docker-alpine:
     runs-on: ubuntu-latest
+    name: Build Alpine-based image
 
     steps:
       - name: Checkout
@@ -41,10 +42,11 @@ jobs:
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push Docker image
+      - name: Build and push Alpine image
         uses: docker/build-push-action@v5
         with:
           context: .
+          file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
