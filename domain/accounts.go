@@ -25,6 +25,9 @@ type Account struct {
 	DisplayName string
 	Summary     string
 	AvatarURL   string
+	// Admin fields
+	IsAdmin bool
+	Muted   bool
 }
 
 func (acc *Account) ToString() string {

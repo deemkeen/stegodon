@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
+	"github.com/deemkeen/stegodon/ui/admin"
 	"github.com/deemkeen/stegodon/ui/common"
 	"github.com/deemkeen/stegodon/ui/createuser"
 	"github.com/deemkeen/stegodon/ui/deleteaccount"
@@ -48,6 +49,7 @@ type MainModel struct {
 	timelineModel      timeline.Model
 	localTimelineModel localtimeline.Model
 	localUsersModel    localusers.Model
+	adminModel         admin.Model
 	deleteAccountModel deleteaccount.Model
 }
 
@@ -76,6 +78,7 @@ func NewModel(acc domain.Account, width int, height int) MainModel {
 	timelineModel := timeline.InitialModel(acc.Id, width, height)
 	localTimelineModel := localtimeline.InitialModel(acc.Id, width, height)
 	localUsersModel := localusers.InitialModel(acc.Id, width, height)
+	adminModel := admin.InitialModel(acc.Id, width, height)
 	deleteAccountModel := deleteaccount.InitialModel(&acc)
 
 	m := MainModel{state: common.CreateUserView}
@@ -88,6 +91,7 @@ func NewModel(acc domain.Account, width int, height int) MainModel {
 	m.timelineModel = timelineModel
 	m.localTimelineModel = localTimelineModel
 	m.localUsersModel = localUsersModel
+	m.adminModel = adminModel
 	m.deleteAccountModel = deleteAccountModel
 	m.headerModel = headerModel
 	m.account = acc
@@ -216,6 +220,12 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case common.FollowingView:
 				m.state = common.LocalUsersView
 			case common.LocalUsersView:
+				if m.account.IsAdmin {
+					m.state = common.AdminPanelView
+				} else {
+					m.state = common.DeleteAccountView
+				}
+			case common.AdminPanelView:
 				m.state = common.DeleteAccountView
 			case common.DeleteAccountView:
 				m.state = common.CreateNoteView
@@ -248,8 +258,14 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.state = common.FollowersView
 			case common.LocalUsersView:
 				m.state = common.FollowingView
-			case common.DeleteAccountView:
+			case common.AdminPanelView:
 				m.state = common.LocalUsersView
+			case common.DeleteAccountView:
+				if m.account.IsAdmin {
+					m.state = common.AdminPanelView
+				} else {
+					m.state = common.LocalUsersView
+				}
 			}
 			// Reload data when switching to certain views
 			if oldState != m.state {
@@ -323,14 +339,38 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.localTimelineModel, cmd = m.localTimelineModel.Update(msg)
 		case common.LocalUsersView:
 			m.localUsersModel, cmd = m.localUsersModel.Update(msg)
+		case common.AdminPanelView:
+			m.adminModel, cmd = m.adminModel.Update(msg)
 		case common.DeleteAccountView:
 			m.deleteAccountModel, cmd = m.deleteAccountModel.Update(msg)
 		}
 		cmds = append(cmds, cmd)
 	} else {
-		// For non-keyboard messages, route to delete account model if in that view
-		if m.state == common.DeleteAccountView {
+		// For non-keyboard messages, route to appropriate models based on current state
+		switch m.state {
+		case common.DeleteAccountView:
 			m.deleteAccountModel, cmd = m.deleteAccountModel.Update(msg)
+			cmds = append(cmds, cmd)
+		case common.AdminPanelView:
+			m.adminModel, cmd = m.adminModel.Update(msg)
+			cmds = append(cmds, cmd)
+		case common.FollowersView:
+			m.followersModel, cmd = m.followersModel.Update(msg)
+			cmds = append(cmds, cmd)
+		case common.FollowingView:
+			m.followingModel, cmd = m.followingModel.Update(msg)
+			cmds = append(cmds, cmd)
+		case common.FederatedTimelineView:
+			m.timelineModel, cmd = m.timelineModel.Update(msg)
+			cmds = append(cmds, cmd)
+		case common.LocalTimelineView:
+			m.localTimelineModel, cmd = m.localTimelineModel.Update(msg)
+			cmds = append(cmds, cmd)
+		case common.LocalUsersView:
+			m.localUsersModel, cmd = m.localUsersModel.Update(msg)
+			cmds = append(cmds, cmd)
+		case common.ListNotesView:
+			m.listModel, cmd = m.listModel.Update(msg)
 			cmds = append(cmds, cmd)
 		}
 	}
@@ -431,6 +471,14 @@ func (m MainModel) View() string {
 		Margin(1).
 		Render(m.localUsersModel.View())
 
+	adminStyleStr := lipgloss.NewStyle().
+		MaxHeight(availableHeight).
+		Height(availableHeight).
+		Width(rightPanelWidth).
+		MaxWidth(rightPanelWidth).
+		Margin(1).
+		Render(m.adminModel.View())
+
 	deleteAccountStyleStr := lipgloss.NewStyle().
 		MaxHeight(availableHeight).
 		Height(availableHeight).
@@ -480,6 +528,10 @@ func (m MainModel) View() string {
 			s += lipgloss.JoinHorizontal(lipgloss.Top,
 				modelStyle.Render(createStyleStr),
 				focusedModelStyle.Render(localUsersStyleStr))
+		case common.AdminPanelView:
+			s += lipgloss.JoinHorizontal(lipgloss.Top,
+				modelStyle.Render(createStyleStr),
+				focusedModelStyle.Render(adminStyleStr))
 		case common.DeleteAccountView:
 			s += lipgloss.JoinHorizontal(lipgloss.Top,
 				modelStyle.Render(createStyleStr),
@@ -503,6 +555,8 @@ func (m MainModel) View() string {
 			viewCommands = "↑/↓: scroll"
 		case common.LocalUsersView:
 			viewCommands = "↑/↓: select • enter: toggle follow"
+		case common.AdminPanelView:
+			viewCommands = "↑/↓: select • m: mute • k: kick"
 		case common.DeleteAccountView:
 			viewCommands = "y: confirm • n/esc: cancel"
 		default:
@@ -549,6 +603,8 @@ func (m MainModel) currentFocusedModel() string {
 		return "local timeline"
 	case common.LocalUsersView:
 		return "local users"
+	case common.AdminPanelView:
+		return "admin panel"
 	case common.DeleteAccountView:
 		return "delete account"
 	default:
@@ -569,6 +625,8 @@ func getViewInitCmd(state common.SessionState, m *MainModel) tea.Cmd {
 		return m.localTimelineModel.Init()
 	case common.LocalUsersView:
 		return m.localUsersModel.Init()
+	case common.AdminPanelView:
+		return m.adminModel.Init()
 	case common.ListNotesView:
 		return m.listModel.Init()
 	default:

@@ -36,6 +36,10 @@ func setupTestDB(t *testing.T) *DB {
 	db.db.Exec(`ALTER TABLE accounts ADD COLUMN summary text`)
 	db.db.Exec(`ALTER TABLE accounts ADD COLUMN avatar_url text`)
 
+	// Add admin fields to accounts table
+	db.db.Exec(`ALTER TABLE accounts ADD COLUMN is_admin INTEGER DEFAULT 0`)
+	db.db.Exec(`ALTER TABLE accounts ADD COLUMN muted INTEGER DEFAULT 0`)
+
 	// Create ActivityPub tables
 	db.db.Exec(`CREATE TABLE IF NOT EXISTS remote_accounts(
 		id uuid NOT NULL PRIMARY KEY,
@@ -90,7 +94,8 @@ func setupTestDB(t *testing.T) *DB {
 		activity_json text NOT NULL,
 		attempts int default 0,
 		next_retry_at timestamp default current_timestamp,
-		created_at timestamp default current_timestamp
+		created_at timestamp default current_timestamp,
+		account_id TEXT
 	)`)
 
 	return db
@@ -775,6 +780,194 @@ func TestDeleteAccountWithNoData(t *testing.T) {
 	err, acc := db.ReadAccById(userId)
 	if err != sql.ErrNoRows {
 		t.Errorf("Account should not exist after deletion, got: %v", acc)
+	}
+}
+
+// Admin functionality tests
+
+func TestFirstUserIsAdmin(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.db.Close()
+
+	// Create first user
+	user1Id := uuid.New()
+	_, err := db.db.Exec(sqlInsertUser, user1Id, "firstuser", "hash1", "webpub1", "webpriv1", time.Now())
+	if err != nil {
+		t.Fatalf("Failed to insert first user: %v", err)
+	}
+
+	// Set is_admin for first user
+	_, err = db.db.Exec("UPDATE accounts SET is_admin = 1 WHERE id = ?", user1Id.String())
+	if err != nil {
+		t.Fatalf("Failed to set is_admin: %v", err)
+	}
+
+	// Create second user
+	user2Id := uuid.New()
+	_, err = db.db.Exec(sqlInsertUser, user2Id, "seconduser", "hash2", "webpub2", "webpriv2", time.Now())
+	if err != nil {
+		t.Fatalf("Failed to insert second user: %v", err)
+	}
+
+	// Verify first user is admin
+	err, acc1 := db.ReadAccById(user1Id)
+	if err != nil {
+		t.Fatalf("ReadAccById failed for first user: %v", err)
+	}
+	if !acc1.IsAdmin {
+		t.Errorf("First user should be admin, got IsAdmin = %v", acc1.IsAdmin)
+	}
+
+	// Verify second user is not admin
+	err, acc2 := db.ReadAccById(user2Id)
+	if err != nil {
+		t.Fatalf("ReadAccById failed for second user: %v", err)
+	}
+	if acc2.IsAdmin {
+		t.Errorf("Second user should not be admin, got IsAdmin = %v", acc2.IsAdmin)
+	}
+}
+
+func TestMuteUser(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.db.Close()
+
+	// Create user with notes
+	userId := uuid.New()
+	createTestAccount(t, db, userId, "testuser", "pubkey", "webpub", "webpriv")
+
+	// Create some notes
+	noteId1 := uuid.New()
+	noteId2 := uuid.New()
+	_, err := db.db.Exec("INSERT INTO notes (id, user_id, message, created_at) VALUES (?, ?, ?, ?)",
+		noteId1, userId.String(), "Note 1", time.Now())
+	if err != nil {
+		t.Fatalf("Failed to create note 1: %v", err)
+	}
+	_, err = db.db.Exec("INSERT INTO notes (id, user_id, message, created_at) VALUES (?, ?, ?, ?)",
+		noteId2, userId.String(), "Note 2", time.Now())
+	if err != nil {
+		t.Fatalf("Failed to create note 2: %v", err)
+	}
+
+	// Verify notes exist
+	err, notes := db.ReadNotesByUserId(userId)
+	if err != nil || len(*notes) != 2 {
+		t.Fatalf("Expected 2 notes before mute, got %d", len(*notes))
+	}
+
+	// Mute the user
+	err = db.MuteUser(userId)
+	if err != nil {
+		t.Fatalf("MuteUser failed: %v", err)
+	}
+
+	// Verify user is muted
+	err, acc := db.ReadAccById(userId)
+	if err != nil {
+		t.Fatalf("ReadAccById failed: %v", err)
+	}
+	if !acc.Muted {
+		t.Errorf("User should be muted, got Muted = %v", acc.Muted)
+	}
+
+	// Verify notes were deleted
+	err, notes = db.ReadNotesByUserId(userId)
+	if err != nil || len(*notes) != 0 {
+		t.Errorf("Expected 0 notes after mute, got %d", len(*notes))
+	}
+}
+
+func TestUnmuteUser(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.db.Close()
+
+	// Create user
+	userId := uuid.New()
+	createTestAccount(t, db, userId, "testuser", "pubkey", "webpub", "webpriv")
+
+	// Mute the user
+	err := db.MuteUser(userId)
+	if err != nil {
+		t.Fatalf("MuteUser failed: %v", err)
+	}
+
+	// Verify user is muted
+	err, acc := db.ReadAccById(userId)
+	if err != nil {
+		t.Fatalf("ReadAccById failed: %v", err)
+	}
+	if !acc.Muted {
+		t.Fatalf("User should be muted")
+	}
+
+	// Unmute the user
+	err = db.UnmuteUser(userId)
+	if err != nil {
+		t.Fatalf("UnmuteUser failed: %v", err)
+	}
+
+	// Verify user is not muted
+	err, acc = db.ReadAccById(userId)
+	if err != nil {
+		t.Fatalf("ReadAccById failed: %v", err)
+	}
+	if acc.Muted {
+		t.Errorf("User should not be muted after unmute, got Muted = %v", acc.Muted)
+	}
+}
+
+func TestReadAllAccountsAdmin(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.db.Close()
+
+	// Create users with different first_time_login states
+	user1Id := uuid.New()
+	user2Id := uuid.New()
+	user3Id := uuid.New()
+
+	createTestAccount(t, db, user1Id, "user1", "pubkey1", "webpub1", "webpriv1")
+	createTestAccount(t, db, user2Id, "user2", "pubkey2", "webpub2", "webpriv2")
+	createTestAccount(t, db, user3Id, "user3", "pubkey3", "webpub3", "webpriv3")
+
+	// Set first_time_login = 0 for user1 and user2 (completed registration)
+	_, err := db.db.Exec("UPDATE accounts SET first_time_login = 0 WHERE id IN (?, ?)", user1Id.String(), user2Id.String())
+	if err != nil {
+		t.Fatalf("Failed to update first_time_login: %v", err)
+	}
+
+	// user3 keeps first_time_login = 1 (default from sqlInsertUser)
+
+	// ReadAllAccounts should only return users with first_time_login = 0
+	err, accounts := db.ReadAllAccounts()
+	if err != nil {
+		t.Fatalf("ReadAllAccounts failed: %v", err)
+	}
+	if len(*accounts) != 2 {
+		t.Errorf("ReadAllAccounts: expected 2 users, got %d", len(*accounts))
+	}
+
+	// ReadAllAccountsAdmin should return ALL users
+	err, accountsAdmin := db.ReadAllAccountsAdmin()
+	if err != nil {
+		t.Fatalf("ReadAllAccountsAdmin failed: %v", err)
+	}
+	if len(*accountsAdmin) != 3 {
+		t.Errorf("ReadAllAccountsAdmin: expected 3 users, got %d", len(*accountsAdmin))
+	}
+
+	// Verify admin query includes the first-time login user
+	foundNewUser := false
+	for _, acc := range *accountsAdmin {
+		if acc.Id == user3Id {
+			foundNewUser = true
+			if acc.FirstTimeLogin != 1 {
+				t.Errorf("User3 should have first_time_login = 1, got %d", acc.FirstTimeLogin)
+			}
+		}
+	}
+	if !foundNewUser {
+		t.Errorf("ReadAllAccountsAdmin should include first-time login user")
 	}
 }
 

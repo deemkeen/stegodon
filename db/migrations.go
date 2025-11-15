@@ -184,6 +184,8 @@ func (db *DB) extendExistingTables(tx *sql.Tx) {
 	tx.Exec("ALTER TABLE accounts ADD COLUMN display_name TEXT")
 	tx.Exec("ALTER TABLE accounts ADD COLUMN summary TEXT")
 	tx.Exec("ALTER TABLE accounts ADD COLUMN avatar_url TEXT")
+	tx.Exec("ALTER TABLE accounts ADD COLUMN is_admin INTEGER DEFAULT 0")
+	tx.Exec("ALTER TABLE accounts ADD COLUMN muted INTEGER DEFAULT 0")
 
 	// Try to add columns to notes table (ignore errors if they exist)
 	tx.Exec("ALTER TABLE notes ADD COLUMN visibility TEXT DEFAULT 'public'")
@@ -196,6 +198,9 @@ func (db *DB) extendExistingTables(tx *sql.Tx) {
 
 	// Add is_local column to follows table to support local follows
 	tx.Exec("ALTER TABLE follows ADD COLUMN is_local INTEGER DEFAULT 0")
+
+	// Add account_id column to delivery_queue table to support account-based cleanup
+	tx.Exec("ALTER TABLE delivery_queue ADD COLUMN account_id TEXT")
 
 	log.Println("Extended existing tables with new columns")
 }

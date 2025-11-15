@@ -43,9 +43,9 @@ const (
 	sqlInsertUser            = `INSERT INTO accounts(id, username, publickey, web_public_key, web_private_key, created_at) VALUES (?, ?, ?, ?, ?, ?)`
 	sqlUpdateLoginUser       = `UPDATE accounts SET first_time_login = 0, username = ?, display_name = ?, summary = ? WHERE publickey = ?`
 	sqlUpdateLoginUserById   = `UPDATE accounts SET first_time_login = 0, username = ?, display_name = ?, summary = ? WHERE id = ?`
-	sqlSelectUserByPublicKey = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key, display_name, summary, avatar_url FROM accounts WHERE publickey = ?`
-	sqlSelectUserById        = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key, display_name, summary, avatar_url FROM accounts WHERE id = ?`
-	sqlSelectUserByUsername  = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key, display_name, summary, avatar_url FROM accounts WHERE username = ?`
+	sqlSelectUserByPublicKey = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key, display_name, summary, avatar_url, is_admin, muted FROM accounts WHERE publickey = ?`
+	sqlSelectUserById        = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key, display_name, summary, avatar_url, is_admin, muted FROM accounts WHERE id = ?`
+	sqlSelectUserByUsername  = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key, display_name, summary, avatar_url, is_admin, muted FROM accounts WHERE username = ?`
 
 	//Notes
 	sqlCreateNotesTable = `CREATE TABLE IF NOT EXISTS notes(
@@ -73,7 +73,8 @@ const (
                                                             ORDER BY notes.created_at DESC`
 
 	// Local users and local timeline queries
-	sqlSelectAllAccounts        = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key, display_name, summary, avatar_url FROM accounts WHERE first_time_login = 0 ORDER BY username ASC`
+	sqlSelectAllAccounts        = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key, display_name, summary, avatar_url, is_admin, muted FROM accounts WHERE first_time_login = 0 ORDER BY username ASC`
+	sqlSelectAllAccountsAdmin   = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key, display_name, summary, avatar_url, is_admin, muted FROM accounts ORDER BY created_at ASC`
 	sqlSelectLocalTimelineNotes = `SELECT notes.id, accounts.username, notes.message, notes.created_at, notes.edited_at FROM notes
 														INNER JOIN accounts ON accounts.id = notes.user_id
 														ORDER BY notes.created_at DESC LIMIT ?`
@@ -172,14 +173,17 @@ func (db *DB) ReadAccBySession(s ssh.Session) (error, *domain.Account) {
 	publicKeyToString := util.PublicKeyToString(s.PublicKey())
 	var tempAcc domain.Account
 	var displayName, summary, avatarURL sql.NullString
+	var isAdmin, muted sql.NullInt64
 	row := db.db.QueryRow(sqlSelectUserByPublicKey, util.PkToHash(publicKeyToString))
-	err := row.Scan(&tempAcc.Id, &tempAcc.Username, &tempAcc.Publickey, &tempAcc.CreatedAt, &tempAcc.FirstTimeLogin, &tempAcc.WebPublicKey, &tempAcc.WebPrivateKey, &displayName, &summary, &avatarURL)
+	err := row.Scan(&tempAcc.Id, &tempAcc.Username, &tempAcc.Publickey, &tempAcc.CreatedAt, &tempAcc.FirstTimeLogin, &tempAcc.WebPublicKey, &tempAcc.WebPrivateKey, &displayName, &summary, &avatarURL, &isAdmin, &muted)
 	if err == sql.ErrNoRows {
 		return err, nil
 	}
 	tempAcc.DisplayName = displayName.String
 	tempAcc.Summary = summary.String
 	tempAcc.AvatarURL = avatarURL.String
+	tempAcc.IsAdmin = isAdmin.Int64 == 1
+	tempAcc.Muted = muted.Int64 == 1
 	return err, &tempAcc
 }
 
@@ -187,13 +191,16 @@ func (db *DB) ReadAccByPkHash(pkHash string) (error, *domain.Account) {
 	row := db.db.QueryRow(sqlSelectUserByPublicKey, pkHash)
 	var tempAcc domain.Account
 	var displayName, summary, avatarURL sql.NullString
-	err := row.Scan(&tempAcc.Id, &tempAcc.Username, &tempAcc.Publickey, &tempAcc.CreatedAt, &tempAcc.FirstTimeLogin, &tempAcc.WebPublicKey, &tempAcc.WebPrivateKey, &displayName, &summary, &avatarURL)
+	var isAdmin, muted sql.NullInt64
+	err := row.Scan(&tempAcc.Id, &tempAcc.Username, &tempAcc.Publickey, &tempAcc.CreatedAt, &tempAcc.FirstTimeLogin, &tempAcc.WebPublicKey, &tempAcc.WebPrivateKey, &displayName, &summary, &avatarURL, &isAdmin, &muted)
 	if err == sql.ErrNoRows {
 		return err, nil
 	}
 	tempAcc.DisplayName = displayName.String
 	tempAcc.Summary = summary.String
 	tempAcc.AvatarURL = avatarURL.String
+	tempAcc.IsAdmin = isAdmin.Int64 == 1
+	tempAcc.Muted = muted.Int64 == 1
 	return err, &tempAcc
 }
 
@@ -201,13 +208,16 @@ func (db *DB) ReadAccById(id uuid.UUID) (error, *domain.Account) {
 	row := db.db.QueryRow(sqlSelectUserById, id)
 	var tempAcc domain.Account
 	var displayName, summary, avatarURL sql.NullString
-	err := row.Scan(&tempAcc.Id, &tempAcc.Username, &tempAcc.Publickey, &tempAcc.CreatedAt, &tempAcc.FirstTimeLogin, &tempAcc.WebPublicKey, &tempAcc.WebPrivateKey, &displayName, &summary, &avatarURL)
+	var isAdmin, muted sql.NullInt64
+	err := row.Scan(&tempAcc.Id, &tempAcc.Username, &tempAcc.Publickey, &tempAcc.CreatedAt, &tempAcc.FirstTimeLogin, &tempAcc.WebPublicKey, &tempAcc.WebPrivateKey, &displayName, &summary, &avatarURL, &isAdmin, &muted)
 	if err == sql.ErrNoRows {
 		return err, nil
 	}
 	tempAcc.DisplayName = displayName.String
 	tempAcc.Summary = summary.String
 	tempAcc.AvatarURL = avatarURL.String
+	tempAcc.IsAdmin = isAdmin.Int64 == 1
+	tempAcc.Muted = muted.Int64 == 1
 	return err, &tempAcc
 }
 
@@ -215,13 +225,16 @@ func (db *DB) ReadAccByUsername(username string) (error, *domain.Account) {
 	row := db.db.QueryRow(sqlSelectUserByUsername, username)
 	var tempAcc domain.Account
 	var displayName, summary, avatarURL sql.NullString
-	err := row.Scan(&tempAcc.Id, &tempAcc.Username, &tempAcc.Publickey, &tempAcc.CreatedAt, &tempAcc.FirstTimeLogin, &tempAcc.WebPublicKey, &tempAcc.WebPrivateKey, &displayName, &summary, &avatarURL)
+	var isAdmin, muted sql.NullInt64
+	err := row.Scan(&tempAcc.Id, &tempAcc.Username, &tempAcc.Publickey, &tempAcc.CreatedAt, &tempAcc.FirstTimeLogin, &tempAcc.WebPublicKey, &tempAcc.WebPrivateKey, &displayName, &summary, &avatarURL, &isAdmin, &muted)
 	if err == sql.ErrNoRows {
 		return err, nil
 	}
 	tempAcc.DisplayName = displayName.String
 	tempAcc.Summary = summary.String
 	tempAcc.AvatarURL = avatarURL.String
+	tempAcc.IsAdmin = isAdmin.Int64 == 1
+	tempAcc.Muted = muted.Int64 == 1
 	return err, &tempAcc
 }
 
@@ -450,7 +463,27 @@ func (db *DB) createNotesTable(tx *sql.Tx) error {
 }
 
 func (db *DB) insertUser(tx *sql.Tx, username string, publicKey string, webKeyPair *util.RsaKeyPair) error {
-	_, err := tx.Exec(sqlInsertUser, uuid.New(), username, util.PkToHash(publicKey), webKeyPair.Public, webKeyPair.Private, time.Now())
+	// Check if this is the first user
+	var count int
+	err := tx.QueryRow("SELECT COUNT(*) FROM accounts").Scan(&count)
+	if err != nil {
+		return err
+	}
+
+	// Set is_admin to 1 for first user, 0 for others
+	isAdmin := 0
+	if count == 0 {
+		isAdmin = 1
+		log.Println("Creating first user as admin:", username)
+	}
+
+	_, err = tx.Exec(sqlInsertUser, uuid.New(), username, util.PkToHash(publicKey), webKeyPair.Public, webKeyPair.Private, time.Now())
+	if err != nil {
+		return err
+	}
+
+	// Update is_admin for the newly created user
+	_, err = tx.Exec("UPDATE accounts SET is_admin = ? WHERE username = ?", isAdmin, username)
 	return err
 }
 
@@ -969,12 +1002,44 @@ func (db *DB) ReadAllAccounts() (error, *[]domain.Account) {
 	for rows.Next() {
 		var acc domain.Account
 		var displayName, summary, avatarURL sql.NullString
-		if err := rows.Scan(&acc.Id, &acc.Username, &acc.Publickey, &acc.CreatedAt, &acc.FirstTimeLogin, &acc.WebPublicKey, &acc.WebPrivateKey, &displayName, &summary, &avatarURL); err != nil {
+		var isAdmin, muted sql.NullInt64
+		if err := rows.Scan(&acc.Id, &acc.Username, &acc.Publickey, &acc.CreatedAt, &acc.FirstTimeLogin, &acc.WebPublicKey, &acc.WebPrivateKey, &displayName, &summary, &avatarURL, &isAdmin, &muted); err != nil {
 			return err, &accounts
 		}
 		acc.DisplayName = displayName.String
 		acc.Summary = summary.String
 		acc.AvatarURL = avatarURL.String
+		acc.IsAdmin = isAdmin.Int64 == 1
+		acc.Muted = muted.Int64 == 1
+		accounts = append(accounts, acc)
+	}
+	if err = rows.Err(); err != nil {
+		return err, &accounts
+	}
+	return nil, &accounts
+}
+
+// ReadAllAccountsAdmin returns all local user accounts including first-time login users (for admin panel)
+func (db *DB) ReadAllAccountsAdmin() (error, *[]domain.Account) {
+	rows, err := db.db.Query(sqlSelectAllAccountsAdmin)
+	if err != nil {
+		return err, nil
+	}
+	defer rows.Close()
+
+	var accounts []domain.Account
+	for rows.Next() {
+		var acc domain.Account
+		var displayName, summary, avatarURL sql.NullString
+		var isAdmin, muted sql.NullInt64
+		if err := rows.Scan(&acc.Id, &acc.Username, &acc.Publickey, &acc.CreatedAt, &acc.FirstTimeLogin, &acc.WebPublicKey, &acc.WebPrivateKey, &displayName, &summary, &avatarURL, &isAdmin, &muted); err != nil {
+			return err, &accounts
+		}
+		acc.DisplayName = displayName.String
+		acc.Summary = summary.String
+		acc.AvatarURL = avatarURL.String
+		acc.IsAdmin = isAdmin.Int64 == 1
+		acc.Muted = muted.Int64 == 1
 		accounts = append(accounts, acc)
 	}
 	if err = rows.Err(); err != nil {
@@ -1022,6 +1087,38 @@ func (db *DB) DeleteAccount(accountId uuid.UUID) error {
 			return fmt.Errorf("failed to delete account: %w", err)
 		}
 
+		return nil
+	})
+}
+
+// MuteUser mutes a user and deletes all their posts
+func (db *DB) MuteUser(accountId uuid.UUID) error {
+	return db.wrapTransaction(func(tx *sql.Tx) error {
+		// Delete all notes by this user
+		_, err := tx.Exec("DELETE FROM notes WHERE user_id = ?", accountId.String())
+		if err != nil {
+			return fmt.Errorf("failed to delete notes: %w", err)
+		}
+
+		// Set muted flag
+		_, err = tx.Exec("UPDATE accounts SET muted = 1 WHERE id = ?", accountId.String())
+		if err != nil {
+			return fmt.Errorf("failed to mute user: %w", err)
+		}
+
+		log.Printf("Muted user %s and deleted their posts", accountId.String())
+		return nil
+	})
+}
+
+// UnmuteUser unmutes a user
+func (db *DB) UnmuteUser(accountId uuid.UUID) error {
+	return db.wrapTransaction(func(tx *sql.Tx) error {
+		_, err := tx.Exec("UPDATE accounts SET muted = 0 WHERE id = ?", accountId.String())
+		if err != nil {
+			return fmt.Errorf("failed to unmute user: %w", err)
+		}
+		log.Printf("Unmuted user %s", accountId.String())
 		return nil
 	})
 }

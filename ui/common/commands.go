@@ -19,6 +19,7 @@ const (
 	FederatedTimelineView // View federated posts
 	LocalTimelineView     // View local posts from all local users
 	LocalUsersView        // Browse and follow local users
+	AdminPanelView        // Admin panel for user management (admin only)
 	DeleteAccountView     // Delete account with confirmation
 )
 
