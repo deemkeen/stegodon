@@ -14,14 +14,31 @@ builds:
     env:
       - CGO_ENABLED=1
     goos:
+      - linux
       - darwin
     goarch:
+      - amd64
       - arm64
     ldflags:
       - -s -w
-    # Note: This build is configured for native platform only (macOS ARM64)
-    # For Linux builds, run goreleaser on a Linux machine or use GitHub Actions
-    # CGO cross-compilation requires platform-specific toolchains
+    # Cross-compilation toolchains configured in GitHub Actions:
+    # - Linux ARM64: gcc-aarch64-linux-gnu
+    # - Linux AMD64: native gcc
+    # - macOS: osxcross
+    hooks:
+      pre:
+        - |
+          # Set CC/CXX for cross-compilation based on target
+          if [ "{{ .Os }}" = "linux" ] && [ "{{ .Arch }}" = "arm64" ]; then
+            export CC=aarch64-linux-gnu-gcc
+            export CXX=aarch64-linux-gnu-g++
+          elif [ "{{ .Os }}" = "darwin" ] && [ "{{ .Arch }}" = "amd64" ]; then
+            export CC=o64-clang
+            export CXX=o64-clang++
+          elif [ "{{ .Os }}" = "darwin" ] && [ "{{ .Arch }}" = "arm64" ]; then
+            export CC=oa64-clang
+            export CXX=oa64-clang++
+          fi
 
 archives:
   - id: stegodon-archive
