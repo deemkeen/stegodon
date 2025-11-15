@@ -231,9 +231,21 @@ func Router(conf *util.AppConfig) error {
 		})
 
 		g.GET("/users/:actor/outbox", func(c *gin.Context) {
-			log.Println("Get outbox..")
+			actor := c.Param("actor")
+			pageStr := c.Query("page")
+			page := ParsePageParam(pageStr)
+
+			log.Printf("GET /users/%s/outbox (page=%d)", actor, page)
+
+			err, outbox := GetOutbox(actor, page, conf)
+			if err != nil {
+				c.Header("Content-Type", "application/activity+json; charset=utf-8")
+				c.Render(404, render.String{Format: "{}"})
+				return
+			}
+
 			c.Header("Content-Type", "application/activity+json; charset=utf-8")
-			c.Render(200, render.String{Format: "{}"})
+			c.Render(200, render.String{Format: outbox})
 		})
 
 		g.GET("/users/:actor/followers", func(c *gin.Context) {

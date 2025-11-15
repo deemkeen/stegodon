@@ -31,6 +31,14 @@ func setupTestDB(t *testing.T) *DB {
 	// Add edited_at column which might be missing from base table
 	db.db.Exec(`ALTER TABLE notes ADD COLUMN edited_at timestamp`)
 
+	// Add ActivityPub note fields to notes table
+	db.db.Exec(`ALTER TABLE notes ADD COLUMN visibility TEXT DEFAULT 'public'`)
+	db.db.Exec(`ALTER TABLE notes ADD COLUMN in_reply_to_uri TEXT`)
+	db.db.Exec(`ALTER TABLE notes ADD COLUMN object_uri TEXT`)
+	db.db.Exec(`ALTER TABLE notes ADD COLUMN federated INTEGER DEFAULT 1`)
+	db.db.Exec(`ALTER TABLE notes ADD COLUMN sensitive INTEGER DEFAULT 0`)
+	db.db.Exec(`ALTER TABLE notes ADD COLUMN content_warning TEXT`)
+
 	// Add ActivityPub profile fields to accounts table
 	db.db.Exec(`ALTER TABLE accounts ADD COLUMN display_name varchar(255)`)
 	db.db.Exec(`ALTER TABLE accounts ADD COLUMN summary text`)
@@ -968,6 +976,91 @@ func TestReadAllAccountsAdmin(t *testing.T) {
 	}
 	if !foundNewUser {
 		t.Errorf("ReadAllAccountsAdmin should include first-time login user")
+	}
+}
+
+func TestReadPublicNotesByUsername(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.db.Close()
+
+	// Create user
+	userId := uuid.New()
+	createTestAccount(t, db, userId, "testuser", "pubkey", "webpub", "webpriv")
+
+	// Create notes with different visibility
+	publicNote1 := uuid.New()
+	publicNote2 := uuid.New()
+	privateNote := uuid.New()
+
+	// Insert public notes
+	_, err := db.db.Exec("INSERT INTO notes (id, user_id, message, created_at, visibility) VALUES (?, ?, ?, ?, ?)",
+		publicNote1, userId.String(), "Public Note 1", time.Now().Add(-2*time.Hour), "public")
+	if err != nil {
+		t.Fatalf("Failed to create public note 1: %v", err)
+	}
+
+	_, err = db.db.Exec("INSERT INTO notes (id, user_id, message, created_at, visibility) VALUES (?, ?, ?, ?, ?)",
+		publicNote2, userId.String(), "Public Note 2", time.Now().Add(-1*time.Hour), "public")
+	if err != nil {
+		t.Fatalf("Failed to create public note 2: %v", err)
+	}
+
+	// Insert private note (should not appear in outbox)
+	_, err = db.db.Exec("INSERT INTO notes (id, user_id, message, created_at, visibility) VALUES (?, ?, ?, ?, ?)",
+		privateNote, userId.String(), "Private Note", time.Now(), "followers")
+	if err != nil {
+		t.Fatalf("Failed to create private note: %v", err)
+	}
+
+	// Test: Should return only public notes
+	err, notes := db.ReadPublicNotesByUsername("testuser", 10, 0)
+	if err != nil {
+		t.Fatalf("ReadPublicNotesByUsername failed: %v", err)
+	}
+
+	if len(*notes) != 2 {
+		t.Errorf("Expected 2 public notes, got %d", len(*notes))
+	}
+
+	// Verify notes are ordered by created_at DESC (newest first)
+	if len(*notes) >= 2 {
+		if (*notes)[0].CreatedAt.Before((*notes)[1].CreatedAt) {
+			t.Errorf("Notes should be ordered by created_at DESC")
+		}
+	}
+
+	// Test: Pagination with limit
+	err, notesPage1 := db.ReadPublicNotesByUsername("testuser", 1, 0)
+	if err != nil {
+		t.Fatalf("ReadPublicNotesByUsername with limit failed: %v", err)
+	}
+	if len(*notesPage1) != 1 {
+		t.Errorf("Expected 1 note with limit=1, got %d", len(*notesPage1))
+	}
+
+	// Test: Pagination with offset
+	err, notesPage2 := db.ReadPublicNotesByUsername("testuser", 1, 1)
+	if err != nil {
+		t.Fatalf("ReadPublicNotesByUsername with offset failed: %v", err)
+	}
+	if len(*notesPage2) != 1 {
+		t.Errorf("Expected 1 note with offset=1, got %d", len(*notesPage2))
+	}
+
+	// Verify pages return different notes
+	if len(*notesPage1) > 0 && len(*notesPage2) > 0 {
+		if (*notesPage1)[0].Id == (*notesPage2)[0].Id {
+			t.Errorf("Pagination should return different notes")
+		}
+	}
+
+	// Test: Non-existent user
+	err, notesNone := db.ReadPublicNotesByUsername("nonexistent", 10, 0)
+	if err != nil {
+		t.Fatalf("ReadPublicNotesByUsername for non-existent user should not error: %v", err)
+	}
+	if len(*notesNone) != 0 {
+		t.Errorf("Expected 0 notes for non-existent user, got %d", len(*notesNone))
 	}
 }
 

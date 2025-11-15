@@ -85,6 +85,14 @@ const (
 															WHERE account_id = ? AND accepted = 1 AND is_local = 1
 														)
 														ORDER BY notes.created_at DESC LIMIT ?`
+
+	// Outbox collection query - returns public notes for ActivityPub outbox
+	sqlSelectPublicNotesByUsername = `SELECT notes.id, notes.user_id, notes.message, notes.created_at, notes.edited_at, notes.visibility, notes.object_uri
+														FROM notes
+														INNER JOIN accounts ON accounts.id = notes.user_id
+														WHERE accounts.username = ? AND notes.visibility = 'public'
+														ORDER BY notes.created_at DESC
+														LIMIT ? OFFSET ?`
 )
 
 func (db *DB) CreateAccount(s ssh.Session, username string) (error, bool) {
@@ -1178,6 +1186,44 @@ func (db *DB) DeleteLocalFollow(followerAccountId, targetAccountId uuid.UUID) er
 		_, err := tx.Exec(sqlDeleteLocalFollow, followerAccountId.String(), targetAccountId.String())
 		return err
 	})
+}
+
+// ReadPublicNotesByUsername returns public notes for a user's ActivityPub outbox with pagination
+// Returns notes with full metadata including object_uri for ActivityPub compatibility
+func (db *DB) ReadPublicNotesByUsername(username string, limit, offset int) (error, *[]domain.Note) {
+	rows, err := db.db.Query(sqlSelectPublicNotesByUsername, username, limit, offset)
+	if err != nil {
+		return err, nil
+	}
+	defer rows.Close()
+
+	var notes []domain.Note
+	for rows.Next() {
+		var note domain.Note
+		var userId, visibility, objectURI sql.NullString
+		var editedAt sql.NullTime
+
+		err := rows.Scan(&note.Id, &userId, &note.Message, &note.CreatedAt, &editedAt, &visibility, &objectURI)
+		if err != nil {
+			return err, &notes
+		}
+
+		// Set username for note (we already know it from the query parameter)
+		note.CreatedBy = username
+
+		// Handle nullable fields
+		if editedAt.Valid {
+			note.EditedAt = &editedAt.Time
+		}
+		note.Visibility = visibility.String
+		note.ObjectURI = objectURI.String
+
+		notes = append(notes, note)
+	}
+	if err = rows.Err(); err != nil {
+		return err, &notes
+	}
+	return nil, &notes
 }
 
 // IsFollowingLocal checks if a user is following another local user
