@@ -125,12 +125,15 @@ func makeNoteActivities(notes []domain.Note, actor string, conf *util.AppConfig)
 			objectURI = fmt.Sprintf("%s/notes/%s", baseURL, note.Id.String())
 		}
 
+		// Convert Markdown links to HTML for ActivityPub content
+		contentHTML := util.MarkdownLinksToHTML(note.Message)
+
 		// Build the Note object
 		noteObj := map[string]interface{}{
 			"id":           objectURI,
 			"type":         "Note",
 			"attributedTo": fmt.Sprintf("%s/users/%s", baseURL, actor),
-			"content":      note.Message,
+			"content":      contentHTML,
 			"published":    note.CreatedAt.Format("2006-01-02T15:04:05Z"),
 			"to": []string{
 				"https://www.w3.org/ns/activitystreams#Public",

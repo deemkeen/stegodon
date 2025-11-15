@@ -96,6 +96,9 @@ func SendCreate(note *domain.Note, localAccount *domain.Account, conf *util.AppC
 	noteURI := fmt.Sprintf("https://%s/notes/%s", conf.Conf.SslDomain, note.Id.String())
 	createID := fmt.Sprintf("https://%s/activities/%s", conf.Conf.SslDomain, uuid.New().String())
 
+	// Convert Markdown links to HTML for ActivityPub content
+	contentHTML := util.MarkdownLinksToHTML(note.Message)
+
 	create := map[string]interface{}{
 		"@context":  "https://www.w3.org/ns/activitystreams",
 		"id":        createID,
@@ -112,7 +115,7 @@ func SendCreate(note *domain.Note, localAccount *domain.Account, conf *util.AppC
 			"id":           noteURI,
 			"type":         "Note",
 			"attributedTo": actorURI,
-			"content":      note.Message,
+			"content":      contentHTML,
 			"published":    note.CreatedAt.Format(time.RFC3339),
 			"to": []string{
 				"https://www.w3.org/ns/activitystreams#Public",
@@ -176,6 +179,9 @@ func SendUpdate(note *domain.Note, localAccount *domain.Account, conf *util.AppC
 		updatedTime = *note.EditedAt
 	}
 
+	// Convert Markdown links to HTML for ActivityPub content
+	contentHTML := util.MarkdownLinksToHTML(note.Message)
+
 	update := map[string]interface{}{
 		"@context": "https://www.w3.org/ns/activitystreams",
 		"id":       updateID,
@@ -191,7 +197,7 @@ func SendUpdate(note *domain.Note, localAccount *domain.Account, conf *util.AppC
 			"id":           noteURI,
 			"type":         "Note",
 			"attributedTo": actorURI,
-			"content":      note.Message,
+			"content":      contentHTML,
 			"published":    note.CreatedAt.Format(time.RFC3339),
 			"updated":      updatedTime.Format(time.RFC3339),
 			"to": []string{
