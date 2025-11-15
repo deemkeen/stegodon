@@ -1,0 +1,177 @@
+# GoReleaser configuration for stegodon
+version: 2
+
+before:
+  hooks:
+    # Run tests before building
+    - go test ./...
+    # Update go mod
+    - go mod tidy
+
+builds:
+  - id: stegodon
+    binary: stegodon
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - darwin
+    goarch:
+      - arm64
+    ldflags:
+      - -s -w
+    # Note: This build is configured for native platform only (macOS ARM64)
+    # For Linux builds, run goreleaser on a Linux machine or use GitHub Actions
+    # CGO cross-compilation requires platform-specific toolchains
+
+archives:
+  - id: stegodon-archive
+    format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+      - CLAUDE.md
+      - DOCKER.md
+      - config.yaml
+
+checksum:
+  name_template: 'checksums.txt'
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - 'merge conflict'
+      - Merge pull request
+      - Merge remote-tracking branch
+      - Merge branch
+  groups:
+    - title: 'New Features'
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: 'Bug Fixes'
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: 'Performance Improvements'
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: 'Documentation Updates'
+      regexp: '^.*?docs(\([[:word:]]+\))??!?:.+$'
+      order: 3
+    - title: 'Other Changes'
+      order: 999
+
+release:
+  github:
+    owner: deemkeen
+    name: stegodon
+  draft: false
+  prerelease: auto
+  mode: replace
+  header: |
+    ## stegodon v{{ .Version }}
+
+    SSH-first federated blogging platform with ActivityPub support.
+
+    ### Installation
+
+    Download the appropriate binary for your system:
+    - **Linux AMD64**: `stegodon_{{ .Version }}_Linux_x86_64.tar.gz`
+    - **Linux ARM64**: `stegodon_{{ .Version }}_Linux_arm64.tar.gz`
+    - **macOS AMD64 (Intel)**: `stegodon_{{ .Version }}_Darwin_x86_64.tar.gz`
+    - **macOS ARM64 (Apple Silicon)**: `stegodon_{{ .Version }}_Darwin_arm64.tar.gz`
+
+    Extract and run:
+    ```bash
+    tar xzf stegodon_{{ .Version }}_*.tar.gz
+    chmod +x stegodon
+    ./stegodon
+    ```
+
+    Or use Docker:
+    ```bash
+    docker pull ghcr.io/deemkeen/stegodon:{{ .Version }}
+    docker-compose up -d
+    ```
+
+    ### Quick Start
+
+    ```bash
+    # Run stegodon
+    ./stegodon
+
+    # Connect via SSH
+    ssh localhost -p 23232
+    ```
+
+    See README.md for full documentation.
+  footer: |
+    ---
+
+    **Full Changelog**: https://github.com/deemkeen/stegodon/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+    ### What's New in v{{ .Version }}
+
+    - Single binary distribution with embedded assets
+    - Centralized user data in `~/.config/stegodon/`
+    - Docker support with slim Alpine-based image (37.9 MB)
+    - Comprehensive documentation updates
+    - Bug fixes and improvements
+
+# Docker images (disabled for macOS-only builds)
+# dockers:
+#   - image_templates:
+#       - "ghcr.io/deemkeen/stegodon:{{ .Version }}-amd64"
+#       - "ghcr.io/deemkeen/stegodon:latest-amd64"
+#     dockerfile: Dockerfile
+#     use: buildx
+#     build_flag_templates:
+#       - "--platform=linux/amd64"
+#       - "--label=org.opencontainers.image.created={{.Date}}"
+#       - "--label=org.opencontainers.image.title={{.ProjectName}}"
+#       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+#       - "--label=org.opencontainers.image.version={{.Version}}"
+#     skip_push: auto
+#
+#   - image_templates:
+#       - "ghcr.io/deemkeen/stegodon:{{ .Version }}-arm64"
+#       - "ghcr.io/deemkeen/stegodon:latest-arm64"
+#     dockerfile: Dockerfile
+#     use: buildx
+#     build_flag_templates:
+#       - "--platform=linux/arm64"
+#       - "--label=org.opencontainers.image.created={{.Date}}"
+#       - "--label=org.opencontainers.image.title={{.ProjectName}}"
+#       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+#       - "--label=org.opencontainers.image.version={{.Version}}"
+#     skip_push: auto
+#
+# docker_manifests:
+#   - name_template: "ghcr.io/deemkeen/stegodon:{{ .Version }}"
+#     image_templates:
+#       - "ghcr.io/deemkeen/stegodon:{{ .Version }}-amd64"
+#       - "ghcr.io/deemkeen/stegodon:{{ .Version }}-arm64"
+#     skip_push: auto
+#
+#   - name_template: "ghcr.io/deemkeen/stegodon:latest"
+#     image_templates:
+#       - "ghcr.io/deemkeen/stegodon:latest-amd64"
+#       - "ghcr.io/deemkeen/stegodon:latest-arm64"
+#     skip_push: auto
+
+announce:
+  skip: true
