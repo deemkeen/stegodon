@@ -87,6 +87,23 @@ STEGODON_CLOSED=true              # Closed registration
 - Aggregated: `http://localhost:9999/feed`
 - Single note: `http://localhost:9999/feed/<uuid>`
 
+## Web UI
+
+Browse posts through a terminal-themed web interface:
+
+- **Homepage:** `http://localhost:9999/` - View all posts from all users
+- **User profile:** `http://localhost:9999/users/<username>` - View posts by a specific user
+- **Single post:** `http://localhost:9999/posts/<uuid>` - View individual post
+
+The web UI features:
+- Terminal-style aesthetic matching the SSH TUI
+- SEO optimized with proper meta tags
+- Clickable Markdown links
+- Responsive design
+- RSS feed links for each user
+
+Replace `localhost:9999` with your domain when deployed publicly.
+
 ## Building from Source
 
 ```bash
