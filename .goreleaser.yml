@@ -25,20 +25,22 @@ builds:
     # - Linux ARM64: gcc-aarch64-linux-gnu
     # - Linux AMD64: native gcc
     # - macOS: osxcross
-    hooks:
-      pre:
-        - |
-          # Set CC/CXX for cross-compilation based on target
-          if [ "{{ .Os }}" = "linux" ] && [ "{{ .Arch }}" = "arm64" ]; then
-            export CC=aarch64-linux-gnu-gcc
-            export CXX=aarch64-linux-gnu-g++
-          elif [ "{{ .Os }}" = "darwin" ] && [ "{{ .Arch }}" = "amd64" ]; then
-            export CC=o64-clang
-            export CXX=o64-clang++
-          elif [ "{{ .Os }}" = "darwin" ] && [ "{{ .Arch }}" = "arm64" ]; then
-            export CC=oa64-clang
-            export CXX=oa64-clang++
-          fi
+    overrides:
+      - goos: linux
+        goarch: arm64
+        env:
+          - CC=aarch64-linux-gnu-gcc
+          - CXX=aarch64-linux-gnu-g++
+      - goos: darwin
+        goarch: amd64
+        env:
+          - CC=o64-clang
+          - CXX=o64-clang++
+      - goos: darwin
+        goarch: arm64
+        env:
+          - CC=oa64-clang
+          - CXX=oa64-clang++
 
 archives:
   - id: stegodon-archive
