@@ -1,6 +1,10 @@
 # Build stage
 FROM golang:1.25-alpine3.21 AS builder
 
+# Use main Alpine mirror instead of CDN
+RUN echo "https://alpine.global.ssl.fastly.net/alpine/v3.21/main" > /etc/apk/repositories && \
+    echo "https://alpine.global.ssl.fastly.net/alpine/v3.21/community" >> /etc/apk/repositories
+
 # Install build dependencies (gcc, musl-dev for CGO/SQLite)
 RUN apk add --no-cache git gcc musl-dev
 
@@ -21,6 +25,10 @@ RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o stegodon .
 
 # Final stage
 FROM alpine:3.21
+
+# Use main Alpine mirror instead of CDN
+RUN echo "https://alpine.global.ssl.fastly.net/alpine/v3.21/main" > /etc/apk/repositories && \
+    echo "https://alpine.global.ssl.fastly.net/alpine/v3.21/community" >> /etc/apk/repositories
 
 # Install runtime dependencies
 RUN apk add --no-cache ca-certificates sqlite
