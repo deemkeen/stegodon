@@ -20,33 +20,33 @@ import (
 var (
 	timeStyle = lipgloss.NewStyle().
 			Align(lipgloss.Left).
-			Foreground(lipgloss.Color(common.COLOR_PURPLE))
+			Foreground(lipgloss.Color(common.COLOR_DARK_GREY))
 
 	authorStyle = lipgloss.NewStyle().
 			Align(lipgloss.Left).
-			Foreground(lipgloss.Color(common.COLOR_LIGHTBLUE)).
+			Foreground(lipgloss.Color(common.COLOR_GREEN)).
 			Bold(true)
 
 	contentStyle = lipgloss.NewStyle().
 			Align(lipgloss.Left)
 
 	emptyStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241")).
+			Foreground(lipgloss.Color(common.COLOR_DARK_GREY)).
 			Italic(true)
 
 	// Inverted styles for selected posts
 	selectedTimeStyle = lipgloss.NewStyle().
 				Align(lipgloss.Left).
-				Foreground(lipgloss.Color("255")) // White
+				Foreground(lipgloss.Color(common.COLOR_WHITE)) // White
 
 	selectedAuthorStyle = lipgloss.NewStyle().
 				Align(lipgloss.Left).
-				Foreground(lipgloss.Color("255")). // White
+				Foreground(lipgloss.Color(common.COLOR_WHITE)). // White
 				Bold(true)
 
 	selectedContentStyle = lipgloss.NewStyle().
 				Align(lipgloss.Left).
-				Foreground(lipgloss.Color("255")) // White
+				Foreground(lipgloss.Color(common.COLOR_WHITE)) // White
 )
 
 type Model struct {
@@ -163,7 +163,7 @@ func (m Model) View() string {
 			// Apply selection highlighting - full width box with inverted colors
 			if i == m.Selected {
 				selectedBg := lipgloss.NewStyle().
-					Background(lipgloss.Color("62")).
+					Background(lipgloss.Color(common.COLOR_LIGHTBLUE)).
 					Width(rightPanelWidth - 4)
 
 				timeFormatted := selectedBg.Render(selectedTimeStyle.Render(timeStr))
@@ -174,13 +174,17 @@ func (m Model) View() string {
 				s.WriteString(authorFormatted + "\n")
 				s.WriteString(contentFormatted)
 			} else {
-				timeFormatted := timeStyle.Render(timeStr)
-				authorStr := authorStyle.Render(post.Actor)
-				contentStr := contentStyle.Render(truncate(post.Content, 150))
+				// Apply same width to unselected items for consistent wrapping
+				unselectedStyle := lipgloss.NewStyle().
+					Width(rightPanelWidth - 4)
+
+				timeFormatted := unselectedStyle.Render(timeStyle.Render(timeStr))
+				authorFormatted := unselectedStyle.Render(authorStyle.Render(post.Actor))
+				contentFormatted := unselectedStyle.Render(contentStyle.Render(truncate(post.Content, 150)))
 
 				s.WriteString(timeFormatted + "\n")
-				s.WriteString(authorStr + "\n")
-				s.WriteString(contentStr)
+				s.WriteString(authorFormatted + "\n")
+				s.WriteString(contentFormatted)
 			}
 
 			s.WriteString("\n\n")

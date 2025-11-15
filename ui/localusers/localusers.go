@@ -22,18 +22,18 @@ var (
 	selectedStyle = lipgloss.NewStyle().
 			PaddingLeft(2).
 			MarginBottom(0).
-			Foreground(lipgloss.Color("86")).
+			Foreground(lipgloss.Color(common.COLOR_GREEN)).
 			Bold(true)
 
 	emptyStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241")).
+			Foreground(lipgloss.Color(common.COLOR_DARK_GREY)).
 			Italic(true)
 
 	statusStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("42"))
+			Foreground(lipgloss.Color(common.COLOR_BLUE))
 
 	errorStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("196"))
+			Foreground(lipgloss.Color(common.COLOR_RED))
 )
 
 type Model struct {

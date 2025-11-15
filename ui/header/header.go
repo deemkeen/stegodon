@@ -76,8 +76,8 @@ func GetHeaderStyle(acc *domain.Account, width int) string {
 	return lipgloss.NewStyle().
 		Width(width).
 		MaxWidth(width).
-		Background(lipgloss.Color(common.COLOR_PURPLE)).
-		Foreground(lipgloss.Color("255")).
+		Background(lipgloss.Color(common.COLOR_LIGHTBLUE)).
+		Foreground(lipgloss.Color(common.COLOR_WHITE)).
 		Bold(true).
 		Inline(true).
 		Render(header)

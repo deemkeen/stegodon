@@ -17,18 +17,18 @@ import (
 var (
 	timeStyle = lipgloss.NewStyle().
 			Align(lipgloss.Left).
-			Foreground(lipgloss.Color(common.COLOR_PURPLE))
+			Foreground(lipgloss.Color(common.COLOR_DARK_GREY))
 
 	authorStyle = lipgloss.NewStyle().
 			Align(lipgloss.Left).
-			Foreground(lipgloss.Color(common.COLOR_LIGHTBLUE)).
+			Foreground(lipgloss.Color(common.COLOR_GREEN)).
 			Bold(true)
 
 	contentStyle = lipgloss.NewStyle().
 			Align(lipgloss.Left)
 
 	emptyStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241")).
+			Foreground(lipgloss.Color(common.COLOR_DARK_GREY)).
 			Italic(true)
 )
 

@@ -21,7 +21,7 @@ var (
 	Style = lipgloss.NewStyle().
 		Padding(1, 2).
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("63"))
+		BorderForeground(lipgloss.Color(common.COLOR_BORDER_GREY))
 )
 
 type Model struct {

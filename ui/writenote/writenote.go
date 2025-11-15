@@ -2,6 +2,9 @@ package writenote
 
 import (
 	"fmt"
+	"log"
+	"time"
+
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -11,8 +14,6 @@ import (
 	"github.com/deemkeen/stegodon/ui/common"
 	"github.com/deemkeen/stegodon/util"
 	"github.com/google/uuid"
-	"log"
-	"time"
 )
 
 const MaxLetters = 150
@@ -232,7 +233,7 @@ func (m Model) CharCount() int {
 }
 
 func (m Model) View() string {
-	styledTextarea := lipgloss.NewStyle().PaddingLeft(5).PaddingRight(5).Margin(2).Render(m.Textarea.View())
+	styledTextarea := lipgloss.NewStyle().PaddingLeft(5).PaddingRight(5).Render(m.Textarea.View())
 
 	helpText := "post message: ctrl+s"
 	if m.isEditing {
@@ -241,13 +242,13 @@ func (m Model) View() string {
 
 	// Build the help section with proper formatting
 	helpLines := fmt.Sprintf("characters left: %d\n\n%s", m.lettersLeft, helpText)
-	charsLeft := common.HelpStyle.Render(lipgloss.NewStyle().PaddingLeft(7).Render(helpLines))
+	charsLeft := common.HelpStyle.Render(lipgloss.NewStyle().PaddingLeft(5).Render(helpLines))
 
 	captionText := "new note"
 	if m.isEditing {
 		captionText = "edit note"
 	}
-	caption := common.CaptionStyle.PaddingLeft(7).Render(captionText)
+	caption := common.CaptionStyle.PaddingLeft(5).Render(captionText)
 
 	return fmt.Sprintf("%s\n\n%s\n\n%s", caption, styledTextarea, charsLeft)
 }

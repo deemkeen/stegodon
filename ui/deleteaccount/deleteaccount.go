@@ -16,14 +16,14 @@ import (
 
 var (
 	warningStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("196")).
+			Foreground(lipgloss.Color(common.COLOR_RED)).
 			Bold(true)
 
 	confirmStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("42"))
+			Foreground(lipgloss.Color(common.COLOR_BLUE))
 
 	instructionStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("240"))
+				Foreground(lipgloss.Color(common.COLOR_DARK_GREY))
 )
 
 type Model struct {

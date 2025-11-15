@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"log"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/deemkeen/stegodon/activitypub"
@@ -13,43 +15,42 @@ import (
 	"github.com/deemkeen/stegodon/ui/common"
 	"github.com/deemkeen/stegodon/util"
 	"github.com/google/uuid"
-	"log"
 )
 
 var (
 	timeStyle = lipgloss.NewStyle().
 			Align(lipgloss.Left).
-			Foreground(lipgloss.Color(common.COLOR_PURPLE))
+			Foreground(lipgloss.Color(common.COLOR_DARK_GREY))
 
 	authorStyle = lipgloss.NewStyle().
 			Align(lipgloss.Left).
-			Foreground(lipgloss.Color(common.COLOR_LIGHTBLUE)).
+			Foreground(lipgloss.Color(common.COLOR_GREEN)).
 			Bold(true)
 
 	contentStyle = lipgloss.NewStyle().
 			Align(lipgloss.Left)
 
 	emptyStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241")).
+			Foreground(lipgloss.Color(common.COLOR_DARK_GREY)).
 			Italic(true)
 
 	confirmDeleteStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("196")).
+				Foreground(lipgloss.Color(common.COLOR_RED)).
 				Bold(true)
 
 	// Inverted styles for selected notes (light text on dark background)
 	selectedTimeStyle = lipgloss.NewStyle().
 				Align(lipgloss.Left).
-				Foreground(lipgloss.Color("255")) // White
+				Foreground(lipgloss.Color(common.COLOR_WHITE)) // White
 
 	selectedAuthorStyle = lipgloss.NewStyle().
 				Align(lipgloss.Left).
-				Foreground(lipgloss.Color("255")). // White
+				Foreground(lipgloss.Color(common.COLOR_WHITE)). // White
 				Bold(true)
 
 	selectedContentStyle = lipgloss.NewStyle().
 				Align(lipgloss.Left).
-				Foreground(lipgloss.Color("255")) // White
+				Foreground(lipgloss.Color(common.COLOR_WHITE)) // White
 )
 
 type Model struct {
@@ -172,7 +173,7 @@ func (m Model) View() string {
 			if i == m.Selected {
 				// Create a style that fills the full width
 				selectedBg := lipgloss.NewStyle().
-					Background(lipgloss.Color("62")).
+					Background(lipgloss.Color(common.COLOR_LIGHTBLUE)).
 					Width(rightPanelWidth - 4)
 
 				// Render each line with the background and inverted text colors
@@ -184,13 +185,17 @@ func (m Model) View() string {
 				s.WriteString(authorFormatted + "\n")
 				s.WriteString(contentFormatted)
 			} else {
-				timeFormatted := timeStyle.Render(timeStr)
-				authorStr := authorStyle.Render("@" + note.CreatedBy)
-				contentStr := contentStyle.Render(truncate(note.Message, 150))
+				// Apply same width to unselected items for consistent wrapping
+				unselectedStyle := lipgloss.NewStyle().
+					Width(rightPanelWidth - 4)
+
+				timeFormatted := unselectedStyle.Render(timeStyle.Render(timeStr))
+				authorFormatted := unselectedStyle.Render(authorStyle.Render("@" + note.CreatedBy))
+				contentFormatted := unselectedStyle.Render(contentStyle.Render(truncate(note.Message, 150)))
 
 				s.WriteString(timeFormatted + "\n")
-				s.WriteString(authorStr + "\n")
-				s.WriteString(contentStr)
+				s.WriteString(authorFormatted + "\n")
+				s.WriteString(contentFormatted)
 			}
 
 			s.WriteString("\n\n")

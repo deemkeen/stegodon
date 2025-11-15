@@ -19,7 +19,7 @@ var (
 			MarginBottom(0)
 
 	emptyStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241")).
+			Foreground(lipgloss.Color(common.COLOR_DARK_GREY)).
 			Italic(true)
 )
 

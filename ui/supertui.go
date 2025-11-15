@@ -372,6 +372,7 @@ func (m MainModel) View() string {
 		Height(availableHeight).
 		Width(leftPanelWidth).
 		MaxWidth(leftPanelWidth).
+		Margin(1).
 		Render(m.createModel.View())
 
 	listStyleStr := lipgloss.NewStyle().
