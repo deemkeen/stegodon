@@ -1,12 +1,11 @@
 # Build stage
-FROM golang:1.25-alpine3.21 AS builder
+FROM golang:1.25-bookworm AS builder
 
-# Use main Alpine mirror instead of CDN
-RUN echo "https://alpine.global.ssl.fastly.net/alpine/v3.21/main" > /etc/apk/repositories && \
-    echo "https://alpine.global.ssl.fastly.net/alpine/v3.21/community" >> /etc/apk/repositories
-
-# Install build dependencies (gcc, musl-dev for CGO/SQLite)
-RUN apk add --no-cache git gcc musl-dev
+# Install build dependencies (gcc for CGO/SQLite)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /build
@@ -24,18 +23,18 @@ COPY . .
 RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o stegodon .
 
 # Final stage
-FROM alpine:3.21
-
-# Use main Alpine mirror instead of CDN
-RUN echo "https://alpine.global.ssl.fastly.net/alpine/v3.21/main" > /etc/apk/repositories && \
-    echo "https://alpine.global.ssl.fastly.net/alpine/v3.21/community" >> /etc/apk/repositories
+FROM debian:bookworm-slim
 
 # Install runtime dependencies
-RUN apk add --no-cache ca-certificates sqlite
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    sqlite3 \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
-RUN addgroup -g 1000 stegodon && \
-    adduser -D -u 1000 -G stegodon stegodon
+RUN groupadd -g 1000 stegodon && \
+    useradd -u 1000 -g stegodon -m -s /bin/bash stegodon
 
 # Set working directory
 WORKDIR /home/stegodon
