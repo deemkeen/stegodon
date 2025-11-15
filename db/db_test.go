@@ -1064,3 +1064,53 @@ func TestReadPublicNotesByUsername(t *testing.T) {
 	}
 }
 
+func TestCountAccounts(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.db.Close()
+
+	// Test: Empty database
+	count, err := db.CountAccounts()
+	if err != nil {
+		t.Fatalf("CountAccounts failed: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("Expected 0 accounts in empty database, got %d", count)
+	}
+
+	// Test: Add one account
+	userId1 := uuid.New()
+	createTestAccount(t, db, userId1, "user1", "pubkey1", "webpub1", "webpriv1")
+
+	count, err = db.CountAccounts()
+	if err != nil {
+		t.Fatalf("CountAccounts failed: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("Expected 1 account, got %d", count)
+	}
+
+	// Test: Add second account
+	userId2 := uuid.New()
+	createTestAccount(t, db, userId2, "user2", "pubkey2", "webpub2", "webpriv2")
+
+	count, err = db.CountAccounts()
+	if err != nil {
+		t.Fatalf("CountAccounts failed: %v", err)
+	}
+	if count != 2 {
+		t.Errorf("Expected 2 accounts, got %d", count)
+	}
+
+	// Test: Add third account
+	userId3 := uuid.New()
+	createTestAccount(t, db, userId3, "user3", "pubkey3", "webpub3", "webpriv3")
+
+	count, err = db.CountAccounts()
+	if err != nil {
+		t.Fatalf("CountAccounts failed: %v", err)
+	}
+	if count != 3 {
+		t.Errorf("Expected 3 accounts, got %d", count)
+	}
+}
+

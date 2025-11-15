@@ -17,6 +17,8 @@ type AppConfig struct {
 		HttpPort  int    `yaml:"httpPort"`
 		SslDomain string `yaml:"sslDomain"`
 		WithAp    bool   `yaml:"withAp"`
+		Single    bool   `yaml:"single"`
+		Closed    bool   `yaml:"closed"`
 	}
 }
 
@@ -39,6 +41,8 @@ func ReadConf() (*AppConfig, error) {
 	envHttpPort := os.Getenv("STEGODON_HTTPPORT")
 	envSslDomain := os.Getenv("STEGODON_SSLDOMAIN")
 	envWithAp := os.Getenv("STEGODON_WITH_AP")
+	envSingle := os.Getenv("STEGODON_SINGLE")
+	envClosed := os.Getenv("STEGODON_CLOSED")
 
 	if envHost != "" {
 		c.Conf.Host = envHost
@@ -66,6 +70,14 @@ func ReadConf() (*AppConfig, error) {
 
 	if envWithAp == "true" {
 		c.Conf.WithAp = true
+	}
+
+	if envSingle == "true" {
+		c.Conf.Single = true
+	}
+
+	if envClosed == "true" {
+		c.Conf.Closed = true
 	}
 
 	return c, err

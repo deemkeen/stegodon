@@ -51,7 +51,7 @@ func main() {
 		//wish.WithAuthorizedKeys(".ssh"),
 		wish.WithMiddleware(
 			middleware.MainTui(),
-			middleware.AuthMiddleware(),
+			middleware.AuthMiddleware(conf),
 			logging.Middleware(), // last middleware executed first
 		),
 	)

@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"html/template"
 	"log"
 	"strconv"
 	"time"
@@ -44,9 +45,10 @@ type UserView struct {
 }
 
 type PostView struct {
-	Username string
-	Message  string
-	TimeAgo  string
+	Username    string
+	Message     string
+	MessageHTML template.HTML // HTML-rendered message with clickable links
+	TimeAgo     string
 }
 
 func formatTimeAgo(t time.Time) string {
@@ -121,9 +123,10 @@ func HandleIndex(c *gin.Context, conf *util.AppConfig) {
 	posts := make([]PostView, 0, len(paginatedNotes))
 	for _, note := range paginatedNotes {
 		posts = append(posts, PostView{
-			Username: note.CreatedBy,
-			Message:  note.Message,
-			TimeAgo:  formatTimeAgo(note.CreatedAt),
+			Username:    note.CreatedBy,
+			Message:     note.Message,
+			MessageHTML: template.HTML(util.MarkdownLinksToHTML(note.Message)),
+			TimeAgo:     formatTimeAgo(note.CreatedAt),
 		})
 	}
 
@@ -200,9 +203,10 @@ func HandleProfile(c *gin.Context, conf *util.AppConfig) {
 	posts := make([]PostView, 0, len(paginatedNotes))
 	for _, note := range paginatedNotes {
 		posts = append(posts, PostView{
-			Username: note.CreatedBy,
-			Message:  note.Message,
-			TimeAgo:  formatTimeAgo(note.CreatedAt),
+			Username:    note.CreatedBy,
+			Message:     note.Message,
+			MessageHTML: template.HTML(util.MarkdownLinksToHTML(note.Message)),
+			TimeAgo:     formatTimeAgo(note.CreatedAt),
 		})
 	}
 

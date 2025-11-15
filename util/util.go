@@ -15,6 +15,7 @@ import (
 	"log"
 	rnd "math/rand"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -98,4 +99,62 @@ func GeneratePemKeypair() *RsaKeyPair {
 	)
 
 	return &RsaKeyPair{Private: string(keyPEM[:]), Public: string(pubPEM[:])}
+}
+
+// MarkdownLinksToHTML converts Markdown links [text](url) to HTML <a> tags
+func MarkdownLinksToHTML(text string) string {
+	// Regex pattern for Markdown links: [text](url)
+	re := regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
+
+	// Replace all Markdown links with HTML anchor tags
+	result := re.ReplaceAllStringFunc(text, func(match string) string {
+		matches := re.FindStringSubmatch(match)
+		if len(matches) == 3 {
+			linkText := html.EscapeString(matches[1])
+			linkURL := html.EscapeString(matches[2])
+			return fmt.Sprintf(`<a href="%s" target="_blank" rel="noopener noreferrer">%s</a>`, linkURL, linkText)
+		}
+		return match
+	})
+
+	return result
+}
+
+// ExtractMarkdownLinks returns a list of URLs from Markdown links in text
+func ExtractMarkdownLinks(text string) []string {
+	re := regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
+	matches := re.FindAllStringSubmatch(text, -1)
+
+	urls := make([]string, 0, len(matches))
+	for _, match := range matches {
+		if len(match) == 3 {
+			urls = append(urls, match[2])
+		}
+	}
+
+	return urls
+}
+
+// MarkdownLinksToTerminal converts Markdown links [text](url) to OSC 8 hyperlinks
+// Format: OSC 8 wrapped link text only (no URL shown)
+// For terminals that support OSC 8, this creates clickable links with green color
+func MarkdownLinksToTerminal(text string) string {
+	// Regex pattern for Markdown links: [text](url)
+	re := regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
+
+	// Replace all Markdown links with OSC 8 hyperlinks
+	result := re.ReplaceAllStringFunc(text, func(match string) string {
+		matches := re.FindStringSubmatch(match)
+		if len(matches) == 3 {
+			linkText := matches[1]
+			linkURL := matches[2]
+			// OSC 8 format with green color (38;2;0;255;127 = RGB #00ff7f) and underline
+			// Format: COLOR_START + OSC8_START + TEXT + OSC8_END + COLOR_RESET
+			// Use \033[39;24m to reset only foreground color and underline, not background
+			return fmt.Sprintf("\033[38;2;0;255;127;4m\033]8;;%s\033\\%s\033]8;;\033\\\033[39;24m", linkURL, linkText)
+		}
+		return match
+	})
+
+	return result
 }

@@ -75,6 +75,7 @@ const (
 	// Local users and local timeline queries
 	sqlSelectAllAccounts        = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key, display_name, summary, avatar_url, is_admin, muted FROM accounts WHERE first_time_login = 0 ORDER BY username ASC`
 	sqlSelectAllAccountsAdmin   = `SELECT id, username, publickey, created_at, first_time_login, web_public_key, web_private_key, display_name, summary, avatar_url, is_admin, muted FROM accounts ORDER BY created_at ASC`
+	sqlCountAccounts            = `SELECT COUNT(*) FROM accounts`
 	sqlSelectLocalTimelineNotes = `SELECT notes.id, accounts.username, notes.message, notes.created_at, notes.edited_at FROM notes
 														INNER JOIN accounts ON accounts.id = notes.user_id
 														ORDER BY notes.created_at DESC LIMIT ?`
@@ -1054,6 +1055,16 @@ func (db *DB) ReadAllAccountsAdmin() (error, *[]domain.Account) {
 		return err, &accounts
 	}
 	return nil, &accounts
+}
+
+// CountAccounts returns the total number of accounts in the database
+func (db *DB) CountAccounts() (int, error) {
+	var count int
+	err := db.db.QueryRow(sqlCountAccounts).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
 }
 
 // DeleteAccount deletes a local account and all associated data (notes, follows, activities)

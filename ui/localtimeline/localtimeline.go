@@ -10,6 +10,7 @@ import (
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
+	"github.com/deemkeen/stegodon/util"
 	"github.com/google/uuid"
 	"log"
 )
@@ -113,10 +114,13 @@ func (m Model) View() string {
 		for i := start; i < end; i++ {
 			post := m.Posts[i]
 
+			// Convert Markdown links to OSC 8 hyperlinks
+			messageWithLinks := util.MarkdownLinksToTerminal(post.Message)
+
 			// Render in vertical layout like notes list
 			timeStr := timeStyle.Render(formatTime(post.CreatedAt))
 			authorStr := authorStyle.Render("@" + post.CreatedBy)
-			contentStr := contentStyle.Render(truncate(post.Message, 150))
+			contentStr := contentStyle.Render(truncate(messageWithLinks, 150))
 
 			postContent := lipgloss.JoinVertical(lipgloss.Left, timeStr, authorStr, contentStr)
 			s.WriteString(postContent)

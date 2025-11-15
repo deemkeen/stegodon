@@ -2,10 +2,9 @@ package listnotes
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
-
-	"log"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -169,6 +168,9 @@ func (m Model) View() string {
 				timeStr += " (edited)"
 			}
 
+			// Convert Markdown links to OSC 8 hyperlinks
+			messageWithLinks := util.MarkdownLinksToTerminal(note.Message)
+
 			// Apply selection highlighting - full width box with proper spacing
 			if i == m.Selected {
 				// Create a style that fills the full width
@@ -179,7 +181,7 @@ func (m Model) View() string {
 				// Render each line with the background and inverted text colors
 				timeFormatted := selectedBg.Render(selectedTimeStyle.Render(timeStr))
 				authorFormatted := selectedBg.Render(selectedAuthorStyle.Render("@" + note.CreatedBy))
-				contentFormatted := selectedBg.Render(selectedContentStyle.Render(truncate(note.Message, 150)))
+				contentFormatted := selectedBg.Render(selectedContentStyle.Render(truncate(messageWithLinks, 150)))
 
 				s.WriteString(timeFormatted + "\n")
 				s.WriteString(authorFormatted + "\n")
@@ -191,7 +193,7 @@ func (m Model) View() string {
 
 				timeFormatted := unselectedStyle.Render(timeStyle.Render(timeStr))
 				authorFormatted := unselectedStyle.Render(authorStyle.Render("@" + note.CreatedBy))
-				contentFormatted := unselectedStyle.Render(contentStyle.Render(truncate(note.Message, 150)))
+				contentFormatted := unselectedStyle.Render(contentStyle.Render(truncate(messageWithLinks, 150)))
 
 				s.WriteString(timeFormatted + "\n")
 				s.WriteString(authorFormatted + "\n")

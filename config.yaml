@@ -4,6 +4,8 @@ conf:
   httpPort: 9999 # local http port
   sslDomain: example.com  # your hosted ssl domain (use ngrok domain for local testing)
   withAp: false # activitypub (experimental!)
+  single: false # single-user mode (only one user can register)
+  closed: false # closed registration (no new users can register)
 
 # For local federation testing:
 # 1. Run: ./test-federation.sh

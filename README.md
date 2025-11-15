@@ -33,6 +33,15 @@ Users connect via SSH and can create notes in a clean terminal interface. Notes 
   - Per-user accounts with unique usernames
   - RSA keypairs for ActivityPub signing
   - Federated timeline and followers list
+  - Admin panel for user management (mute/kick users)
+  - Single-user mode (restrict to one user)
+  - Closed registration mode (prevent new registrations)
+
+- **Web Interface**
+  - Browse user profiles and posts
+  - Terminal-themed aesthetic with green-on-black styling
+  - SEO optimized with Open Graph and Twitter Card meta tags
+  - Responsive pagination for post history
 
 ## Installation
 
@@ -49,10 +58,13 @@ Once the server is started, open an SSH session via `ssh 127.0.0.1 -p 23232` to 
 You will be authenticated with your SSH public key. On your first login, you'll be prompted to choose a username.
 
 **Navigation:**
-- `Tab`: Cycle through views (New Note → Notes List → Follow User → Followers → Federated Timeline)
+- `Tab`: Cycle through views
+- Number keys: Jump directly to views (1: New Note, 2: Notes List, 3: Follow User, 4: Followers, 5: Federated Timeline, 6: Delete Account, 7: Admin Panel)
 - `↑/↓` or `j/k`: Navigate items in lists
 - `u`: Edit selected note (in Notes List view)
 - `d`: Delete selected note with confirmation (in Notes List view)
+- `m`: Mute user (in Admin Panel, if admin)
+- `k`: Kick/delete user (in Admin Panel, if admin)
 - `Ctrl+S`: Save/post note
 - `Ctrl+C` or `q`: Quit
 
@@ -85,6 +97,17 @@ You will be authenticated with your SSH public key. On your first login, you'll 
 
 **stegodon** can be used as a multi-user system when exposed to the internet. Each user gets a dedicated account, accessible with their personal SSH key.
 
+**Admin Features:**
+- The first user to register automatically becomes an admin
+- Admins can access the admin panel (press `7` or Tab to view)
+- Mute users to block their login and delete their content
+- Kick users to permanently delete accounts and all associated data
+
+**Registration Control:**
+- Use single-user mode (`STEGODON_SINGLE=true`) for personal blogs
+- Use closed registration (`STEGODON_CLOSED=true`) for invite-only instances
+- Default mode allows unlimited user registration
+
 ## Configuration
 
 Configuration is managed via environment variables:
@@ -94,8 +117,26 @@ Configuration is managed via environment variables:
 - **STEGODON_HTTPPORT** - HTTP port (default: `9999`)
 - **STEGODON_SSLDOMAIN** - **Required for ActivityPub** - Your public domain (default: `example.com`)
 - **STEGODON_WITH_AP** - Enable ActivityPub functionality (default: `false`)
+- **STEGODON_SINGLE** - Enable single-user mode (default: `false`)
+- **STEGODON_CLOSED** - Close registration for new users (default: `false`)
 
 Default configuration is in `config.yaml`.
+
+### Single-User Mode
+
+Set `STEGODON_SINGLE=true` to restrict registration to only one user. After the first user registers, additional SSH connection attempts will be rejected with a friendly message. Useful for personal blogs.
+
+```bash
+STEGODON_SINGLE=true ./stegodon
+```
+
+### Closed Registration
+
+Set `STEGODON_CLOSED=true` to completely close registration. All new user registration attempts will be rejected. Existing users can continue to log in normally. Useful for invite-only instances or maintenance periods.
+
+```bash
+STEGODON_CLOSED=true ./stegodon
+```
 
 ## Tech Stack
 
@@ -141,14 +182,16 @@ For optimal results, use a terminal with:
 
 All data is persisted in a local SQLite database (`database.db`) with the following tables:
 
-- `accounts` - User accounts with SSH key hashes and RSA keypairs
-- `notes` - User notes with timestamps and edit history
+- `accounts` - User accounts with SSH key hashes, RSA keypairs, and admin/muted status
+- `notes` - User notes with timestamps, edit history, and visibility settings
 - `remote_accounts` - Cached remote ActivityPub actors
 - `follows` - Follow relationships (local and remote)
 - `followers` - Follower relationships
 - `activities` - Received ActivityPub activities
 - `likes` - Like activities
 - `delivery_queue` - Outgoing activity delivery queue
+
+The database uses WAL mode for concurrent access. The first user to register automatically becomes an admin. Admins can access the admin panel (view 7) to manage users.
 
 The database can be deleted to wipe all data and start fresh.
 

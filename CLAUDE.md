@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**stegodon** is a single-user/multi-user federated blog TUI application written in Go using [Charm Tools](https://github.com/charmbracelet). Users connect via SSH and create notes in a terminal interface. Notes can be subscribed to via RSS and federate via ActivityPub to the Fediverse (Mastodon, Pleroma, etc.).
+**stegodon** is a ssh-first fediverse multi-user blog written in Go using [Charm Tools](https://github.com/charmbracelet). Users connect via SSH and create notes in a terminal interface. Notes can be subscribed to via RSS and federate via ActivityPub to the Fediverse (Mastodon, Pleroma, etc.) and optionally viewed in a web browser.
 
 ## Build and Run Commands
 
@@ -23,6 +23,12 @@ go run main.go
 
 # Run with ActivityPub enabled
 STEGODON_WITH_AP=true STEGODON_SSLDOMAIN=yourdomain.com ./stegodon
+
+# Run in single-user mode
+STEGODON_SINGLE=true ./stegodon
+
+# Run with closed registration
+STEGODON_CLOSED=true ./stegodon
 ```
 
 ## Development Workflow
@@ -53,6 +59,8 @@ Configuration is managed via environment variables:
 - `STEGODON_HTTPPORT` - HTTP port (default: 9999)
 - `STEGODON_SSLDOMAIN` - **Required for ActivityPub** - Your public domain (default: example.com)
 - `STEGODON_WITH_AP` - Enable ActivityPub functionality (default: false)
+- `STEGODON_SINGLE` - Enable single-user mode (default: false)
+- `STEGODON_CLOSED` - Close registration for new users (default: false)
 
 Default configuration is in `config.yaml`.
 
@@ -61,6 +69,19 @@ Default configuration is in `config.yaml`.
 2. Set `STEGODON_SSLDOMAIN` to your actual domain
 3. Have your domain publicly accessible with proper DNS
 4. Proxy the HTTP port (9999) through a reverse proxy with TLS
+
+**For single-user mode**:
+- Set `STEGODON_SINGLE=true` to restrict registration to only one user
+- When enabled, only the first user can register
+- Additional SSH connection attempts are rejected with the message: "This blog is in single-user mode, but you can host your own stegodon!"
+- Useful for personal blogs where you want to prevent other users from registering
+
+**For closed registration**:
+- Set `STEGODON_CLOSED=true` to completely close registration
+- When enabled, no new users can register (regardless of current user count)
+- SSH connection attempts from new users are rejected with the message: "Registration is closed. Please contact the administrator."
+- Existing users can continue to log in normally
+- Useful for invite-only or maintenance periods
 
 ## Architecture
 
@@ -72,6 +93,9 @@ Default configuration is in `config.yaml`.
 
 2. **Authentication Flow** (`middleware/auth.go`):
    - Users authenticate via SSH public key
+   - Existing users with muted status are rejected
+   - In closed mode (`STEGODON_CLOSED=true`), all new registrations are blocked
+   - In single-user mode (`STEGODON_SINGLE=true`), new registrations are blocked if one user already exists
    - On first connection, a random username is generated
    - On first login, users are prompted to choose their username (`ui/createuser/`)
    - Public keys are hashed and stored in SQLite for user identification

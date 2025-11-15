@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"strings"
 
+	"log"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
 	"github.com/google/uuid"
-	"log"
 )
 
 var (
@@ -229,10 +230,6 @@ func (m Model) View() string {
 			s.WriteString("\n")
 		}
 
-		// Help text
-		s.WriteString("\n")
-		s.WriteString(common.HelpStyle.Render("m: mute  k: kick  ↑/↓: navigate"))
-		s.WriteString("\n")
 	}
 
 	if m.Status != "" {

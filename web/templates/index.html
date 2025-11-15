@@ -201,6 +201,13 @@
                 position: relative;
                 padding-left: 1.8em;
             }
+            .post-text a {
+                color: #5fafff;
+                text-decoration: underline;
+            }
+            .post-text a:hover {
+                color: #7fc8ff;
+            }
             .post-text::before {
                 content: "$";
                 position: absolute;
@@ -385,7 +392,7 @@
                         </div>
                         <div class="post-content">
                             <p class="post-time">{{.TimeAgo}}</p>
-                            <p class="post-text">{{.Message}}</p>
+                            <p class="post-text">{{.MessageHTML}}</p>
                         </div>
                     </div>
                     {{end}} {{if or .HasPrev .HasNext}}
