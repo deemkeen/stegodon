@@ -5,7 +5,30 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>{{.Title}} - stegodon – ssh-first fediverse blog</title>
+
+        <!-- SEO Meta Tags -->
+        <meta name="description" content="{{.User.DisplayName}} (@{{.User.Username}}) on stegodon. {{if .User.Summary}}{{.User.Summary}}{{else}}SSH-first federated blog on the Fediverse.{{end}}" />
+        <meta name="keywords" content="{{.User.Username}}, fediverse, activitypub, blog, mastodon, federated" />
+        <meta name="author" content="{{.User.Username}}" />
+        <link rel="canonical" href="https://{{.Host}}/{{.User.Username}}" />
+
+        <!-- Open Graph / Facebook -->
+        <meta property="og:type" content="profile" />
+        <meta property="og:url" content="https://{{.Host}}/{{.User.Username}}" />
+        <meta property="og:title" content="{{.User.DisplayName}} (@{{.User.Username}}) - stegodon" />
+        <meta property="og:description" content="{{if .User.Summary}}{{.User.Summary}}{{else}}View posts from {{.User.DisplayName}} on stegodon, an SSH-first federated blog platform.{{end}}" />
+        <meta property="og:site_name" content="stegodon" />
+        <meta property="profile:username" content="{{.User.Username}}" />
+
+        <!-- Twitter Card -->
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:url" content="https://{{.Host}}/{{.User.Username}}" />
+        <meta name="twitter:title" content="{{.User.DisplayName}} (@{{.User.Username}})" />
+        <meta name="twitter:description" content="{{if .User.Summary}}{{.User.Summary}}{{else}}Posts from {{.User.DisplayName}} on stegodon{{end}}" />
+
+        <!-- Favicon -->
         <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23000'/><text x='50' y='70' text-anchor='middle' font-family='monospace' font-size='70' font-weight='bold' fill='%2300ff7f'>S</text></svg>">
+
         <style>
             * {
                 margin: 0;

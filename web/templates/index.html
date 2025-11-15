@@ -5,7 +5,29 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>{{.Title}} - stegodon – ssh-first fediverse blog</title>
+
+        <!-- SEO Meta Tags -->
+        <meta name="description" content="Stegodon is an SSH-first federated blog platform. Connect via SSH to write and share posts that federate to the Fediverse via ActivityPub." />
+        <meta name="keywords" content="fediverse, activitypub, ssh, blog, terminal, mastodon, federated, decentralized" />
+        <meta name="author" content="stegodon" />
+        <link rel="canonical" href="https://{{.Host}}/" />
+
+        <!-- Open Graph / Facebook -->
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://{{.Host}}/" />
+        <meta property="og:title" content="{{.Title}} - stegodon – ssh-first fediverse blog" />
+        <meta property="og:description" content="SSH-first federated blog platform. Connect via terminal to write posts that federate to the Fediverse via ActivityPub." />
+        <meta property="og:site_name" content="stegodon" />
+
+        <!-- Twitter Card -->
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:url" content="https://{{.Host}}/" />
+        <meta name="twitter:title" content="{{.Title}} - stegodon" />
+        <meta name="twitter:description" content="SSH-first federated blog platform connecting to the Fediverse" />
+
+        <!-- Favicon -->
         <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23000'/><text x='50' y='70' text-anchor='middle' font-family='monospace' font-size='70' font-weight='bold' fill='%2300ff7f'>S</text></svg>">
+
         <style>
             * {
                 margin: 0;
