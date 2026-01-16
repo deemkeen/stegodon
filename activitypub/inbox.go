@@ -911,6 +911,31 @@ func handleAnnounceActivityWithDeps(body []byte, username string, deps *InboxDep
 		log.Printf("Inbox: Failed to increment boost count: %v", err)
 	}
 
+	// Create notification for the note author
+	err, noteAuthor := database.ReadAccByUsername(note.CreatedBy)
+	if err == nil && noteAuthor != nil {
+		preview := note.Message
+		if len(preview) > 100 {
+			preview = preview[:100] + "..."
+		}
+		notification := &domain.Notification{
+			Id:               uuid.New(),
+			AccountId:        noteAuthor.Id,
+			NotificationType: domain.NotificationBoost,
+			ActorId:          remoteAcc.Id,
+			ActorUsername:    remoteAcc.Username,
+			ActorDomain:      remoteAcc.Domain,
+			NoteId:           note.Id,
+			NoteURI:          note.ObjectURI,
+			NotePreview:      preview,
+			Read:             false,
+			CreatedAt:        time.Now(),
+		}
+		if err := database.CreateNotification(notification); err != nil {
+			log.Printf("Inbox: Failed to create boost notification: %v", err)
+		}
+	}
+
 	log.Printf("Inbox: Stored Boost from %s on note %s", announceActivity.Actor, note.Id)
 	return nil
 }
@@ -1347,4 +1372,3 @@ func handleDeleteActivityWithDeps(body []byte, username string, deps *InboxDeps)
 
 	return nil
 }
-
