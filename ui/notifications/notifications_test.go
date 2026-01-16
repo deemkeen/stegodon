@@ -221,3 +221,379 @@ func TestView_WithNotifications(t *testing.T) {
 		t.Errorf("View should not be empty with notifications")
 	}
 }
+
+func TestUpdate_ViewNotification_WithLocalNote(t *testing.T) {
+	model := InitialModel(uuid.New(), 100, 40)
+	noteId := uuid.New()
+	createdAt := time.Now()
+
+	// Add a notification with a local note (has NoteId)
+	model.Notifications = []domain.Notification{
+		{
+			Id:               uuid.New(),
+			AccountId:        model.AccountId,
+			NotificationType: domain.NotificationLike,
+			ActorUsername:    "alice",
+			ActorDomain:      "", // Local user (no domain)
+			NoteId:           noteId,
+			NoteURI:          "https://example.com/note/123",
+			NotePreview:      "This is a test note",
+			Read:             false,
+			CreatedAt:        createdAt,
+		},
+	}
+	model.Selected = 0
+
+	// Press 'v' to view the notification
+	newModel, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+
+	if cmd == nil {
+		t.Fatal("Expected ViewThreadMsg command to be returned")
+	}
+
+	// Execute the command to get the message
+	msg := cmd()
+
+	viewMsg, ok := msg.(common.ViewThreadMsg)
+	if !ok {
+		t.Fatalf("Expected ViewThreadMsg, got %T", msg)
+	}
+
+	// Verify the ViewThreadMsg contains correct data
+	if viewMsg.NoteURI != "https://example.com/note/123" {
+		t.Errorf("Expected NoteURI 'https://example.com/note/123', got %s", viewMsg.NoteURI)
+	}
+	if viewMsg.NoteID != noteId {
+		t.Errorf("Expected NoteID %v, got %v", noteId, viewMsg.NoteID)
+	}
+	if !viewMsg.IsLocal {
+		t.Errorf("Expected IsLocal true for local note")
+	}
+	if viewMsg.Author != "alice" {
+		t.Errorf("Expected Author 'alice', got %s", viewMsg.Author)
+	}
+	if viewMsg.Content != "This is a test note" {
+		t.Errorf("Expected Content 'This is a test note', got %s", viewMsg.Content)
+	}
+	if viewMsg.CreatedAt != createdAt {
+		t.Errorf("Expected CreatedAt %v, got %v", createdAt, viewMsg.CreatedAt)
+	}
+
+	// Model should remain unchanged (no side effects)
+	if newModel.Selected != model.Selected {
+		t.Errorf("Selection should not change when viewing notification")
+	}
+}
+
+func TestUpdate_ViewNotification_WithRemoteNote(t *testing.T) {
+	model := InitialModel(uuid.New(), 100, 40)
+	noteId := uuid.New()
+	createdAt := time.Now()
+
+	// Add a notification from a remote user
+	model.Notifications = []domain.Notification{
+		{
+			Id:               uuid.New(),
+			AccountId:        model.AccountId,
+			NotificationType: domain.NotificationMention,
+			ActorUsername:    "bob",
+			ActorDomain:      "remote.social", // Remote user
+			NoteId:           noteId,
+			NoteURI:          "https://remote.social/note/456",
+			NotePreview:      "Mentioning you here!",
+			Read:             false,
+			CreatedAt:        createdAt,
+		},
+	}
+	model.Selected = 0
+
+	// Press 'v' to view the notification
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+
+	if cmd == nil {
+		t.Fatal("Expected ViewThreadMsg command to be returned")
+	}
+
+	msg := cmd()
+	viewMsg, ok := msg.(common.ViewThreadMsg)
+	if !ok {
+		t.Fatalf("Expected ViewThreadMsg, got %T", msg)
+	}
+
+	// Verify remote user format includes domain
+	expectedAuthor := "bob@remote.social"
+	if viewMsg.Author != expectedAuthor {
+		t.Errorf("Expected Author '%s', got %s", expectedAuthor, viewMsg.Author)
+	}
+	if viewMsg.IsLocal {
+		t.Errorf("Expected IsLocal false for remote note")
+	}
+	if viewMsg.NoteURI != "https://remote.social/note/456" {
+		t.Errorf("Expected NoteURI 'https://remote.social/note/456', got %s", viewMsg.NoteURI)
+	}
+}
+
+func TestUpdate_ViewNotification_ReplyType(t *testing.T) {
+	model := InitialModel(uuid.New(), 100, 40)
+	noteId := uuid.New()
+
+	// Add a reply notification
+	model.Notifications = []domain.Notification{
+		{
+			Id:               uuid.New(),
+			AccountId:        model.AccountId,
+			NotificationType: domain.NotificationReply,
+			ActorUsername:    "charlie",
+			ActorDomain:      "another.instance",
+			NoteId:           noteId,
+			NoteURI:          "https://another.instance/note/789",
+			NotePreview:      "Replying to your post",
+			Read:             false,
+			CreatedAt:        time.Now(),
+		},
+	}
+	model.Selected = 0
+
+	// Press 'v' to view the notification
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+
+	if cmd == nil {
+		t.Fatal("Expected ViewThreadMsg command for reply notification")
+	}
+
+	msg := cmd()
+	viewMsg, ok := msg.(common.ViewThreadMsg)
+	if !ok {
+		t.Fatalf("Expected ViewThreadMsg, got %T", msg)
+	}
+
+	if viewMsg.Content != "Replying to your post" {
+		t.Errorf("Expected Content 'Replying to your post', got %s", viewMsg.Content)
+	}
+}
+
+func TestUpdate_ViewNotification_FollowType_NoAction(t *testing.T) {
+	model := InitialModel(uuid.New(), 100, 40)
+
+	// Add a follow notification (no associated note)
+	model.Notifications = []domain.Notification{
+		{
+			Id:               uuid.New(),
+			AccountId:        model.AccountId,
+			NotificationType: domain.NotificationFollow,
+			ActorUsername:    "dave",
+			ActorDomain:      "example.com",
+			NoteId:           uuid.Nil,
+			NoteURI:          "",
+			Read:             false,
+			CreatedAt:        time.Now(),
+		},
+	}
+	model.Selected = 0
+
+	// Press 'v' on a follow notification
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+
+	// Should not return a command (follow notifications don't have notes)
+	if cmd != nil {
+		t.Errorf("Expected no command for follow notification, got %v", cmd)
+	}
+}
+
+func TestUpdate_ViewNotification_NoNoteData_NoAction(t *testing.T) {
+	model := InitialModel(uuid.New(), 100, 40)
+
+	// Add a like notification without note data
+	model.Notifications = []domain.Notification{
+		{
+			Id:               uuid.New(),
+			AccountId:        model.AccountId,
+			NotificationType: domain.NotificationLike,
+			ActorUsername:    "eve",
+			ActorDomain:      "",
+			NoteId:           uuid.Nil,   // No note ID
+			NoteURI:          "",          // No note URI
+			Read:             false,
+			CreatedAt:        time.Now(),
+		},
+	}
+	model.Selected = 0
+
+	// Press 'v' on a notification without note data
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+
+	// Should not return a command (no note to view)
+	if cmd != nil {
+		t.Errorf("Expected no command when notification has no note data, got %v", cmd)
+	}
+}
+
+func TestUpdate_ViewNotification_EmptyPreview(t *testing.T) {
+	model := InitialModel(uuid.New(), 100, 40)
+	noteId := uuid.New()
+
+	// Add a notification with empty preview
+	model.Notifications = []domain.Notification{
+		{
+			Id:               uuid.New(),
+			AccountId:        model.AccountId,
+			NotificationType: domain.NotificationLike,
+			ActorUsername:    "frank",
+			ActorDomain:      "",
+			NoteId:           noteId,
+			NoteURI:          "https://example.com/note/999",
+			NotePreview:      "", // Empty preview
+			Read:             false,
+			CreatedAt:        time.Now(),
+		},
+	}
+	model.Selected = 0
+
+	// Press 'v' to view the notification
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+
+	if cmd == nil {
+		t.Fatal("Expected ViewThreadMsg command even with empty preview")
+	}
+
+	msg := cmd()
+	viewMsg, ok := msg.(common.ViewThreadMsg)
+	if !ok {
+		t.Fatalf("Expected ViewThreadMsg, got %T", msg)
+	}
+
+	// Should use placeholder text for empty preview
+	expectedContent := "[No preview available]"
+	if viewMsg.Content != expectedContent {
+		t.Errorf("Expected Content '%s' for empty preview, got %s", expectedContent, viewMsg.Content)
+	}
+}
+
+func TestUpdate_ViewNotification_EmptyList_NoAction(t *testing.T) {
+	model := InitialModel(uuid.New(), 100, 40)
+	model.Notifications = []domain.Notification{} // Empty list
+	model.Selected = 0
+
+	// Press 'v' when no notifications exist
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+
+	// Should not return a command (no notifications to view)
+	if cmd != nil {
+		t.Errorf("Expected no command when notifications list is empty, got %v", cmd)
+	}
+}
+
+func TestUpdate_ViewNotification_OutOfBounds_NoAction(t *testing.T) {
+	model := InitialModel(uuid.New(), 100, 40)
+	noteId := uuid.New()
+
+	// Add one notification
+	model.Notifications = []domain.Notification{
+		{
+			Id:               uuid.New(),
+			AccountId:        model.AccountId,
+			NotificationType: domain.NotificationLike,
+			ActorUsername:    "grace",
+			ActorDomain:      "",
+			NoteId:           noteId,
+			NoteURI:          "https://example.com/note/111",
+			NotePreview:      "Test note",
+			Read:             false,
+			CreatedAt:        time.Now(),
+		},
+	}
+	model.Selected = 5 // Out of bounds
+
+	// Press 'v' when selection is out of bounds
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+
+	// Should not return a command (selection is invalid)
+	if cmd != nil {
+		t.Errorf("Expected no command when selection is out of bounds, got %v", cmd)
+	}
+}
+
+func TestUpdate_ViewNotification_WithOnlyNoteId(t *testing.T) {
+	model := InitialModel(uuid.New(), 100, 40)
+	noteId := uuid.New()
+
+	// Add a notification with only NoteId (no URI)
+	model.Notifications = []domain.Notification{
+		{
+			Id:               uuid.New(),
+			AccountId:        model.AccountId,
+			NotificationType: domain.NotificationLike,
+			ActorUsername:    "henry",
+			ActorDomain:      "",
+			NoteId:           noteId,
+			NoteURI:          "", // No URI, only ID
+			NotePreview:      "Local note only",
+			Read:             false,
+			CreatedAt:        time.Now(),
+		},
+	}
+	model.Selected = 0
+
+	// Press 'v' to view the notification
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+
+	if cmd == nil {
+		t.Fatal("Expected ViewThreadMsg command when NoteId is present")
+	}
+
+	msg := cmd()
+	viewMsg, ok := msg.(common.ViewThreadMsg)
+	if !ok {
+		t.Fatalf("Expected ViewThreadMsg, got %T", msg)
+	}
+
+	// Should still work with just NoteId
+	if viewMsg.NoteID != noteId {
+		t.Errorf("Expected NoteID %v, got %v", noteId, viewMsg.NoteID)
+	}
+	if viewMsg.NoteURI != "" {
+		t.Errorf("Expected empty NoteURI, got %s", viewMsg.NoteURI)
+	}
+}
+
+func TestUpdate_ViewNotification_WithOnlyNoteUri(t *testing.T) {
+	model := InitialModel(uuid.New(), 100, 40)
+
+	// Add a notification with only NoteURI (no local ID)
+	model.Notifications = []domain.Notification{
+		{
+			Id:               uuid.New(),
+			AccountId:        model.AccountId,
+			NotificationType: domain.NotificationMention,
+			ActorUsername:    "iris",
+			ActorDomain:      "remote.example",
+			NoteId:           uuid.Nil, // No local ID
+			NoteURI:          "https://remote.example/note/222",
+			NotePreview:      "Remote note only",
+			Read:             false,
+			CreatedAt:        time.Now(),
+		},
+	}
+	model.Selected = 0
+
+	// Press 'v' to view the notification
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+
+	if cmd == nil {
+		t.Fatal("Expected ViewThreadMsg command when NoteURI is present")
+	}
+
+	msg := cmd()
+	viewMsg, ok := msg.(common.ViewThreadMsg)
+	if !ok {
+		t.Fatalf("Expected ViewThreadMsg, got %T", msg)
+	}
+
+	// Should work with just NoteURI
+	if viewMsg.NoteURI != "https://remote.example/note/222" {
+		t.Errorf("Expected NoteURI 'https://remote.example/note/222', got %s", viewMsg.NoteURI)
+	}
+	if viewMsg.NoteID != uuid.Nil {
+		t.Errorf("Expected Nil NoteID, got %v", viewMsg.NoteID)
+	}
+}

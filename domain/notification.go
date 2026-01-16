@@ -13,6 +13,7 @@ type NotificationType string
 const (
 	NotificationFollow  NotificationType = "follow"
 	NotificationLike    NotificationType = "like"
+	NotificationBoost   NotificationType = "boost"
 	NotificationReply   NotificationType = "reply"
 	NotificationMention NotificationType = "mention"
 )
@@ -47,6 +48,8 @@ func (n *Notification) TypeLabel() string {
 		return "followed you"
 	case NotificationLike:
 		return "liked your post"
+	case NotificationBoost:
+		return "boosted your post"
 	case NotificationReply:
 		return "replied to your post"
 	case NotificationMention:
@@ -63,6 +66,8 @@ func (n *Notification) TypeIcon() string {
 		return "👤"
 	case NotificationLike:
 		return "❤️"
+	case NotificationBoost:
+		return "🔁"
 	case NotificationReply:
 		return "💬"
 	case NotificationMention:

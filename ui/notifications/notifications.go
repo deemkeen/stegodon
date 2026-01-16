@@ -120,17 +120,19 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 						content = "[No preview available]"
 					}
 					
-					// Send ViewThreadMsg to navigate to the post
-					return m, func() tea.Msg {
-						return common.ViewThreadMsg{
-							NoteURI:   notif.NoteURI,
-							NoteID:    notif.NoteId,
-							IsLocal:   notif.NoteId != uuid.Nil && notif.ActorDomain == "",
-							Author:    author,
-							Content:   content,
-							CreatedAt: notif.CreatedAt,
-						}
+				// Send ViewThreadMsg to navigate to the post
+				// Note: IsLocal should be based on the NOTE being local, not the ACTOR
+				// If NoteId is set, the note exists in our local notes table
+				return m, func() tea.Msg {
+					return common.ViewThreadMsg{
+						NoteURI:   notif.NoteURI,
+						NoteID:    notif.NoteId,
+						IsLocal:   notif.NoteId != uuid.Nil,
+						Author:    author,
+						Content:   content,
+						CreatedAt: notif.CreatedAt,
 					}
+				}
 				}
 			}
 		case "enter":
