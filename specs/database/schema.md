@@ -11,6 +11,7 @@ Stegodon uses SQLite with WAL mode for persistent storage. The schema consists o
 - **ActivityPub tables**: Federation-related data
 - **Junction tables**: Many-to-many relationships
 - **Queue tables**: Background processing
+- **Configuration tables**: `info_boxes` - Customizable UI content
 
 ---
 
@@ -383,6 +384,40 @@ CREATE TABLE IF NOT EXISTS notifications (
 CREATE INDEX IF NOT EXISTS idx_notifications_account_id ON notifications(account_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_account_read ON notifications(account_id, read);
+```
+
+---
+
+### info_boxes
+
+Stores customizable information boxes for the web UI sidebar.
+
+```sql
+CREATE TABLE IF NOT EXISTS info_boxes (
+    id TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    order_num INTEGER DEFAULT 0,
+    enabled INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+```
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | TEXT | UUID primary key |
+| `title` | TEXT | Box title (can include HTML/SVG) |
+| `content` | TEXT | Markdown-formatted content |
+| `order_num` | INTEGER | Display order (lower first) |
+| `enabled` | INTEGER | 1 if visible on web UI |
+| `created_at` | TIMESTAMP | Creation time |
+| `updated_at` | TIMESTAMP | Last modification time |
+
+**Indexes:**
+```sql
+CREATE INDEX IF NOT EXISTS idx_info_boxes_order ON info_boxes(order_num);
+CREATE INDEX IF NOT EXISTS idx_info_boxes_enabled ON info_boxes(enabled);
 ```
 
 ---

@@ -404,6 +404,25 @@ func TestUpdate_ViewNotification_NoNoteData_NoAction(t *testing.T) {
 	model := InitialModel(uuid.New(), 100, 40)
 
 	// Add a like notification without note data
+func TestUpdate_ViewNotification_EmptyList_NoAction(t *testing.T) {
+	model := InitialModel(uuid.New(), 100, 40)
+	model.Notifications = []domain.Notification{} // Empty list
+	model.Selected = 0
+
+	// Press 'v' when no notifications exist
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+
+	// Should not return a command (no notifications to view)
+	if cmd != nil {
+		t.Errorf("Expected no command when notifications list is empty, got %v", cmd)
+	}
+}
+
+func TestUpdate_FollowBack_LocalUser(t *testing.T) {
+	model := InitialModel(uuid.New(), 100, 40)
+	actorId := uuid.New()
+
+	// Add a follow notification from a local user
 	model.Notifications = []domain.Notification{
 		{
 			Id:               uuid.New(),
@@ -413,6 +432,10 @@ func TestUpdate_ViewNotification_NoNoteData_NoAction(t *testing.T) {
 			ActorDomain:      "",
 			NoteId:           uuid.Nil,   // No note ID
 			NoteURI:          "",          // No note URI
+			NotificationType: domain.NotificationFollow,
+			ActorId:          actorId,
+			ActorUsername:    "localuser",
+			ActorDomain:      "", // Local user (no domain)
 			Read:             false,
 			CreatedAt:        time.Now(),
 		},
@@ -433,6 +456,32 @@ func TestUpdate_ViewNotification_EmptyPreview(t *testing.T) {
 	noteId := uuid.New()
 
 	// Add a notification with empty preview
+	// Press 'f' to follow back
+	newModel, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+
+	if cmd == nil {
+		t.Fatal("Expected follow command to be returned")
+	}
+
+	// Status should be set indicating follow in progress
+	if newModel.Status == "" {
+		t.Errorf("Expected status message to be set")
+	}
+	if newModel.Status != "Following @localuser..." {
+		t.Errorf("Expected status 'Following @localuser...', got '%s'", newModel.Status)
+	}
+
+	// Model selection should remain unchanged
+	if newModel.Selected != 0 {
+		t.Errorf("Expected selection to remain at 0, got %d", newModel.Selected)
+	}
+}
+
+func TestUpdate_FollowBack_RemoteUser(t *testing.T) {
+	model := InitialModel(uuid.New(), 100, 40)
+	actorId := uuid.New()
+
+	// Add a follow notification from a remote user
 	model.Notifications = []domain.Notification{
 		{
 			Id:               uuid.New(),
@@ -443,6 +492,10 @@ func TestUpdate_ViewNotification_EmptyPreview(t *testing.T) {
 			NoteId:           noteId,
 			NoteURI:          "https://example.com/note/999",
 			NotePreview:      "", // Empty preview
+			NotificationType: domain.NotificationFollow,
+			ActorId:          actorId,
+			ActorUsername:    "remoteuser",
+			ActorDomain:      "mastodon.social", // Remote user
 			Read:             false,
 			CreatedAt:        time.Now(),
 		},
@@ -470,6 +523,24 @@ func TestUpdate_ViewNotification_EmptyPreview(t *testing.T) {
 }
 
 func TestUpdate_ViewNotification_EmptyList_NoAction(t *testing.T) {
+	// Press 'f' to follow back
+	newModel, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+
+	if cmd == nil {
+		t.Fatal("Expected follow command to be returned")
+	}
+
+	// Status should be set indicating follow request in progress
+	if newModel.Status == "" {
+		t.Errorf("Expected status message to be set")
+	}
+	expectedStatus := "Requesting to follow @remoteuser@mastodon.social..."
+	if newModel.Status != expectedStatus {
+		t.Errorf("Expected status '%s', got '%s'", expectedStatus, newModel.Status)
+	}
+}
+
+func TestUpdate_FollowBack_EmptyList_NoAction(t *testing.T) {
 	model := InitialModel(uuid.New(), 100, 40)
 	model.Notifications = []domain.Notification{} // Empty list
 	model.Selected = 0
@@ -478,6 +549,10 @@ func TestUpdate_ViewNotification_EmptyList_NoAction(t *testing.T) {
 	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
 
 	// Should not return a command (no notifications to view)
+	// Press 'f' when no notifications exist
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+
+	// Should not return a command (no notifications to follow)
 	if cmd != nil {
 		t.Errorf("Expected no command when notifications list is empty, got %v", cmd)
 	}
@@ -486,6 +561,9 @@ func TestUpdate_ViewNotification_EmptyList_NoAction(t *testing.T) {
 func TestUpdate_ViewNotification_OutOfBounds_NoAction(t *testing.T) {
 	model := InitialModel(uuid.New(), 100, 40)
 	noteId := uuid.New()
+func TestUpdate_FollowBack_OutOfBounds_NoAction(t *testing.T) {
+	model := InitialModel(uuid.New(), 100, 40)
+	actorId := uuid.New()
 
 	// Add one notification
 	model.Notifications = []domain.Notification{
@@ -498,6 +576,10 @@ func TestUpdate_ViewNotification_OutOfBounds_NoAction(t *testing.T) {
 			NoteId:           noteId,
 			NoteURI:          "https://example.com/note/111",
 			NotePreview:      "Test note",
+			NotificationType: domain.NotificationFollow,
+			ActorId:          actorId,
+			ActorUsername:    "alice",
+			ActorDomain:      "",
 			Read:             false,
 			CreatedAt:        time.Now(),
 		},
@@ -506,6 +588,8 @@ func TestUpdate_ViewNotification_OutOfBounds_NoAction(t *testing.T) {
 
 	// Press 'v' when selection is out of bounds
 	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+	// Press 'f' when selection is out of bounds
+	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
 
 	// Should not return a command (selection is invalid)
 	if cmd != nil {
@@ -518,6 +602,11 @@ func TestUpdate_ViewNotification_WithOnlyNoteId(t *testing.T) {
 	noteId := uuid.New()
 
 	// Add a notification with only NoteId (no URI)
+func TestUpdate_FollowBack_NonFollowNotification(t *testing.T) {
+	model := InitialModel(uuid.New(), 100, 40)
+	actorId := uuid.New()
+
+	// Add a like notification (not a follow)
 	model.Notifications = []domain.Notification{
 		{
 			Id:               uuid.New(),
@@ -528,6 +617,11 @@ func TestUpdate_ViewNotification_WithOnlyNoteId(t *testing.T) {
 			NoteId:           noteId,
 			NoteURI:          "", // No URI, only ID
 			NotePreview:      "Local note only",
+			ActorId:          actorId,
+			ActorUsername:    "bob",
+			ActorDomain:      "",
+			NoteId:           uuid.New(),
+			NotePreview:      "Liked your post",
 			Read:             false,
 			CreatedAt:        time.Now(),
 		},
@@ -596,4 +690,120 @@ func TestUpdate_ViewNotification_WithOnlyNoteUri(t *testing.T) {
 	if viewMsg.NoteID != uuid.Nil {
 		t.Errorf("Expected Nil NoteID, got %v", viewMsg.NoteID)
 	}
+	// Press 'f' on a like notification
+	newModel, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+
+	// Should still allow following (f works on any notification)
+	if cmd == nil {
+		t.Fatal("Expected follow command to be returned")
+	}
+
+	// Status should be set
+	if newModel.Status == "" {
+		t.Errorf("Expected status message to be set")
+	}
+}
+
+func TestUpdate_FollowResultMsg_Success(t *testing.T) {
+	model := InitialModel(uuid.New(), 100, 40)
+
+	// Simulate successful follow
+	msg := followResultMsg{
+		username: "@testuser",
+		err:      nil,
+	}
+
+	newModel, cmd := model.Update(msg)
+
+	// Should show success status
+	expectedStatus := "✓ Following @testuser"
+	if newModel.Status != expectedStatus {
+		t.Errorf("Expected status '%s', got '%s'", expectedStatus, newModel.Status)
+	}
+	if newModel.Error != "" {
+		t.Errorf("Expected no error, got '%s'", newModel.Error)
+	}
+
+	// Should schedule status clear
+	if cmd == nil {
+		t.Errorf("Expected clear status command")
+	}
+}
+
+func TestUpdate_FollowResultMsg_AlreadyFollowing(t *testing.T) {
+	model := InitialModel(uuid.New(), 100, 40)
+
+	// Simulate already following error
+	msg := followResultMsg{
+		username: "@testuser",
+		err:      &testError{msg: "already following"},
+	}
+
+	newModel, cmd := model.Update(msg)
+
+	// Should show info status (not error)
+	if newModel.Status == "" {
+		t.Errorf("Expected status message to be set")
+	}
+	if newModel.Error != "" {
+		t.Errorf("Expected no error for 'already following', got '%s'", newModel.Error)
+	}
+
+	// Should schedule status clear
+	if cmd == nil {
+		t.Errorf("Expected clear status command")
+	}
+}
+
+func TestUpdate_FollowResultMsg_GenericError(t *testing.T) {
+	model := InitialModel(uuid.New(), 100, 40)
+
+	// Simulate generic follow error
+	msg := followResultMsg{
+		username: "@testuser",
+		err:      &testError{msg: "network error"},
+	}
+
+	newModel, cmd := model.Update(msg)
+
+	// Should show error
+	if newModel.Error == "" {
+		t.Errorf("Expected error message to be set")
+	}
+	if newModel.Status != "" {
+		t.Errorf("Expected no status for generic error, got '%s'", newModel.Status)
+	}
+
+	// Should schedule status clear
+	if cmd == nil {
+		t.Errorf("Expected clear status command")
+	}
+}
+
+func TestUpdate_ClearStatusMsg(t *testing.T) {
+	model := InitialModel(uuid.New(), 100, 40)
+	model.Status = "Test status"
+	model.Error = "Test error"
+
+	newModel, cmd := model.Update(clearStatusMsg{})
+
+	// Should clear both status and error
+	if newModel.Status != "" {
+		t.Errorf("Expected status to be cleared, got '%s'", newModel.Status)
+	}
+	if newModel.Error != "" {
+		t.Errorf("Expected error to be cleared, got '%s'", newModel.Error)
+	}
+	if cmd != nil {
+		t.Errorf("Expected no command, got %v", cmd)
+	}
+}
+
+// testError is a simple error type for testing
+type testError struct {
+	msg string
+}
+
+func (e *testError) Error() string {
+	return e.msg
 }

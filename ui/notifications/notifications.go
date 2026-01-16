@@ -8,9 +8,12 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/deemkeen/stegodon/activitypub"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
+	"github.com/deemkeen/stegodon/util"
+	"github.com/deemkeen/stegodon/web"
 	"github.com/google/uuid"
 )
 
@@ -28,6 +31,8 @@ type Model struct {
 	Height        int
 	isActive      bool
 	UnreadCount   int
+	Status        string
+	Error         string
 }
 
 type notificationsLoadedMsg struct {
@@ -36,6 +41,105 @@ type notificationsLoadedMsg struct {
 }
 
 type refreshTickMsg struct{}
+
+// clearStatusMsg is sent after a delay to clear status/error messages
+type clearStatusMsg struct{}
+
+// clearStatusAfter returns a command that sends clearStatusMsg after a duration
+func clearStatusAfter(d time.Duration) tea.Cmd {
+	return tea.Tick(d, func(t time.Time) tea.Msg {
+		return clearStatusMsg{}
+	})
+}
+
+// followResultMsg is sent when the follow operation completes
+type followResultMsg struct {
+	username string
+	err      error
+}
+
+// followLocalUserCmd returns a command that follows a local user
+func followLocalUserCmd(followerId, targetId uuid.UUID) tea.Cmd {
+	return func() tea.Msg {
+		database := db.GetDB()
+		
+		// Check if already following
+		isFollowing, err := database.IsFollowingLocal(followerId, targetId)
+		if err != nil {
+			return followResultMsg{username: "user", err: err}
+		}
+		
+		if isFollowing {
+			return followResultMsg{username: "user", err: fmt.Errorf("already following")}
+		}
+		
+		// Create follow
+		err = database.CreateLocalFollow(followerId, targetId)
+		if err != nil {
+			return followResultMsg{username: "user", err: err}
+		}
+		
+		// Get target username for success message
+		err, targetUser := database.ReadAccById(targetId)
+		username := "user"
+		if err == nil && targetUser != nil {
+			username = "@" + targetUser.Username
+			
+			// Create notification for the followed user
+			err, follower := database.ReadAccById(followerId)
+			if err == nil && follower != nil {
+				notification := &domain.Notification{
+					Id:               uuid.New(),
+					AccountId:        targetId,
+					NotificationType: domain.NotificationFollow,
+					ActorId:          followerId,
+					ActorUsername:    follower.Username,
+					ActorDomain:      "", // Empty for local users
+					Read:             false,
+					CreatedAt:        time.Now(),
+				}
+				if err := database.CreateNotification(notification); err != nil {
+					log.Printf("Failed to create follow notification: %v", err)
+				}
+			}
+		}
+		
+		return followResultMsg{username: username, err: nil}
+	}
+}
+
+// followRemoteUserCmd returns a command that follows a remote user
+func followRemoteUserCmd(accountId uuid.UUID, username, domain string) tea.Cmd {
+	return func() tea.Msg {
+		fullUsername := fmt.Sprintf("%s@%s", username, domain)
+		
+		// Get local account
+		database := db.GetDB()
+		err, localAccount := database.ReadAccById(accountId)
+		if err != nil {
+			return followResultMsg{username: fullUsername, err: err}
+		}
+
+		// Resolve WebFinger to get actor URI
+		actorURI, err := web.ResolveWebFinger(username, domain)
+		if err != nil {
+			return followResultMsg{username: fullUsername, err: fmt.Errorf("webfinger failed: %w", err)}
+		}
+
+		// Get config
+		conf, err := util.ReadConf()
+		if err != nil {
+			return followResultMsg{username: fullUsername, err: err}
+		}
+
+		// Send Follow activity
+		if err := activitypub.SendFollow(localAccount, actorURI, conf); err != nil {
+			return followResultMsg{username: fullUsername, err: err}
+		}
+
+		return followResultMsg{username: fullUsername, err: nil}
+	}
+}
 
 func InitialModel(accountId uuid.UUID, width, height int) Model {
 	return Model{
@@ -47,6 +151,8 @@ func InitialModel(accountId uuid.UUID, width, height int) Model {
 		Height:        height,
 		isActive:      false,
 		UnreadCount:   0,
+		Status:        "",
+		Error:         "",
 	}
 }
 
@@ -84,6 +190,34 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case refreshTickMsg:
 		// Always refresh to keep badge count updated
 		return m, loadNotifications(m.AccountId)
+
+	case clearStatusMsg:
+		m.Status = ""
+		m.Error = ""
+		return m, nil
+
+	case followResultMsg:
+		if msg.err != nil {
+			// Check error type (case-insensitive)
+			errMsg := strings.ToLower(msg.err.Error())
+			if strings.Contains(errMsg, "already following") {
+				m.Status = fmt.Sprintf("ℹ Already following %s", msg.username)
+				m.Error = ""
+			} else if strings.Contains(errMsg, "follow pending") {
+				m.Status = fmt.Sprintf("ℹ Follow request pending for %s", msg.username)
+				m.Error = ""
+			} else if strings.Contains(errMsg, "self-follow not allowed") {
+				m.Status = "ℹ Self-follow not allowed"
+				m.Error = ""
+			} else {
+				m.Error = fmt.Sprintf("Failed to follow %s: %v", msg.username, msg.err)
+				m.Status = ""
+			}
+		} else {
+			m.Status = fmt.Sprintf("✓ Following %s", msg.username)
+			m.Error = ""
+		}
+		return m, clearStatusAfter(3 * time.Second)
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -133,6 +267,22 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 						CreatedAt: notif.CreatedAt,
 					}
 				}
+				}
+			}
+		case "f":
+			// Follow user back
+			if m.Selected < len(m.Notifications) {
+				notif := m.Notifications[m.Selected]
+				
+				// Determine if local or remote
+				if notif.ActorDomain == "" {
+					// Local user
+					m.Status = fmt.Sprintf("Following @%s...", notif.ActorUsername)
+					return m, followLocalUserCmd(m.AccountId, notif.ActorId)
+				} else {
+					// Remote user
+					m.Status = fmt.Sprintf("Requesting to follow @%s@%s...", notif.ActorUsername, notif.ActorDomain)
+					return m, followRemoteUserCmd(m.AccountId, notif.ActorUsername, notif.ActorDomain)
 				}
 			}
 		case "enter":
@@ -216,6 +366,16 @@ func (m Model) View() string {
 	if len(m.Notifications) > itemsPerPage {
 		pageInfo := fmt.Sprintf("Showing %d-%d of %d", start+1, end, len(m.Notifications))
 		s.WriteString("\n" + common.ListBadgeStyle.Render(pageInfo))
+	}
+
+	if m.Status != "" {
+		s.WriteString("\n")
+		s.WriteString(common.ListStatusStyle.Render(m.Status))
+	}
+
+	if m.Error != "" {
+		s.WriteString("\n")
+		s.WriteString(common.ListErrorStyle.Render(m.Error))
 	}
 
 	return s.String()

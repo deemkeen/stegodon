@@ -377,6 +377,43 @@ fmt.Sprintf("\033[38;5;48;4m\033]8;;%s\033\\%s\033]8;;\033\\\033[39;24m",
 
 ---
 
+## Template Placeholder Processing
+
+### ReplacePlaceholders
+
+Replaces template placeholders in text with actual configuration values.
+
+```go
+func ReplacePlaceholders(text string, sshPort int) string {
+    text = strings.ReplaceAll(text, "{{SSH_PORT}}", fmt.Sprintf("%d", sshPort))
+    return text
+}
+```
+
+### Supported Placeholders
+
+| Placeholder | Replaced With | Example |
+|-------------|---------------|---------|
+| `{{SSH_PORT}}` | SSH port number | `23232` |
+
+### Use Cases
+
+Used primarily in info box content rendering:
+
+```go
+// Before rendering info box content
+content := util.ReplacePlaceholders(box.Content, conf.Conf.SshPort)
+htmlContent := convertMarkdownToHTML(content)
+```
+
+Example transformation:
+```
+Input:  "ssh -p {{SSH_PORT}} example.com"
+Output: "ssh -p 23232 example.com"
+```
+
+---
+
 ## Source Files
 
 - `util/util.go` - All text processing functions

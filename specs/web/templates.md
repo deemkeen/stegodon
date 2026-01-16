@@ -101,15 +101,16 @@ All templates receive these common fields:
 
 ```go
 type IndexPageData struct {
-    Title    string
-    Host     string
-    SSHPort  int
-    Version  string
-    Posts    []PostView
-    HasPrev  bool
-    HasNext  bool
-    PrevPage int
-    NextPage int
+    Title     string
+    Host      string
+    SSHPort   int
+    Version   string
+    Posts     []PostView
+    HasPrev   bool
+    HasNext   bool
+    PrevPage  int
+    NextPage  int
+    InfoBoxes []InfoBoxView
 }
 ```
 
@@ -128,6 +129,7 @@ type ProfilePageData struct {
     HasNext    bool
     PrevPage   int
     NextPage   int
+    InfoBoxes  []InfoBoxView
 }
 ```
 
@@ -143,6 +145,7 @@ type SinglePostPageData struct {
     User       UserView
     ParentPost *PostView   // nil if not a reply
     Replies    []PostView
+    InfoBoxes  []InfoBoxView
 }
 ```
 
@@ -161,6 +164,17 @@ type TagPageData struct {
     HasNext    bool
     PrevPage   int
     NextPage   int
+    InfoBoxes  []InfoBoxView
+}
+```
+
+### InfoBoxView
+
+```go
+type InfoBoxView struct {
+    Title       string        // Plain text title (auto-escaped)
+    TitleHTML   template.HTML // Title rendered as markdown/HTML
+    ContentHTML template.HTML // Sanitized HTML content from markdown
 }
 ```
 
@@ -464,6 +478,85 @@ Post text uses terminal-style prefix:
     color: #7fc8ff;
 }
 ```
+
+---
+
+## Info Box Rendering
+
+Info boxes are rendered in the sidebar on all pages:
+
+### Template Structure
+
+```html
+<div class="sidebar">
+    {{range .InfoBoxes}}
+    <div class="info-section">
+        <h3>{{.TitleHTML}}</h3>
+        {{.ContentHTML}}
+    </div>
+    {{end}}
+</div>
+```
+
+### CSS Styling
+
+```css
+.info-section {
+    background: #111;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+    border: 1px solid #333;
+}
+
+.info-section h3 {
+    color: #00ff7f;
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1em;
+    display: flex;
+    align-items: center;
+}
+
+.info-section p {
+    margin: 10px 0;
+}
+
+.info-section pre {
+    background: #000;
+    padding: 10px;
+    border-radius: 4px;
+    overflow-x: auto;
+}
+
+.info-section code {
+    background: #333;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.info-section a {
+    color: #5fafff;
+}
+```
+
+### Content Features
+
+| Feature | Rendering |
+|---------|-----------|
+| Markdown headers | Styled `<h1>`-`<h6>` |
+| Code blocks | `<pre><code>` with dark background |
+| Links | Blue color, opens in new tab |
+| Lists | Standard HTML lists |
+| SVG icons in title | Inline rendering |
+
+### Placeholder Replacement
+
+Before rendering, placeholders are replaced:
+
+| Placeholder | Replaced With |
+|-------------|---------------|
+| `{{SSH_PORT}}` | Configured SSH port value |
 
 ---
 

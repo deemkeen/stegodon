@@ -76,6 +76,7 @@ func (db *DB) createTableIfNotExists(tx *sql.Tx, createSQL string, tableName str
 | `note_mentions` | Note-mention junction |
 | `relays` | Relay subscriptions |
 | `notifications` | User notifications |
+| `info_boxes` | Web UI information boxes |
 
 ---
 
@@ -227,6 +228,46 @@ func (db *DB) fixOrphanedUpdateActivities(tx *sql.Tx) error {
 
 **Use case**: User followed after original post, only received Update.
 
+### Seed Default Info Boxes
+
+Creates default info boxes on first run:
+
+```go
+func (db *DB) seedDefaultInfoBoxes(tx *sql.Tx) error {
+    // Check if any info boxes already exist
+    var count int
+    err := tx.QueryRow(`SELECT COUNT(*) FROM info_boxes`).Scan(&count)
+    if count > 0 {
+        return nil  // Skip if already seeded
+    }
+
+    // Seed default boxes
+    defaultBoxes := []struct {
+        title    string
+        content  string
+        orderNum int
+    }{
+        {title: "ssh-first fediverse blog", content: "...", orderNum: 1},
+        {title: "features", content: "...", orderNum: 2},
+        {title: "<svg>...</svg>github", content: "...", orderNum: 3},
+    }
+
+    for _, box := range defaultBoxes {
+        tx.Exec(`INSERT INTO info_boxes (id, title, content, order_num, ...) VALUES (...)`)
+    }
+}
+```
+
+**Default boxes:**
+
+| Order | Title | Content |
+|-------|-------|---------|
+| 1 | "ssh-first fediverse blog" | SSH connection instructions with `{{SSH_PORT}}` placeholder |
+| 2 | "features" | Feature list (posts, follows, federation, RSS) |
+| 3 | "(GitHub SVG icon) github" | Link to GitHub repository |
+
+---
+
 ### Add Username Unique Constraint
 
 Handles duplicate usernames before adding UNIQUE constraint:
@@ -286,6 +327,7 @@ Can be called separately from main migration for existing databases.
 3. **Extend tables** - `ALTER TABLE ADD COLUMN`
 4. **Backfill data** - Object URIs, reply counts
 5. **Fix data** - Orphaned updates, duplicate usernames
+6. **Seed defaults** - Default info boxes
 
 ---
 
@@ -298,6 +340,7 @@ Can be called separately from main migration for existing databases.
 | Add column | Yes | Error suppression |
 | Backfill | Yes | Skip check |
 | Data fix | Yes | Only processes unfixed |
+| Seed defaults | Yes | Count check (skip if > 0) |
 
 ---
 
@@ -316,6 +359,8 @@ Renamed duplicate username 'admin' (id: xxx) to 'admin_2'
 Added UNIQUE constraint to accounts.username column
 Completed backfilling reply counts
 Converted 3 orphaned Update activities to Create
+Info boxes already exist, skipping seed
+Seeded 3 default info boxes
 ```
 
 ---

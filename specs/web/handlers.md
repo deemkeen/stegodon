@@ -21,15 +21,16 @@ Web UI handlers render HTML pages using embedded templates. They provide:
 
 ```go
 type IndexPageData struct {
-    Title    string
-    Host     string
-    SSHPort  int
-    Version  string
-    Posts    []PostView
-    HasPrev  bool
-    HasNext  bool
-    PrevPage int
-    NextPage int
+    Title     string
+    Host      string
+    SSHPort   int
+    Version   string
+    Posts     []PostView
+    HasPrev   bool
+    HasNext   bool
+    PrevPage  int
+    NextPage  int
+    InfoBoxes []InfoBoxView
 }
 ```
 
@@ -48,6 +49,7 @@ type ProfilePageData struct {
     HasNext    bool
     PrevPage   int
     NextPage   int
+    InfoBoxes  []InfoBoxView
 }
 ```
 
@@ -63,6 +65,7 @@ type SinglePostPageData struct {
     User       UserView
     ParentPost *PostView   // Parent if reply (nil otherwise)
     Replies    []PostView  // Replies to this post
+    InfoBoxes  []InfoBoxView
 }
 ```
 
@@ -81,6 +84,17 @@ type TagPageData struct {
     HasNext    bool
     PrevPage   int
     NextPage   int
+    InfoBoxes  []InfoBoxView
+}
+```
+
+### InfoBoxView
+
+```go
+type InfoBoxView struct {
+    Title       string        // Plain text title (auto-escaped)
+    TitleHTML   template.HTML // Title rendered as markdown/HTML
+    ContentHTML template.HTML // Sanitized HTML content from markdown
 }
 ```
 
@@ -432,6 +446,70 @@ if note.CreatedBy != username {
 | `post.html` | HandleSinglePost | Single post with thread |
 | `tag.html` | HandleTagFeed | Hashtag feed |
 | `base.html` | (errors) | Error pages |
+
+---
+
+## Info Box Loading
+
+All handlers load info boxes for sidebar display:
+
+```go
+// Load info boxes for the page
+var infoBoxViews []InfoBoxView
+err, infoBoxes := database.ReadEnabledInfoBoxes()
+if err == nil && infoBoxes != nil {
+    for _, box := range *infoBoxes {
+        // Replace placeholders first (e.g., {{SSH_PORT}})
+        content := util.ReplacePlaceholders(box.Content, conf.Conf.SshPort)
+
+        // Convert markdown to HTML
+        htmlContent := convertMarkdownToHTML(content)
+
+        // Render title as markdown too (for HTML/SVG icons)
+        titleHTML := convertMarkdownToHTML(box.Title)
+
+        infoBoxViews = append(infoBoxViews, InfoBoxView{
+            Title:       box.Title,
+            TitleHTML:   template.HTML(titleHTML),
+            ContentHTML: template.HTML(htmlContent),
+        })
+    }
+}
+```
+
+### Markdown Conversion
+
+Uses the `gomarkdown/markdown` library with extensions:
+
+```go
+func convertMarkdownToHTML(md string) string {
+    // Extensions: CommonExtensions, AutoHeadingIDs, NoEmptyLineBeforeBlock, Strikethrough
+    extensions := parser.CommonExtensions | parser.AutoHeadingIDs |
+                  parser.NoEmptyLineBeforeBlock | parser.Strikethrough
+    p := parser.NewWithExtensions(extensions)
+    doc := p.Parse([]byte(md))
+
+    // HTML renderer with CommonFlags and HrefTargetBlank
+    htmlFlags := html.CommonFlags | html.HrefTargetBlank
+    opts := html.RendererOptions{Flags: htmlFlags}
+    renderer := html.NewRenderer(opts)
+
+    return string(markdown.Render(doc, renderer))
+}
+```
+
+### Supported Markdown Features
+
+| Feature | Example |
+|---------|---------|
+| Headers | `# H1`, `## H2` |
+| Bold | `**bold**` |
+| Italic | `*italic*` |
+| Strikethrough | `~~strikethrough~~` |
+| Links | `[text](url)` |
+| Code blocks | Triple backticks |
+| Inline code | Single backticks |
+| Lists | `- item` or `1. item` |
 
 ---
 

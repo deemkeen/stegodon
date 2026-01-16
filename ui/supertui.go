@@ -793,7 +793,7 @@ func (m MainModel) View() string {
 		case common.FollowUserView:
 			viewCommands = "enter: follow"
 		case common.FollowersView:
-			viewCommands = "↑/↓: scroll"
+			viewCommands = "↑/↓: scroll • f: follow back"
 		case common.FollowingView:
 			viewCommands = "↑/↓ • u/enter: unfollow"
 		case common.LocalUsersView:
@@ -821,7 +821,7 @@ func (m MainModel) View() string {
 		case common.ThreadView:
 			viewCommands = "↑/↓ • enter: thread • r: reply • l: ⭐ • o: URL • esc: back"
 		case common.NotificationsView:
-			viewCommands = "j/k: nav • v: view post • enter: delete • a: delete all"
+			viewCommands = "j/k: nav • v: view • f: follow • enter: del • a: del all"
 		default:
 			viewCommands = " "
 		}

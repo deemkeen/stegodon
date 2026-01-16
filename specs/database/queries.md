@@ -442,6 +442,76 @@ func (db *DB) ReadAccById(id uuid.UUID) (error, *domain.Account) {
 
 ---
 
+## Info Box Queries
+
+### SQL Definitions
+
+```go
+const (
+    sqlSelectAllInfoBoxes     = `SELECT id, title, content, order_num, enabled, created_at, updated_at
+                                 FROM info_boxes ORDER BY order_num ASC`
+    sqlSelectEnabledInfoBoxes = `SELECT id, title, content, order_num, enabled, created_at, updated_at
+                                 FROM info_boxes WHERE enabled = 1 ORDER BY order_num ASC`
+    sqlSelectInfoBoxById      = `SELECT id, title, content, order_num, enabled, created_at, updated_at
+                                 FROM info_boxes WHERE id = ?`
+    sqlInsertInfoBox          = `INSERT INTO info_boxes(id, title, content, order_num, enabled, created_at, updated_at)
+                                 VALUES (?, ?, ?, ?, ?, ?, ?)`
+    sqlUpdateInfoBox          = `UPDATE info_boxes SET title = ?, content = ?, order_num = ?, enabled = ?, updated_at = ?
+                                 WHERE id = ?`
+    sqlDeleteInfoBox          = `DELETE FROM info_boxes WHERE id = ?`
+    sqlToggleInfoBoxEnabled   = `UPDATE info_boxes SET enabled = NOT enabled, updated_at = ? WHERE id = ?`
+)
+```
+
+### Read Operations
+
+```go
+// ReadAllInfoBoxes returns all info boxes ordered by order_num
+func (db *DB) ReadAllInfoBoxes() (error, *[]domain.InfoBox)
+
+// ReadEnabledInfoBoxes returns only enabled info boxes (for web display)
+func (db *DB) ReadEnabledInfoBoxes() (error, *[]domain.InfoBox)
+
+// ReadInfoBoxById returns a single info box
+func (db *DB) ReadInfoBoxById(id uuid.UUID) (error, *domain.InfoBox)
+```
+
+### Write Operations
+
+```go
+// CreateInfoBox creates a new info box
+func (db *DB) CreateInfoBox(box *domain.InfoBox) error
+
+// UpdateInfoBox updates an existing info box
+func (db *DB) UpdateInfoBox(box *domain.InfoBox) error
+
+// DeleteInfoBox removes an info box
+func (db *DB) DeleteInfoBox(id uuid.UUID) error
+
+// ToggleInfoBoxEnabled flips the enabled status
+func (db *DB) ToggleInfoBoxEnabled(id uuid.UUID) error
+```
+
+### Boolean Handling
+
+SQLite stores booleans as integers:
+
+```go
+// Reading
+var enabled int
+rows.Scan(&idStr, &box.Title, &box.Content, &box.OrderNum, &enabled, ...)
+box.Enabled = enabled == 1
+
+// Writing
+enabledInt := 0
+if box.Enabled {
+    enabledInt = 1
+}
+tx.Exec(sqlInsertInfoBox, ..., enabledInt, ...)
+```
+
+---
+
 ## Source Files
 
 - `db/db.go` - All query implementations

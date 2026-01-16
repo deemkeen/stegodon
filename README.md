@@ -212,11 +212,26 @@ go build
 - **Database:** SQLite with WAL mode
 - **Federation:** Custom ActivityPub implementation with HTTP signatures
 
+## CLI Mode
+
+Stegodon supports non-interactive CLI commands for scripting and automation:
+
+```bash
+ssh -p 23232 localhost post "Hello world"
+ssh -p 23232 localhost timeline -j
+echo "Content" | ssh -p 23232 localhost post -
+```
+
+All commands support `--json` / `-j` for machine-readable output. See [cli/CLI.md](cli/CLI.md) for full documentation.
+
 ## Documentation
 
+- [cli/CLI.md](cli/CLI.md) - CLI mode commands and JSON output
 - [DATABASE.md](DATABASE.md) - Database schema and tables
 - [FEDERATION.md](FEDERATION.md) - ActivityPub federation details
 - [DOCKER.md](DOCKER.md) - Docker deployment guide
+
+For detailed technical specifications covering the TUI architecture, ActivityPub federation, database schema, and all subsystems, see [specs/overview.md](specs/overview.md).
 
 ## License
 

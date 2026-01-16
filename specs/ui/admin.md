@@ -1,56 +1,120 @@
 # Admin Panel View
 
-This document specifies the Admin Panel view, which provides user management capabilities for administrators.
+This document specifies the Admin Panel view, which provides user and content management capabilities for administrators.
 
 ---
 
 ## Overview
 
-The Admin Panel is an admin-only view for managing users on the server. It supports:
-- Viewing all registered users with their status
-- Muting users (deletes their posts)
-- Kicking users (deletes their account)
+The Admin Panel is an admin-only view with two main functions:
+- **User Management**: View, mute, and kick users
+- **Info Box Management**: Create, edit, delete, and toggle web UI info boxes
+
+---
+
+## View Architecture
+
+The admin panel uses a menu-based navigation system:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ admin panel                                                 │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│ MenuView (default)                                          │
+│   › user management                                         │
+│     info boxes                                              │
+│                                                              │
+│ ─────────────────────────────────────────────────────────   │
+│ enter: select                                               │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## Data Structure
 
 ```go
+type AdminView int
+
+const (
+    MenuView AdminView = iota
+    UsersView
+    InfoBoxesView
+)
+
 type Model struct {
-    AdminId  uuid.UUID
-    Users    []domain.Account
-    Selected int
-    Offset   int               // Pagination offset
-    Width    int
-    Height   int
-    Status   string            // Success message
-    Error    string            // Error message
+    AdminId       uuid.UUID
+    CurrentView   AdminView
+    MenuSelected  int
+
+    // User management
+    Users         []domain.Account
+    Selected      int
+    Offset        int
+
+    // Info boxes management
+    InfoBoxes     []domain.InfoBox
+    BoxSelected   int
+    BoxOffset     int
+    Editing       bool
+    EditBox       *domain.InfoBox
+    EditField     int              // 0=Title, 1=Content, 2=Order
+    TitleInput    textarea.Model
+    ContentInput  textarea.Model
+    OrderInput    textarea.Model
+    ConfirmDelete bool
+    DeleteBoxId   uuid.UUID
+
+    Width         int
+    Height        int
+    Status        string
+    Error         string
 }
 ```
 
 ---
 
-## View Layout
+## Menu View
+
+### Layout
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ admin panel (5 users)                                        │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│ ▸ @alice [ADMIN]                                             │  ← Selected, admin badge
-│   @bob                                                       │
-│   @charlie [MUTED]                                           │  ← Muted user (red text)
-│   @diana                                                     │
-│   @eve                                                       │
-│                                                              │
-│ User muted and posts deleted                                 │  ← Status message
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+admin panel
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+› user management
+  info boxes
 ```
+
+### Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `↑` / `k` | Move selection up |
+| `↓` / `j` | Move selection down |
+| `Enter` | Enter selected submenu |
 
 ---
 
-## Keyboard Shortcuts
+## User Management View
+
+### Layout
+
+```
+admin panel > users (5 users)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+› @alice [ADMIN]
+  @bob
+  @charlie [MUTED]
+  @diana
+  @eve
+
+User muted and posts deleted
+```
+
+### Keyboard Shortcuts
 
 | Key | Action |
 |-----|--------|
@@ -58,281 +122,284 @@ type Model struct {
 | `↓` / `j` | Move selection down |
 | `m` | Mute selected user |
 | `K` | Kick selected user (capital K to prevent accidents) |
+| `Esc` | Return to menu |
+
+### User Badges
+
+| Badge | Style | Meaning |
+|-------|-------|---------|
+| `[ADMIN]` | Dim color | Admin user |
+| `[MUTED]` | Error/red color | Muted user |
+
+### Muting Users
+
+Muting a user:
+- Sets `Muted` flag to true
+- Deletes all their posts
+- Prevents new post creation
+
+**Restrictions:**
+- Cannot mute admin users
+- Cannot mute yourself
+- Cannot mute already-muted users
+
+### Kicking Users
+
+Kicking a user (capital `K` for safety):
+- Completely deletes their account
+- Removes all notes, follows, activities, notifications
+
+**Restrictions:**
+- Cannot kick admin users
+- Cannot kick yourself
 
 ---
 
-## User Badges
+## Info Boxes Management View
 
-Users display status badges:
+### List Layout
 
-```go
-var badges []string
+```
+admin panel > info boxes (3 boxes)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-if user.IsAdmin {
-    badges = append(badges, "[ADMIN]")
-}
-if user.Muted {
-    badges = append(badges, "[MUTED]")
-}
+› [1] ssh-first fediverse blog [ENABLED]
+  [2] features [ENABLED]
+  [3] github [DISABLED]
 
-badge := ""
-if len(badges) > 0 {
-    badge = " " + strings.Join(badges, " ")
-}
+Info box saved successfully
 ```
 
----
+### List Keyboard Shortcuts
 
-## Muting Users
+| Key | Action |
+|-----|--------|
+| `↑` / `k` | Move selection up |
+| `↓` / `j` | Move selection down |
+| `n` | Create new info box |
+| `Enter` | Edit selected info box |
+| `d` | Delete selected info box |
+| `t` | Toggle enabled/disabled |
+| `Esc` | Return to menu |
 
-Muting a user deletes their posts and prevents them from posting new content.
+### Edit Mode Layout
 
-### Restrictions
+```
+admin panel > info boxes > editing
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-```go
-case "m":
-    if len(m.Users) > 0 && m.Selected < len(m.Users) {
-        selectedUser := m.Users[m.Selected]
+Title:
+┌──────────────────────────────────────────────────────────┐
+│ ssh-first fediverse blog                                 │
+└──────────────────────────────────────────────────────────┘
 
-        // Can't mute admin
-        if selectedUser.IsAdmin {
-            m.Error = "Cannot mute admin user"
-            return m, nil
-        }
+Content (Markdown):
+┌──────────────────────────────────────────────────────────┐
+│ Connect via SSH to start posting:                        │
+│                                                          │
+│ ```                                                      │
+│ ssh -p {{SSH_PORT}} YourDomain                          │
+│ ```                                                      │
+└──────────────────────────────────────────────────────────┘
 
-        // Can't mute yourself
-        if selectedUser.Id == m.AdminId {
-            m.Error = "Cannot mute yourself"
-            return m, nil
-        }
+Order:
+┌──────────────────────────────────────────────────────────┐
+│ 1                                                        │
+└──────────────────────────────────────────────────────────┘
 
-        // Already muted
-        if selectedUser.Muted {
-            m.Error = "User is already muted"
-            return m, nil
-        }
-
-        return m, muteUser(selectedUser.Id)
-    }
+tab/shift+tab: switch • ctrl+s: save • esc: cancel
 ```
 
-### Mute Command
+### Edit Mode Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `Tab` | Move to next field |
+| `Shift+Tab` | Move to previous field |
+| `Ctrl+S` | Save changes |
+| `Esc` | Cancel editing (discard changes) |
+
+### Edit Fields
+
+| Field | Input Type | Description |
+|-------|------------|-------------|
+| Title | Single-line textarea | Box title (can include HTML/SVG) |
+| Content | Multi-line textarea | Markdown content |
+| Order | Single-line textarea | Display order number |
+
+### Textarea Configuration
 
 ```go
-func muteUser(userId uuid.UUID) tea.Cmd {
-    return func() tea.Msg {
-        database := db.GetDB()
-        err := database.MuteUser(userId)
-        if err != nil {
-            log.Printf("Failed to mute user: %v", err)
-        }
-        return muteUserMsg{userId: userId}
-    }
-}
-```
-
-### Result Handling
-
-```go
-case muteUserMsg:
-    m.Status = "User muted and posts deleted"
-    m.Error = ""
-    return m, loadUsers()
-```
-
----
-
-## Kicking Users
-
-Kicking a user completely deletes their account. Uses capital `K` to prevent accidental kicks.
-
-### Restrictions
-
-```go
-case "K":  // Capital K for safety
-    if len(m.Users) > 0 && m.Selected < len(m.Users) {
-        selectedUser := m.Users[m.Selected]
-
-        // Can't kick admin
-        if selectedUser.IsAdmin {
-            m.Error = "Cannot kick admin user"
-            return m, nil
-        }
-
-        // Can't kick yourself
-        if selectedUser.Id == m.AdminId {
-            m.Error = "Cannot kick yourself"
-            return m, nil
-        }
-
-        return m, kickUser(selectedUser.Id)
-    }
-```
-
-### Kick Command
-
-```go
-func kickUser(userId uuid.UUID) tea.Cmd {
-    return func() tea.Msg {
-        database := db.GetDB()
-        err := database.DeleteAccount(userId)
-        if err != nil {
-            log.Printf("Failed to kick user: %v", err)
-        }
-        return kickUserMsg{userId: userId}
-    }
+func createTextarea(placeholder string, maxHeight int) textarea.Model {
+    t := textarea.New()
+    t.Placeholder = placeholder
+    t.CharLimit = 0              // No limit
+    t.ShowLineNumbers = false
+    t.SetWidth(50)
+    t.SetHeight(maxHeight)
+    t.Cursor.SetMode(cursor.CursorBlink)
+    return t
 }
 ```
 
-### Result Handling
-
-```go
-case kickUserMsg:
-    m.Status = "User kicked successfully"
-    m.Error = ""
-    return m, loadUsers()
-```
-
----
-
-## User Rendering
-
-```go
-for i := start; i < end; i++ {
-    user := m.Users[i]
-
-    username := "@" + user.Username
-
-    // Build badges
-    var badges []string
-    if user.IsAdmin {
-        badges = append(badges, "[ADMIN]")
-    }
-    if user.Muted {
-        badges = append(badges, "[MUTED]")
-    }
-    badge := ""
-    if len(badges) > 0 {
-        badge = " " + strings.Join(badges, " ")
-    }
-
-    if i == m.Selected {
-        // Selected item
-        text := common.ListItemSelectedStyle.Render(username + badge)
-        s.WriteString(common.ListSelectedPrefix + text)
-    } else if user.Muted {
-        // Muted users shown in error/red color
-        text := username + common.ListBadgeMutedStyle.Render(badge)
-        s.WriteString(common.ListUnselectedPrefix + common.ListItemStyle.Render(text))
-    } else {
-        // Normal item
-        text := username + common.ListBadgeStyle.Render(badge)
-        s.WriteString(common.ListUnselectedPrefix + common.ListItemStyle.Render(text))
-    }
-    s.WriteString("\n")
-}
-```
-
----
-
-## Data Loading
-
-```go
-func loadUsers() tea.Cmd {
-    return func() tea.Msg {
-        database := db.GetDB()
-        err, users := database.ReadAllAccountsAdmin()
-        if err != nil || users == nil {
-            return usersLoadedMsg{users: []domain.Account{}}
-        }
-        return usersLoadedMsg{users: *users}
-    }
-}
-```
-
-Note: Uses `ReadAllAccountsAdmin()` which returns additional admin-specific fields.
+| Field | Height | Purpose |
+|-------|--------|---------|
+| Title | 1 | Single line |
+| Content | 8 | Multi-line markdown |
+| Order | 1 | Single line number |
 
 ---
 
 ## Message Types
 
 ```go
+// User management
 type usersLoadedMsg struct {
     users []domain.Account
 }
+type muteUserMsg struct{}
+type kickUserMsg struct{}
 
-type muteUserMsg struct {
-    userId uuid.UUID
+// Info box management
+type infoBoxesLoadedMsg struct {
+    boxes []domain.InfoBox
 }
-
-type kickUserMsg struct {
-    userId uuid.UUID
-}
+type infoBoxSavedMsg struct{}
+type infoBoxDeletedMsg struct{}
+type infoBoxToggledMsg struct{}
 ```
 
 ---
 
-## Empty State
+## Commands
+
+### User Commands
 
 ```go
-if len(m.Users) == 0 {
-    s.WriteString(common.ListEmptyStyle.Render("No users found."))
-}
-```
-
----
-
-## Pagination
-
-```go
-start := m.Offset
-end := min(start + common.DefaultItemsPerPage, len(m.Users))
-
-// Pagination indicator
-if len(m.Users) > common.DefaultItemsPerPage {
-    paginationText := fmt.Sprintf("showing %d-%d of %d", start+1, end, len(m.Users))
-    s.WriteString(common.ListBadgeStyle.Render(paginationText))
-}
-```
-
----
-
-## Selection Bounds
-
-After loading, keep selection within bounds:
-
-```go
-case usersLoadedMsg:
-    m.Users = msg.users
-    m.Selected = 0
-    m.Offset = 0
-    if m.Selected >= len(m.Users) {
-        m.Selected = max(0, len(m.Users)-1)
+func loadUsers() tea.Cmd {
+    return func() tea.Msg {
+        database := db.GetDB()
+        err, users := database.ReadAllAccountsAdmin()
+        // ...
+        return usersLoadedMsg{users: *users}
     }
+}
+
+func muteUser(userId uuid.UUID) tea.Cmd {
+    return func() tea.Msg {
+        database := db.GetDB()
+        database.MuteUser(userId)
+        return muteUserMsg{}
+    }
+}
+
+func kickUser(userId uuid.UUID) tea.Cmd {
+    return func() tea.Msg {
+        database := db.GetDB()
+        database.DeleteAccount(userId)
+        return kickUserMsg{}
+    }
+}
+```
+
+### Info Box Commands
+
+```go
+func loadInfoBoxes() tea.Cmd {
+    return func() tea.Msg {
+        database := db.GetDB()
+        err, boxes := database.ReadAllInfoBoxes()
+        // ...
+        return infoBoxesLoadedMsg{boxes: *boxes}
+    }
+}
+
+func saveInfoBox(box *domain.InfoBox) tea.Cmd {
+    return func() tea.Msg {
+        database := db.GetDB()
+        if box.Id == uuid.Nil {
+            box.Id = uuid.New()
+            box.CreatedAt = time.Now()
+            database.CreateInfoBox(box)
+        } else {
+            database.UpdateInfoBox(box)
+        }
+        return infoBoxSavedMsg{}
+    }
+}
+
+func deleteInfoBox(id uuid.UUID) tea.Cmd {
+    return func() tea.Msg {
+        database := db.GetDB()
+        database.DeleteInfoBox(id)
+        return infoBoxDeletedMsg{}
+    }
+}
+
+func toggleInfoBox(id uuid.UUID) tea.Cmd {
+    return func() tea.Msg {
+        database := db.GetDB()
+        database.ToggleInfoBoxEnabled(id)
+        return infoBoxToggledMsg{}
+    }
+}
+```
+
+---
+
+## Navigation Flow
+
+```
+┌────────────┐
+│  MenuView  │ ◄─── Esc ───┐
+└─────┬──────┘             │
+      │ Enter              │
+      ▼                    │
+┌────────────┐             │
+│ UsersView  │ ────────────┤
+└────────────┘             │
+      or                   │
+┌────────────┐             │
+│InfoBoxesView│────────────┤
+└─────┬──────┘             │
+      │ Enter/n            │
+      ▼                    │
+┌────────────┐             │
+│ Edit Mode  │ ─── Esc ────┘
+└────────────┘
+      │ Ctrl+S
+      ▼
+   Save & Return
+```
+
+---
+
+## Tab Navigation Blocking
+
+When in admin submenus (UsersView or InfoBoxesView), tab navigation between main TUI panels is blocked:
+
+```go
+// In supertui.go
+if m.state == common.AdminPanelView && m.adminModel.CurrentView != 0 {
+    // Tab/Shift+Tab blocked in submenus
     return m, nil
+}
 ```
+
+This prevents accidental navigation away from admin tasks.
 
 ---
 
-## Scroll Behavior
+## Context-Aware Help Text
 
-```go
-case "up", "k":
-    if m.Selected > 0 {
-        m.Selected--
-        if m.Selected < m.Offset {
-            m.Offset = m.Selected
-        }
-    }
+The footer shows context-specific help:
 
-case "down", "j":
-    if len(m.Users) > 0 && m.Selected < len(m.Users)-1 {
-        m.Selected++
-        if m.Selected >= m.Offset + common.DefaultItemsPerPage {
-            m.Offset = m.Selected - common.DefaultItemsPerPage + 1
-        }
-    }
-```
+| View | Help Text |
+|------|-----------|
+| MenuView | `↑/↓ • enter: select` |
+| UsersView | `↑/↓ • m: mute • K: kick • esc: back` |
+| InfoBoxesView (list) | `↑/↓ • n: add • enter: edit • d: delete • t: toggle • esc: back` |
+| InfoBoxesView (edit) | `tab/shift+tab: switch • ctrl+s: save • esc: cancel` |
 
 ---
 
@@ -341,19 +408,21 @@ case "down", "j":
 ```go
 func InitialModel(adminId uuid.UUID, width, height int) Model {
     return Model{
-        AdminId:  adminId,
-        Users:    []domain.Account{},
-        Selected: 0,
-        Offset:   0,
-        Width:    width,
-        Height:   height,
-        Status:   "",
-        Error:    "",
+        AdminId:      adminId,
+        CurrentView:  MenuView,
+        MenuSelected: 0,
+        Users:        []domain.Account{},
+        InfoBoxes:    []domain.InfoBox{},
+        Selected:     0,
+        BoxSelected:  0,
+        Width:        width,
+        Height:       height,
+        Editing:      false,
     }
 }
 
 func (m Model) Init() tea.Cmd {
-    return loadUsers()
+    return tea.Batch(loadUsers(), loadInfoBoxes())
 }
 ```
 
@@ -365,26 +434,10 @@ This view is only accessible to admin users. Access is controlled in supertui.go
 
 ---
 
-## Database Operations
-
-### MuteUser
-
-Sets the user's `Muted` flag to true and deletes all their notes.
-
-### DeleteAccount (Kick)
-
-Completely removes the account and all associated data:
-- Account record
-- Notes
-- Follow relationships
-- Activities
-- Notifications
-
----
-
 ## Source Files
 
 - `ui/admin/admin.go` - Admin panel view implementation
-- `ui/common/styles.go` - List styles including ListBadgeMutedStyle
-- `db/db.go` - ReadAllAccountsAdmin, MuteUser, DeleteAccount
+- `ui/common/styles.go` - List styles (ListBadgeMutedStyle, ListBadgeEnabledStyle)
+- `db/db.go` - Database operations (ReadAllAccountsAdmin, MuteUser, DeleteAccount, InfoBox CRUD)
 - `domain/account.go` - Account entity with IsAdmin, Muted fields
+- `domain/infobox.go` - InfoBox entity
