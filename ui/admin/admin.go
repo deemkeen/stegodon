@@ -24,6 +24,7 @@ const (
 	UsersView
 	InfoBoxesView
 	ServerMessageView
+	TermsAndConditionsView
 	BansView
 )
 
@@ -54,6 +55,11 @@ type Model struct {
 	ServerMessage    *domain.ServerMessage
 	EditingServerMsg bool
 	ServerMsgInput   textarea.Model // Textarea for server message
+
+	// Terms and Conditions management
+	TermsAndConditions *domain.TermsAndConditions
+	EditingTerms       bool
+	TermsInput         textarea.Model // Textarea for terms and conditions
 
 	// Ban management
 	Bans         []domain.Ban
@@ -147,6 +153,13 @@ type bansLoadedMsg struct {
 }
 
 type unbanUserMsg struct{}
+
+// Terms and Conditions message types
+type termsAndConditionsLoadedMsg struct {
+	terms *domain.TermsAndConditions
+}
+
+type termsAndConditionsSavedMsg struct{}
 
 // User management commands
 func loadUsers() tea.Cmd {
@@ -339,6 +352,33 @@ func loadServerMessage() tea.Cmd {
 	}
 }
 
+func loadTermsAndConditions() tea.Cmd {
+	return func() tea.Msg {
+		database := db.GetDB()
+		err, terms := database.GetCurrentTermsAndConditions()
+		if err != nil {
+			log.Printf("Failed to load terms and conditions: %v", err)
+			return termsAndConditionsLoadedMsg{terms: &domain.TermsAndConditions{
+				Id:        1,
+				Content:   "Default Terms and Conditions",
+				UpdatedAt: time.Now(),
+			}}
+		}
+		return termsAndConditionsLoadedMsg{terms: terms}
+	}
+}
+
+func saveTermsAndConditions(content string) tea.Cmd {
+	return func() tea.Msg {
+		database := db.GetDB()
+		err := database.UpdateTermsAndConditions(content)
+		if err != nil {
+			log.Printf("Failed to save terms and conditions: %v", err)
+		}
+		return termsAndConditionsSavedMsg{}
+	}
+}
+
 func saveServerMessage(message string, enabled bool, webEnabled bool) tea.Cmd {
 	return func() tea.Msg {
 		database := db.GetDB()
@@ -383,6 +423,16 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case serverMessageLoadedMsg:
 		m.ServerMessage = msg.message
 		return m, nil
+
+	case termsAndConditionsLoadedMsg:
+		m.TermsAndConditions = msg.terms
+		return m, nil
+
+	case termsAndConditionsSavedMsg:
+		m.Status = "Terms and conditions saved successfully"
+		m.Error = ""
+		m.EditingTerms = false
+		return m, loadTermsAndConditions()
 
 	case infoBoxSavedMsg:
 		m.Status = "Info box saved successfully"
@@ -445,6 +495,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			}
 		case ServerMessageView:
 			return m.handleServerMessageKeys(msg)
+		case TermsAndConditionsView:
+			return m.handleTermsAndConditionsKeys(msg)
 		case BansView:
 			return m.handleBansKeys(msg)
 		}
@@ -492,7 +544,7 @@ func (m Model) handleMenuKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.MenuSelected--
 		}
 	case "down", "j":
-		if m.MenuSelected < 3 { // We have 4 menu items (0, 1, 2, and 3)
+		if m.MenuSelected < 4 { // We have 5 menu items (0, 1, 2, 3, and 4)
 			m.MenuSelected++
 		}
 	case "enter":
@@ -505,6 +557,9 @@ func (m Model) handleMenuKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 		case 2:
 			m.CurrentView = ServerMessageView
 		case 3:
+			m.CurrentView = TermsAndConditionsView
+			return m, loadTermsAndConditions()
+		case 4:
 			m.CurrentView = BansView
 		}
 	}
@@ -878,6 +933,12 @@ func (m Model) View() string {
 		} else {
 			s.WriteString(m.renderServerMessageView())
 		}
+	case TermsAndConditionsView:
+		if m.EditingTerms {
+			s.WriteString(m.renderTermsAndConditionsEditView())
+		} else {
+			s.WriteString(m.renderTermsAndConditionsView())
+		}
 	case BansView:
 		s.WriteString(m.renderBansView())
 	}
@@ -896,10 +957,54 @@ func (m Model) View() string {
 	return s.String()
 }
 
+func (m Model) handleTermsAndConditionsKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
+	if m.EditingTerms {
+		// Handle editing mode
+		switch msg.String() {
+		case "esc":
+			// Cancel editing
+			m.EditingTerms = false
+			m.Status = "Edit cancelled"
+			return m, nil
+		case "ctrl+s":
+			// Save terms and conditions
+			if m.TermsAndConditions != nil {
+				content := m.TermsInput.Value()
+				m.EditingTerms = false
+				return m, saveTermsAndConditions(content)
+			}
+			return m, nil
+		}
+
+		// Pass keys to textarea
+		var cmd tea.Cmd
+		m.TermsInput, cmd = m.TermsInput.Update(msg)
+		return m, cmd
+	}
+
+	// Normal navigation
+	switch msg.String() {
+	case "esc":
+		// Go back to menu
+		m.CurrentView = MenuView
+		return m, nil
+	case "e", "enter":
+		// Edit terms and conditions
+		if m.TermsAndConditions != nil {
+			m.EditingTerms = true
+			m.TermsInput = createTextarea("Enter terms and conditions", 10)
+			m.TermsInput.SetValue(m.TermsAndConditions.Content)
+			m.TermsInput.Focus()
+			return m, textarea.Blink
+		}
+	}
+	return m, nil
+}
+
 func (m Model) renderMenu() string {
 	var s strings.Builder
 
-	menuItems := []string{"Manage Users", "Manage Info Boxes", "Server Message", "Manage Bans"}
+	menuItems := []string{"Manage Users", "Manage Info Boxes", "Server Message", "Terms and Conditions", "Manage Bans"}
 
 	for i, item := range menuItems {
 		if i == m.MenuSelected {
@@ -1204,6 +1309,56 @@ func (m Model) renderBansView() string {
 
 	s.WriteString("\n\n")
 	s.WriteString(common.ListBadgeStyle.Render("Keys: ↑/↓: navigate • u: unban • esc: back"))
+
+	return s.String()
+}
+
+func (m Model) renderTermsAndConditionsView() string {
+	var s strings.Builder
+
+	s.WriteString(common.CaptionStyle.Render("terms and conditions"))
+	s.WriteString("\n\n")
+
+	if m.TermsAndConditions == nil {
+		s.WriteString(common.ListEmptyStyle.Render("Loading..."))
+		return s.String()
+	}
+
+	// Show last updated time
+	updatedTime := m.TermsAndConditions.UpdatedAt.Format("2006-01-02 15:04")
+	s.WriteString(common.ListBadgeStyle.Render(fmt.Sprintf("Last updated: %s\n\n", updatedTime)))
+
+	// Show terms content
+	if m.TermsAndConditions.Content == "" {
+		s.WriteString(common.ListEmptyStyle.Render("No terms and conditions set"))
+	} else {
+		s.WriteString(common.ListItemStyle.Render("Current terms and conditions:"))
+		s.WriteString("\n")
+
+		// Show first 200 characters with ellipsis if longer
+		content := m.TermsAndConditions.Content
+		if len(content) > 200 {
+			content = content[:197] + "..."
+		}
+		s.WriteString(common.ListItemSelectedStyle.Render(content))
+	}
+
+	s.WriteString("\n\n")
+	s.WriteString(common.ListBadgeStyle.Render("Keys: enter/e: edit • esc: back"))
+
+	return s.String()
+}
+
+func (m Model) renderTermsAndConditionsEditView() string {
+	var s strings.Builder
+
+	s.WriteString(common.CaptionStyle.Render("edit terms and conditions"))
+	s.WriteString("\n\n")
+
+	s.WriteString(m.TermsInput.View())
+	s.WriteString("\n\n")
+
+	s.WriteString(common.ListBadgeStyle.Render("Keys: ctrl+s: save • esc: cancel"))
 
 	return s.String()
 }

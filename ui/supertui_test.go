@@ -6,6 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
+	"github.com/deemkeen/stegodon/ui/terms"
 	"github.com/google/uuid"
 )
 
@@ -317,6 +318,7 @@ func TestCommandBatchingWithMultipleModels(t *testing.T) {
 
 // TestAccountSettingsModelUpdatedAfterUsernameChange verifies accountSettingsModel
 // receives updated account info after username creation
+// New flow: Terms first → username → display name → bio → main app
 func TestAccountSettingsModelUpdatedAfterUsernameChange(t *testing.T) {
 	account := domain.Account{
 		Id:             uuid.New(),
@@ -325,6 +327,7 @@ func TestAccountSettingsModelUpdatedAfterUsernameChange(t *testing.T) {
 	}
 
 	model := NewModel(account, 100, 30)
+	// New users start at TermsAcceptanceView, simulate they already accepted
 	model.state = common.CreateUserView
 
 	// Setup the newUserModel as if user filled in the form
@@ -339,9 +342,14 @@ func TestAccountSettingsModelUpdatedAfterUsernameChange(t *testing.T) {
 			model.accountSettingsModel.Account.Username)
 	}
 
-	// Simulate pressing enter on bio step (Step 2)
+	// Simulate pressing enter on bio step (Step 2) - goes directly to main app
 	updatedModel, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	mainModel := updatedModel.(MainModel)
+
+	// Verify we're now in CreateNoteView (main app)
+	if mainModel.state != common.CreateNoteView {
+		t.Errorf("Expected state CreateNoteView after bio, got %v", mainModel.state)
+	}
 
 	// Verify account was updated
 	if mainModel.account.Username != "alice" {
@@ -642,5 +650,199 @@ func TestReplyFromHomeTimelineSwitchesToCreateNoteView(t *testing.T) {
 
 	if mainModel.state != common.CreateNoteView {
 		t.Errorf("Expected state CreateNoteView after reply from home, got %v", mainModel.state)
+	}
+}
+
+// ============================================================================
+// Terms and Conditions Tests
+// ============================================================================
+
+// TestTermsCheckResultNeedsAcceptance verifies that when terms need to be
+// accepted, the state transitions to TermsAcceptanceView
+func TestTermsCheckResultNeedsAcceptance(t *testing.T) {
+	account := domain.Account{
+		Id:             uuid.New(),
+		Username:       "existinguser",
+		FirstTimeLogin: domain.FALSE, // Existing user
+	}
+
+	model := NewModel(account, 100, 30)
+
+	// Simulate receiving termsCheckResultMsg indicating acceptance is needed
+	updatedModel, cmd := model.Update(termsCheckResultMsg{needsAcceptance: true})
+	mainModel := updatedModel.(MainModel)
+
+	if mainModel.state != common.TermsAcceptanceView {
+		t.Errorf("Expected state TermsAcceptanceView when terms need acceptance, got %v", mainModel.state)
+	}
+
+	// Should return a command to initialize terms model
+	if cmd == nil {
+		t.Error("Expected Init command for terms model")
+	}
+}
+
+// TestTermsCheckResultNoAcceptanceNeeded verifies that when terms don't need
+// to be accepted, the state transitions directly to CreateNoteView
+func TestTermsCheckResultNoAcceptanceNeeded(t *testing.T) {
+	account := domain.Account{
+		Id:             uuid.New(),
+		Username:       "existinguser",
+		FirstTimeLogin: domain.FALSE, // Existing user
+	}
+
+	model := NewModel(account, 100, 30)
+
+	// Simulate receiving termsCheckResultMsg indicating no acceptance needed
+	updatedModel, cmd := model.Update(termsCheckResultMsg{needsAcceptance: false})
+	mainModel := updatedModel.(MainModel)
+
+	if mainModel.state != common.CreateNoteView {
+		t.Errorf("Expected state CreateNoteView when no terms acceptance needed, got %v", mainModel.state)
+	}
+
+	// Should return a command to initialize create model
+	if cmd == nil {
+		t.Error("Expected Init command for create model")
+	}
+}
+
+// TestTermsAcceptanceViewBlocksTabNavigation verifies that tab navigation
+// is blocked when in TermsAcceptanceView
+func TestTermsAcceptanceViewBlocksTabNavigation(t *testing.T) {
+	account := domain.Account{
+		Id:       uuid.New(),
+		Username: "testuser",
+	}
+
+	model := NewModel(account, 100, 30)
+	model.state = common.TermsAcceptanceView
+
+	// Try to tab away
+	updatedModel, _ := model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	mainModel := updatedModel.(MainModel)
+
+	// State should remain TermsAcceptanceView
+	if mainModel.state != common.TermsAcceptanceView {
+		t.Errorf("Expected state to remain TermsAcceptanceView after tab, got %v", mainModel.state)
+	}
+
+	// Also test shift+tab
+	updatedModel, _ = mainModel.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	mainModel = updatedModel.(MainModel)
+
+	if mainModel.state != common.TermsAcceptanceView {
+		t.Errorf("Expected state to remain TermsAcceptanceView after shift+tab, got %v", mainModel.state)
+	}
+}
+
+// TestTermsAcceptanceTransitionsToCreateNoteView verifies that after accepting
+// terms in TermsAcceptanceView, the state transitions to CreateNoteView
+func TestTermsAcceptanceTransitionsToCreateNoteView(t *testing.T) {
+	account := domain.Account{
+		Id:       uuid.New(),
+		Username: "existinguser",
+	}
+
+	model := NewModel(account, 100, 30)
+	model.state = common.TermsAcceptanceView
+
+	// Simulate receiving TermsAcceptedMsg (from terms model after user accepts)
+	updatedModel, cmd := model.Update(terms.TermsAcceptedMsg{})
+	mainModel := updatedModel.(MainModel)
+
+	if mainModel.state != common.CreateNoteView {
+		t.Errorf("Expected state CreateNoteView after terms accepted, got %v", mainModel.state)
+	}
+
+	// Should return a command to initialize create model
+	if cmd == nil {
+		t.Error("Expected Init command for create model after terms accepted")
+	}
+}
+
+// TestTermsAcceptanceViewRendersTerms verifies that View() renders the terms
+// screen when in TermsAcceptanceView and doesn't panic
+func TestTermsAcceptanceViewRendersTerms(t *testing.T) {
+	account := domain.Account{
+		Id:       uuid.New(),
+		Username: "testuser",
+	}
+
+	model := NewModel(account, 100, 30)
+	model.state = common.TermsAcceptanceView
+	model.termsModel.TermsContent = "Test Terms Content"
+
+	// Should not panic and should return non-empty view
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("View() panicked: %v", r)
+		}
+	}()
+
+	view := model.View()
+
+	// The view should be non-empty
+	if len(view) == 0 {
+		t.Error("Expected non-empty view for TermsAcceptanceView")
+	}
+
+	// Verify we're in the right state
+	if model.state != common.TermsAcceptanceView {
+		t.Errorf("Expected state TermsAcceptanceView, got %v", model.state)
+	}
+}
+
+// TestNewUserFlowShowsTermsFirst verifies that new users see terms FIRST
+// before creating their profile (username/display name/bio)
+func TestNewUserFlowShowsTermsFirst(t *testing.T) {
+	account := domain.Account{
+		Id:             uuid.New(),
+		Username:       "internal_name",
+		FirstTimeLogin: domain.TRUE,
+	}
+
+	model := NewModel(account, 100, 30)
+
+	// Run Init - for new users, Init returns commands including TermsAcceptanceView state
+	cmd := model.Init()
+	if cmd == nil {
+		t.Error("Expected Init to return commands")
+	}
+
+	// Simulate receiving the TermsAcceptanceView state message (from Init batch)
+	updatedModel, _ := model.Update(common.TermsAcceptanceView)
+	mainModel := updatedModel.(MainModel)
+
+	// New users should be in TermsAcceptanceView after processing Init message
+	if mainModel.state != common.TermsAcceptanceView {
+		t.Errorf("Expected new user to be in TermsAcceptanceView, got %v", mainModel.state)
+	}
+}
+
+// TestNewUserFlowAfterTermsAccepted verifies that after accepting terms,
+// new users go to CreateUserView to set up their profile
+func TestNewUserFlowAfterTermsAccepted(t *testing.T) {
+	account := domain.Account{
+		Id:             uuid.New(),
+		Username:       "internal_name",
+		FirstTimeLogin: domain.TRUE,
+	}
+
+	model := NewModel(account, 100, 30)
+	model.state = common.TermsAcceptanceView
+
+	// Simulate accepting terms
+	updatedModel, cmd := model.Update(terms.TermsAcceptedMsg{})
+	mainModel := updatedModel.(MainModel)
+
+	// Should now be in CreateUserView to set up profile
+	if mainModel.state != common.CreateUserView {
+		t.Errorf("Expected state CreateUserView after terms accepted, got %v", mainModel.state)
+	}
+
+	// Should return a command to initialize the createuser model
+	if cmd == nil {
+		t.Error("Expected Init command for createuser model")
 	}
 }

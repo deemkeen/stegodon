@@ -30,6 +30,7 @@ type AppConfig struct {
 		MaxChars        int    `yaml:"maxChars"`
 		ShowGlobal      bool   `yaml:"showGlobal"`
 		SshOnly         bool   `yaml:"sshOnly"`
+		ShowTos         bool   `yaml:"showTos"`
 	}
 }
 
@@ -81,6 +82,7 @@ func ReadConf() (*AppConfig, error) {
 	envMaxChars := os.Getenv("STEGODON_MAX_CHARS")
 	envShowGlobal := os.Getenv("STEGODON_SHOW_GLOBAL")
 	envSshOnly := os.Getenv("STEGODON_SSH_ONLY")
+	envShowTos := os.Getenv("STEGODON_SHOW_TOS")
 
 	if envHost != "" {
 		c.Conf.Host = envHost
@@ -136,6 +138,10 @@ func ReadConf() (*AppConfig, error) {
 
 	if envSshOnly == "true" {
 		c.Conf.SshOnly = true
+	}
+
+	if envShowTos == "true" {
+		c.Conf.ShowTos = true
 	}
 
 	if envMaxChars != "" {

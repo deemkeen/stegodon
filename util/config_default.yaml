@@ -8,6 +8,7 @@ conf:
   closed: false # closed registration (no new users can register)
   maxChars: 150 # maximum characters allowed in a note (can be overridden by STEGODON_MAX_CHARS env var, maximum 300)
   showGlobal: false # show global timeline (local + federated posts, can be overridden by STEGODON_SHOW_GLOBAL env var)
+  showTos: false # show terms of service acceptance screen (can be overridden by STEGODON_SHOW_TOS env var)
 
 # For local federation testing:
 # 1. Run: ./test-federation.sh

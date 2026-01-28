@@ -157,6 +157,22 @@ func setupTestDB(t *testing.T) *DB {
 		accepted_at TIMESTAMP
 	)`)
 
+	// Create terms and conditions tables
+	db.db.Exec(`CREATE TABLE IF NOT EXISTS terms_and_conditions(
+		id INTEGER PRIMARY KEY,
+		content TEXT NOT NULL,
+		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	)`)
+
+	db.db.Exec(`CREATE TABLE IF NOT EXISTS user_terms_acceptance(
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id uuid NOT NULL,
+		terms_id INTEGER NOT NULL,
+		accepted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (user_id) REFERENCES accounts(id),
+		FOREIGN KEY (terms_id) REFERENCES terms_and_conditions(id)
+	)`)
+
 	return db
 }
 
@@ -3827,5 +3843,210 @@ func TestGetExistingUploadTokenExpired(t *testing.T) {
 	}
 	if token != "" {
 		t.Errorf("Expected empty token for expired token, got %s", token)
+	}
+}
+
+// ============================================================================
+// Terms and Conditions Tests
+// ============================================================================
+
+func TestGetCurrentTermsAndConditions_Default(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.db.Close()
+
+	// When no terms exist, should return default
+	err, terms := db.GetCurrentTermsAndConditions()
+	if err != nil {
+		t.Fatalf("GetCurrentTermsAndConditions failed: %v", err)
+	}
+	if terms == nil {
+		t.Fatal("Expected default terms, got nil")
+	}
+	if terms.Content != "Default Terms and Conditions" {
+		t.Errorf("Expected default content, got %q", terms.Content)
+	}
+}
+
+func TestUpdateTermsAndConditions(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.db.Close()
+
+	content := "These are the new terms and conditions."
+	err := db.UpdateTermsAndConditions(content)
+	if err != nil {
+		t.Fatalf("UpdateTermsAndConditions failed: %v", err)
+	}
+
+	// Verify it was saved
+	err2, terms := db.GetCurrentTermsAndConditions()
+	if err2 != nil {
+		t.Fatalf("GetCurrentTermsAndConditions failed: %v", err2)
+	}
+	if terms.Content != content {
+		t.Errorf("Expected content %q, got %q", content, terms.Content)
+	}
+}
+
+func TestRecordUserTermsAcceptance(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.db.Close()
+
+	// Create a user first
+	userId := uuid.New()
+	createTestAccount(t, db, userId, "testuser", "pubkey", "webpub", "webpriv")
+
+	// Create terms
+	err := db.UpdateTermsAndConditions("Test terms")
+	if err != nil {
+		t.Fatalf("UpdateTermsAndConditions failed: %v", err)
+	}
+
+	// Record acceptance
+	err = db.RecordUserTermsAcceptance(userId)
+	if err != nil {
+		t.Fatalf("RecordUserTermsAcceptance failed: %v", err)
+	}
+
+	// Verify acceptance was recorded
+	err2, acceptance := db.GetUserTermsAcceptance(userId)
+	if err2 != nil {
+		t.Fatalf("GetUserTermsAcceptance failed: %v", err2)
+	}
+	if acceptance == nil {
+		t.Fatal("Expected acceptance record, got nil")
+	}
+	if acceptance.UserId != userId {
+		t.Errorf("Expected UserId %v, got %v", userId, acceptance.UserId)
+	}
+}
+
+func TestGetUserTermsAcceptance_NoRecord(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.db.Close()
+
+	userId := uuid.New()
+	err, acceptance := db.GetUserTermsAcceptance(userId)
+	if err != nil {
+		t.Fatalf("GetUserTermsAcceptance failed: %v", err)
+	}
+	if acceptance != nil {
+		t.Error("Expected nil acceptance for user with no record")
+	}
+}
+
+func TestUserNeedsToAcceptTerms_NoTermsSet(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.db.Close()
+
+	userId := uuid.New()
+	createTestAccount(t, db, userId, "testuser", "pubkey", "webpub", "webpriv")
+
+	// With default terms (no custom terms set), user should not need to accept
+	needs, err := db.UserNeedsToAcceptTerms(userId)
+	if err != nil {
+		t.Fatalf("UserNeedsToAcceptTerms failed: %v", err)
+	}
+	if needs {
+		t.Error("Expected user NOT to need acceptance when no custom terms are set")
+	}
+}
+
+func TestUserNeedsToAcceptTerms_TermsSetButNotAccepted(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.db.Close()
+
+	userId := uuid.New()
+	createTestAccount(t, db, userId, "testuser", "pubkey", "webpub", "webpriv")
+
+	// Set custom terms
+	err := db.UpdateTermsAndConditions("Custom terms that require acceptance")
+	if err != nil {
+		t.Fatalf("UpdateTermsAndConditions failed: %v", err)
+	}
+
+	// User should need to accept
+	needs, err := db.UserNeedsToAcceptTerms(userId)
+	if err != nil {
+		t.Fatalf("UserNeedsToAcceptTerms failed: %v", err)
+	}
+	if !needs {
+		t.Error("Expected user to need acceptance when terms are set but not accepted")
+	}
+}
+
+func TestUserNeedsToAcceptTerms_AlreadyAccepted(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.db.Close()
+
+	userId := uuid.New()
+	createTestAccount(t, db, userId, "testuser", "pubkey", "webpub", "webpriv")
+
+	// Set custom terms
+	err := db.UpdateTermsAndConditions("Custom terms")
+	if err != nil {
+		t.Fatalf("UpdateTermsAndConditions failed: %v", err)
+	}
+
+	// Record acceptance
+	err = db.RecordUserTermsAcceptance(userId)
+	if err != nil {
+		t.Fatalf("RecordUserTermsAcceptance failed: %v", err)
+	}
+
+	// User should NOT need to accept
+	needs, err := db.UserNeedsToAcceptTerms(userId)
+	if err != nil {
+		t.Fatalf("UserNeedsToAcceptTerms failed: %v", err)
+	}
+	if needs {
+		t.Error("Expected user NOT to need acceptance when already accepted")
+	}
+}
+
+func TestUserNeedsToAcceptTerms_TermsUpdatedAfterAcceptance(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.db.Close()
+
+	userId := uuid.New()
+	createTestAccount(t, db, userId, "testuser", "pubkey", "webpub", "webpriv")
+
+	// Set initial terms with a timestamp in the past
+	pastTime := time.Now().Add(-1 * time.Hour)
+	_, err := db.db.Exec(`INSERT OR REPLACE INTO terms_and_conditions(id, content, updated_at) VALUES (1, ?, ?)`,
+		"Original terms v1", pastTime.Format(time.RFC3339))
+	if err != nil {
+		t.Fatalf("Failed to insert initial terms: %v", err)
+	}
+
+	// User accepts terms (acceptance time is "now", which is after the terms)
+	err = db.RecordUserTermsAcceptance(userId)
+	if err != nil {
+		t.Fatalf("RecordUserTermsAcceptance failed: %v", err)
+	}
+
+	// Verify user doesn't need to accept (yet)
+	needs, err := db.UserNeedsToAcceptTerms(userId)
+	if err != nil {
+		t.Fatalf("UserNeedsToAcceptTerms failed: %v", err)
+	}
+	if needs {
+		t.Error("Expected user NOT to need acceptance immediately after accepting")
+	}
+
+	// Now update the terms with a future timestamp (simulating admin changing T&Cs)
+	futureTime := time.Now().Add(1 * time.Hour)
+	_, err = db.db.Exec(`INSERT OR REPLACE INTO terms_and_conditions(id, content, updated_at) VALUES (1, ?, ?)`,
+		"Updated terms v2 with new conditions", futureTime.Format(time.RFC3339))
+	if err != nil {
+		t.Fatalf("Failed to update terms: %v", err)
+	}
+
+	// User should now need to accept again
+	needs, err = db.UserNeedsToAcceptTerms(userId)
+	if err != nil {
+		t.Fatalf("UserNeedsToAcceptTerms failed: %v", err)
+	}
+	if !needs {
+		t.Error("Expected user to need acceptance after terms were updated")
 	}
 }

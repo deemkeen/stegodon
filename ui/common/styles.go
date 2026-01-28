@@ -126,3 +126,9 @@ func DefaultListWidth(width int) int {
 func DefaultListHeight(height int) int {
 	return height
 }
+
+// Terms and Conditions dialog constants
+const (
+	TermsDialogBorderAndMargin = 8  // 2 (border) + 6 (margins)
+	TermsDialogMinWidth        = 60 // Minimum width for terms dialog
+)

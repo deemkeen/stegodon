@@ -45,6 +45,7 @@ Environment variables:
 - `STEGODON_NODE_DESCRIPTION` - NodeInfo description
 - `STEGODON_MAX_CHARS` - Maximum note length (default: 150, max: 300)
 - `STEGODON_SHOW_GLOBAL` - Show global timeline in TUI and web (default: false)
+- `STEGODON_SHOW_TOS` - Show terms of service acceptance screen (default: false)
 - `STEGODON_WITH_JOURNALD` - Linux journald logging (default: false)
 - `STEGODON_WITH_PPROF` - Enable pprof on localhost:6060 (default: false)
 

@@ -26,6 +26,7 @@ import (
 	"github.com/deemkeen/stegodon/ui/notifications"
 	"github.com/deemkeen/stegodon/ui/profileview"
 	"github.com/deemkeen/stegodon/ui/relay"
+	"github.com/deemkeen/stegodon/ui/terms"
 	"github.com/deemkeen/stegodon/ui/threadview"
 	"github.com/deemkeen/stegodon/ui/writenote"
 	"github.com/deemkeen/stegodon/util"
@@ -50,6 +51,7 @@ type MainModel struct {
 	account              domain.Account
 	state                common.SessionState
 	newUserModel         createuser.Model
+	termsModel           terms.Model
 	createModel          writenote.Model
 	myPostsModel         myposts.Model
 	globalPostsModel     globalposts.Model
@@ -68,6 +70,36 @@ type MainModel struct {
 
 type userUpdateErrorMsg struct {
 	err error
+}
+
+type termsCheckResultMsg struct {
+	needsAcceptance bool
+}
+
+func checkTermsAcceptanceCmd(userId uuid.UUID) tea.Cmd {
+	return func() tea.Msg {
+		needs, err := db.GetDB().UserNeedsToAcceptTerms(userId)
+		if err != nil {
+			log.Printf("Failed to check terms acceptance: %v", err)
+			return termsCheckResultMsg{needsAcceptance: false}
+		}
+		return termsCheckResultMsg{needsAcceptance: needs}
+	}
+}
+
+type termsLoadedMsg struct {
+	content string
+}
+
+func loadTermsCmd() tea.Cmd {
+	return func() tea.Msg {
+		err, terms := db.GetDB().GetCurrentTermsAndConditions()
+		if err != nil {
+			log.Printf("Failed to load terms: %v", err)
+			return termsLoadedMsg{content: "Terms and conditions could not be loaded."}
+		}
+		return termsLoadedMsg{content: terms.Content}
+	}
 }
 
 func updateUserModelCmd(acc *domain.Account) tea.Cmd {
@@ -118,6 +150,7 @@ func NewModel(acc domain.Account, width int, height int) MainModel {
 	m := MainModel{state: common.CreateUserView}
 	m.config = config
 	m.newUserModel = createuser.InitialModel()
+	m.termsModel = terms.InitialModel(acc.Id)
 	m.createModel = noteModel
 	m.myPostsModel = myPostsModel
 	m.globalPostsModel = globalPostsModel
@@ -150,15 +183,30 @@ func (m MainModel) Init() tea.Cmd {
 	cmds = append(cmds, func() tea.Msg { return common.ActivateViewMsg{} })
 
 	if m.account.FirstTimeLogin == domain.TRUE {
-		cmds = append(cmds, func() tea.Msg {
-			return common.CreateUserView
-		})
+		if m.config.Conf.ShowTos {
+			// New users must accept terms first, then create profile
+			cmds = append(cmds, func() tea.Msg {
+				return common.TermsAcceptanceView
+			})
+			cmds = append(cmds, loadTermsCmd())
+		} else {
+			// Terms disabled, go directly to profile creation
+			cmds = append(cmds, func() tea.Msg {
+				return common.CreateUserView
+			})
+		}
 	} else {
-		cmds = append(cmds, func() tea.Msg {
-			return common.CreateNoteView
-		})
-		// Initialize writenote model to start cursor blinking
-		cmds = append(cmds, m.createModel.Init())
+		if m.config.Conf.ShowTos {
+			// For existing users, check if they need to accept terms first
+			// The termsCheckResultMsg handler will transition to the appropriate state
+			cmds = append(cmds, checkTermsAcceptanceCmd(m.account.Id))
+		} else {
+			// Terms disabled, go directly to main app
+			cmds = append(cmds, func() tea.Msg {
+				return common.CreateNoteView
+			})
+			cmds = append(cmds, m.createModel.Init())
+		}
 	}
 
 	return tea.Batch(cmds...)
@@ -177,6 +225,21 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.newUserModel.TextInput.Focus()
 			return m, nil
 		}
+
+	case termsCheckResultMsg:
+		// Handle terms acceptance check for existing users
+		if msg.needsAcceptance {
+			m.state = common.TermsAcceptanceView
+			return m, loadTermsCmd()
+		}
+		// No terms acceptance needed, proceed to normal view
+		m.state = common.CreateNoteView
+		return m, m.createModel.Init()
+
+	case termsLoadedMsg:
+		// Update terms model with loaded content
+		m.termsModel.TermsContent = msg.content
+		return m, nil
 
 	case tea.WindowSizeMsg:
 		// Handle window resize - update all models that use width/height for layout
@@ -248,6 +311,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = common.ThreadView
 		case common.ProfileView:
 			m.state = common.ProfileView
+		case common.TermsAcceptanceView:
+			m.state = common.TermsAcceptanceView
 		case common.UpdateNoteList:
 			// Route to models that need to refresh (handled by SessionState routing below)
 			// Note: This message is also a SessionState, so it will trigger reloads
@@ -335,7 +400,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Order: write -> home -> my posts -> [global posts] -> [follow] -> followers -> following -> users -> [admin -> relay] -> delete
 			// AP-only views: follow remote user, relay management
 			// Optional views: global posts (when ShowGlobal is enabled)
-			if m.state == common.CreateUserView {
+			if m.state == common.CreateUserView || m.state == common.TermsAcceptanceView {
 				return m, nil
 			}
 			// Block tab navigation when in admin submenus (users/info boxes management)
@@ -433,7 +498,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Cycle backwards through views
 			// AP-only views: follow remote user, relay management
 			// Optional views: global posts (when ShowGlobal is enabled)
-			if m.state == common.CreateUserView {
+			if m.state == common.CreateUserView || m.state == common.TermsAcceptanceView {
 				return m, nil
 			}
 			// Block shift+tab navigation when in admin submenus (users/info boxes management)
@@ -535,7 +600,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.newUserModel, cmd = m.newUserModel.Update(msg)
 					return m, cmd
 				}
-				// Step 2 (bio) - save all info
+				// Step 2 (bio) complete - save user and go to main app
 				m.state = common.CreateNoteView
 				m.account.Username = m.newUserModel.TextInput.Value()
 				m.account.DisplayName = m.newUserModel.DisplayName.Value()
@@ -547,7 +612,6 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				m.headerModel = header.Model{Width: m.width, Acc: &m.account}
-				// Update accountSettingsModel and relayModel with the new account info
 				m.accountSettingsModel.Account = &m.account
 				m.relayModel.AdminAcct = &m.account
 				return m, updateUserModelCmd(&m.account)
@@ -639,6 +703,22 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case common.CreateUserView:
 		m.newUserModel, cmd = m.newUserModel.Update(msg)
 		cmds = append(cmds, cmd)
+	case common.TermsAcceptanceView:
+		// Route to terms model
+		m.termsModel, cmd = m.termsModel.Update(msg)
+		cmds = append(cmds, cmd)
+
+		// Handle terms acceptance
+		if _, ok := msg.(terms.TermsAcceptedMsg); ok {
+			if m.account.FirstTimeLogin == domain.TRUE {
+				// New user: go to profile creation (username/display name/bio)
+				m.state = common.CreateUserView
+				return m, m.newUserModel.Init()
+			}
+			// Existing user: go to main app
+			m.state = common.CreateNoteView
+			return m, m.createModel.Init()
+		}
 	case common.CreateNoteView:
 		m.createModel, cmd = m.createModel.Update(msg)
 		cmds = append(cmds, cmd)
@@ -855,6 +935,10 @@ func (m MainModel) View() string {
 
 	if m.state == common.CreateUserView {
 		s = m.newUserModel.ViewWithWidth(m.width, m.height)
+		return s
+	} else if m.state == common.TermsAcceptanceView {
+		// Show terms acceptance (new users see this first, existing users if terms updated)
+		s = m.termsModel.ViewWithWidth(m.width, m.height)
 		return s
 	} else {
 		// Update header with current unread notification count
