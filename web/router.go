@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/deemkeen/stegodon/activitypub"
+	"github.com/deemkeen/stegodon/assets"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/util"
 	"github.com/gin-contrib/gzip"
@@ -22,9 +23,6 @@ import (
 
 //go:embed templates/*.html
 var embeddedTemplates embed.FS
-
-//go:embed static/stegologo.png
-var embeddedLogo []byte
 
 //go:embed static/style.css
 var embeddedCSS []byte
@@ -104,7 +102,7 @@ func Router(conf *util.AppConfig) (*gin.Engine, error) {
 		g.GET("/static/stegologo.png", func(c *gin.Context) {
 			c.Header("Content-Type", "image/png")
 			c.Header("Cache-Control", "public, max-age=86400") // Cache for 24 hours
-			c.Data(200, "image/png", embeddedLogo)
+			c.Data(200, "image/png", assets.StegoLogo)
 		})
 		g.GET("/static/style.css", func(c *gin.Context) {
 			c.Header("Content-Type", "text/css; charset=utf-8")

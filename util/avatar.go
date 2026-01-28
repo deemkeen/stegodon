@@ -1,6 +1,7 @@
 package util
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	_ "image/jpeg"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/deemkeen/stegodon/assets"
 	"golang.org/x/image/draw"
 )
 
@@ -68,6 +70,15 @@ func LoadAvatarImage(avatarURL string) image.Image {
 	defer f.Close()
 
 	img, _, err := image.Decode(f)
+	if err != nil {
+		return nil
+	}
+	return img
+}
+
+// LoadDefaultAvatarImage returns the embedded stegodon logo as a fallback avatar.
+func LoadDefaultAvatarImage() image.Image {
+	img, _, err := image.Decode(bytes.NewReader(assets.StegoLogo))
 	if err != nil {
 		return nil
 	}

@@ -407,13 +407,14 @@ func loadProfile(viewerAccountId uuid.UUID, username string) tea.Cmd {
 			isFollowing = false
 		}
 
-		// Render avatar if available
+		// Render avatar: custom if available, otherwise default logo
 		var avatarStr string
-		if account.AvatarURL != "" {
-			img := util.LoadAvatarImage(account.AvatarURL)
-			if img != nil {
-				avatarStr = util.RenderImageToHalfBlocks(img, avatarCols, avatarRows)
-			}
+		img := util.LoadAvatarImage(account.AvatarURL)
+		if img == nil {
+			img = util.LoadDefaultAvatarImage()
+		}
+		if img != nil {
+			avatarStr = util.RenderImageToHalfBlocks(img, avatarCols, avatarRows)
 		}
 
 		return profileLoadedMsg{

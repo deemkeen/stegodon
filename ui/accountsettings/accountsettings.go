@@ -115,12 +115,13 @@ func InitialModel(account *domain.Account) Model {
 
 	conf, _ := util.ReadConf()
 
+	img := util.LoadAvatarImage(account.AvatarURL)
+	if img == nil {
+		img = util.LoadDefaultAvatarImage()
+	}
 	var avatarStr string
-	if account.AvatarURL != "" {
-		img := util.LoadAvatarImage(account.AvatarURL)
-		if img != nil {
-			avatarStr = util.RenderImageToHalfBlocks(img, avatarCols, avatarRows)
-		}
+	if img != nil {
+		avatarStr = util.RenderImageToHalfBlocks(img, avatarCols, avatarRows)
 	}
 
 	return Model{
@@ -223,12 +224,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.displayNameInput.SetValue(msg.account.DisplayName)
 			m.bioInput.SetValue(msg.account.Summary)
 			// Re-render avatar
+			img := util.LoadAvatarImage(msg.account.AvatarURL)
+			if img == nil {
+				img = util.LoadDefaultAvatarImage()
+			}
 			m.avatarRendered = ""
-			if msg.account.AvatarURL != "" {
-				img := util.LoadAvatarImage(msg.account.AvatarURL)
-				if img != nil {
-					m.avatarRendered = util.RenderImageToHalfBlocks(img, avatarCols, avatarRows)
-				}
+			if img != nil {
+				m.avatarRendered = util.RenderImageToHalfBlocks(img, avatarCols, avatarRows)
 			}
 		}
 		// Always clear status after refresh completes (handles both manual refresh and post-upload)
