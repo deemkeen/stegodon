@@ -37,14 +37,17 @@ This document provides a lookup table for all specification documents in the ste
 | WriteNote View | Note composition, @mention autocomplete, reply mode | [ui/writenote.md](./ui/writenote.md) |
 | MyPosts View | User's own posts with edit/delete capabilities | [ui/myposts.md](./ui/myposts.md) |
 | HomeTimeline View | Combined local + federated feed with auto-refresh | [ui/hometimeline.md](./ui/hometimeline.md) |
+| GlobalPosts View | Global timeline (all local + federated posts) | [ui/globalposts.md](./ui/globalposts.md) |
 | ThreadView | Conversation/reply thread display | [ui/threadview.md](./ui/threadview.md) |
+| ProfileView | User profile with avatar and recent posts | — |
 | FollowUser View | WebFinger-based remote user follow | [ui/followuser.md](./ui/followuser.md) |
 | Followers/Following Views | Paginated relationship lists | [ui/relationships.md](./ui/relationships.md) |
 | LocalUsers View | Browse and follow local users | [ui/localusers.md](./ui/localusers.md) |
 | Notifications View | Notification center with unread badges | [ui/notifications.md](./ui/notifications.md) |
 | Relay Management | Admin relay control (add, pause, delete) | [ui/relay.md](./ui/relay.md) |
-| Admin Panel | User management (mute, ban) and ban management | [ui/admin.md](./ui/admin.md) |
-| DeleteAccount View | Two-step account deletion confirmation | [ui/deleteaccount.md](./ui/deleteaccount.md) |
+| Admin Panel | User management (mute, ban), server message, terms | [ui/admin.md](./ui/admin.md) |
+| AccountSettings View | Profile editing, avatar upload, account deletion | [ui/deleteaccount.md](./ui/deleteaccount.md) |
+| Terms View | Terms of service acceptance screen | — |
 | Common Components | Header, styles, layout, commands | [ui/common.md](./ui/common.md) |
 
 ---

@@ -164,6 +164,45 @@ erDiagram
         TIMESTAMP created_at
     }
 
+    info_boxes {
+        TEXT id PK
+        TEXT title
+        TEXT content
+        INTEGER order_num
+        INTEGER enabled
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+
+    upload_tokens {
+        TEXT token PK
+        TEXT account_id FK
+        TEXT token_type
+        TIMESTAMP created_at
+        TIMESTAMP expires_at
+    }
+
+    server_message {
+        INTEGER id PK
+        TEXT message
+        INTEGER enabled
+        INTEGER web_enabled
+        TIMESTAMP updated_at
+    }
+
+    terms_and_conditions {
+        INTEGER id PK
+        TEXT content
+        TIMESTAMP updated_at
+    }
+
+    user_terms_acceptance {
+        INTEGER id PK
+        TEXT user_id FK
+        INTEGER terms_id FK
+        TIMESTAMP accepted_at
+    }
+
     accounts ||--o{ notes : "creates"
     accounts ||--o{ bans : "receives"
     accounts ||--o{ follows : "follower"
@@ -177,6 +216,9 @@ erDiagram
     notes ||--o{ note_mentions : "mentions"
     hashtags ||--o{ note_hashtags : "used_in"
     remote_accounts ||--o{ follows : "federated_follow"
+    accounts ||--o{ upload_tokens : "owns"
+    accounts ||--o{ user_terms_acceptance : "accepts"
+    terms_and_conditions ||--o{ user_terms_acceptance : "accepted_by"
 ```
 
 ## Tables
@@ -265,6 +307,60 @@ Records of banned user accounts. When an admin bans a user, a record is created 
 | `banned_by` | The admin account that issued the ban |
 | `reason` | Optional reason for the ban |
 | `created_at` | When the ban was issued |
+
+### info_boxes
+Customizable content boxes displayed on the web homepage. Admins can create, reorder, enable/disable, and edit boxes to show announcements or information.
+
+| Column | Description |
+|--------|-------------|
+| `id` | Unique identifier (UUID) |
+| `title` | Box title |
+| `content` | Box content (text) |
+| `order_num` | Display order (lower = higher) |
+| `enabled` | Whether the box is visible (0 or 1) |
+| `created_at` | When the box was created |
+| `updated_at` | Last modification timestamp |
+
+### upload_tokens
+One-time-use tokens for avatar uploads via the web browser. Generated from the TUI, consumed when the upload completes.
+
+| Column | Description |
+|--------|-------------|
+| `token` | Unique token string (primary key) |
+| `account_id` | The account this token belongs to |
+| `token_type` | Type of upload (e.g., `avatar`) |
+| `created_at` | When the token was created |
+| `expires_at` | When the token expires (10 minutes by default) |
+
+### server_message
+Single-row table storing an admin-configurable server announcement. Displayed in the TUI and optionally on the web interface.
+
+| Column | Description |
+|--------|-------------|
+| `id` | Always 1 (single-row constraint) |
+| `message` | The announcement text |
+| `enabled` | Whether the message is shown in TUI (0 or 1) |
+| `web_enabled` | Whether the message is shown on the web (0 or 1) |
+| `updated_at` | Last modification timestamp |
+
+### terms_and_conditions
+Stores terms of service content. When `STEGODON_SHOW_TOS` is enabled, users must accept the current terms before using the TUI.
+
+| Column | Description |
+|--------|-------------|
+| `id` | Auto-incrementing identifier |
+| `content` | The terms text |
+| `updated_at` | When the terms were last modified |
+
+### user_terms_acceptance
+Tracks which users have accepted which version of the terms. When terms are updated, users must re-accept.
+
+| Column | Description |
+|--------|-------------|
+| `id` | Auto-incrementing identifier |
+| `user_id` | The accepting user account (UUID) |
+| `terms_id` | The terms version accepted |
+| `accepted_at` | When the user accepted |
 
 ### accounts (additional columns)
 

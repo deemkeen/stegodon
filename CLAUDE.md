@@ -82,7 +82,9 @@ Built with [bubbletea](https://github.com/charmbracelet/bubbletea) MVC pattern. 
 - `writenote` - Note creation (with reply mode)
 - `myposts` - User's own notes with edit/delete
 - `hometimeline` - Combined local + federated timeline
+- `globalposts` - Global timeline (all local + all federated posts, admin-enabled)
 - `threadview` - Thread/conversation view
+- `profileview` - User profile with avatar and recent posts
 - `followuser` - Follow remote users
 - `followers` / `following` - Relationship lists
 - `localusers` - Browse local users
@@ -90,6 +92,7 @@ Built with [bubbletea](https://github.com/charmbracelet/bubbletea) MVC pattern. 
 - `relay` - Manage ActivityPub relay subscriptions (admin)
 - `admin` - Admin panel
 - `accountsettings` - Profile editing, avatar upload, account deletion
+- `terms` - Terms of service acceptance screen
 
 **Navigation:** Tab cycles forward, Shift+Tab backward. Press Ctrl+N for notifications. Enter opens threads, Esc returns.
 
@@ -100,6 +103,8 @@ SQLite with WAL mode. Singleton pattern with connection pooling (max 25 connecti
 **Core tables:** `accounts`, `notes`, `hashtags`, `note_hashtags`
 
 **ActivityPub tables:** `follows`, `remote_accounts`, `activities`, `likes`, `boosts`, `delivery_queue`, `note_mentions`, `relays`
+
+**Admin/feature tables:** `bans`, `notifications`, `info_boxes`, `server_message`, `upload_tokens`, `terms_and_conditions`, `user_terms_acceptance`
 
 **Denormalized counters:** `reply_count`, `like_count`, `boost_count` on notes and activities for performance.
 
@@ -128,17 +133,20 @@ Located in `web/`:
 stegodon/
 ├── app/             # Application lifecycle (App struct, Start, Shutdown)
 ├── activitypub/     # ActivityPub federation protocol
+├── assets/          # Shared embedded assets (logo)
+├── cli/             # Non-interactive SSH CLI commands
 ├── db/              # Database layer (SQLite operations, migrations)
 ├── domain/          # Domain models (Account, Note, Activity, Relay, etc.)
 ├── middleware/      # SSH middleware (auth, TUI handler)
-├── remote/          # Remote utilities
 ├── ui/              # TUI components
 │   ├── common/      # Shared styles, commands, session states, layout
 │   ├── createuser/  # Username selection
 │   ├── writenote/   # Note creation
 │   ├── myposts/     # User's notes
 │   ├── hometimeline/# Combined timeline
+│   ├── globalposts/ # Global timeline (all posts)
 │   ├── threadview/  # Thread display
+│   ├── profileview/ # User profile display
 │   ├── followuser/  # Follow interface
 │   ├── followers/   # Followers list
 │   ├── following/   # Following list
@@ -147,11 +155,11 @@ stegodon/
 │   ├── admin/       # Admin panel
 │   ├── header/      # Navigation bar
 │   ├── accountsettings/ # Profile and account settings
-│   └── notifications/ # Notifications view
-├── util/            # Utilities (config, crypto, helpers)
+│   ├── notifications/ # Notifications view
+│   └── terms/       # Terms of service acceptance
+├── util/            # Utilities (config, crypto, helpers, avatar rendering)
 ├── web/             # HTTP server (RSS, ActivityPub, web UI)
-│   ├── templates/   # HTML templates (embedded)
-│   └── static/      # Static assets (embedded)
+│   └── templates/   # HTML templates (embedded)
 └── main.go          # Entry point
 ```
 

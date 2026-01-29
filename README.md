@@ -107,6 +107,7 @@ STEGODON_SSH_ONLY=true            # SSH-only mode (disables web UI)
 STEGODON_NODE_DESCRIPTION="My personal microblog server"  # NodeInfo description
 STEGODON_MAX_CHARS=200            # Default is 150, max length is capped to 300 characters
 STEGODON_SHOW_GLOBAL=true         # Show global timeline (local + all federated posts) in TUI and web
+STEGODON_SHOW_TOS=true            # Show terms of service acceptance screen on login
 
 # Logging (Linux only)
 STEGODON_WITH_JOURNALD=true       # Send logs to systemd journald
