@@ -486,7 +486,15 @@ func (m Model) renderMenu() string {
 	}
 
 	if m.avatarRendered != "" {
-		s.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, m.avatarRendered, "   ", headerText.String()))
+		leftPanelWidth := common.CalculateLeftPanelWidth(m.Width)
+		rightPanelWidth := common.CalculateRightPanelWidth(m.Width, leftPanelWidth)
+		contentWidth := common.CalculateContentWidth(rightPanelWidth, 2)
+		textWidth := contentWidth - avatarCols - 3
+		if textWidth < 20 {
+			textWidth = 20
+		}
+		constrainedHeader := lipgloss.NewStyle().Width(textWidth).Render(headerText.String())
+		s.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, m.avatarRendered, "   ", constrainedHeader))
 	} else {
 		s.WriteString(headerText.String())
 	}

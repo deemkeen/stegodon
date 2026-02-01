@@ -280,7 +280,12 @@ func (m Model) View() string {
 
 	// Compose avatar + header text
 	if m.AvatarRendered != "" {
-		s.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, m.AvatarRendered, "   ", headerText.String()))
+		textWidth := contentWidth - avatarCols - 3
+		if textWidth < 20 {
+			textWidth = 20
+		}
+		constrainedHeader := lipgloss.NewStyle().Width(textWidth).Render(headerText.String())
+		s.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, m.AvatarRendered, "   ", constrainedHeader))
 	} else {
 		s.WriteString(headerText.String())
 	}

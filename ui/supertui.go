@@ -262,6 +262,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.threadViewModel.Height = msg.Height
 		m.profileViewModel.Width = msg.Width
 		m.profileViewModel.Height = msg.Height
+		m.accountSettingsModel.Width = msg.Width
 		return m, nil
 
 	case tea.MouseMsg:
