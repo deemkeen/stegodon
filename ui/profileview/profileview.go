@@ -374,7 +374,8 @@ func (m Model) viewLocalProfile(contentWidth int) string {
 
 	if m.ProfileUser.Summary != "" {
 		headerText.WriteString("\n")
-		headerText.WriteString(bioStyle.Render(m.ProfileUser.Summary))
+		bio := util.SanitizeRemoteContent(m.ProfileUser.Summary)
+		headerText.WriteString(bioStyle.Render(bio))
 		headerText.WriteString("\n")
 	}
 
@@ -438,7 +439,7 @@ func (m Model) viewLocalProfile(contentWidth int) string {
 			author := "@" + post.CreatedBy
 
 			// Format content
-			processedContent := post.Message
+			processedContent := util.SanitizeRemoteContent(post.Message)
 			processedContent = util.TruncateContent(processedContent, common.MaxDisplayContentLength)
 			processedContent = util.UnescapeHTML(processedContent)
 			processedContent = util.MarkdownLinksToTerminal(processedContent)
@@ -504,6 +505,7 @@ func (m Model) viewRemoteProfile(contentWidth int) string {
 		// Clean HTML from bio
 		bio := util.StripHTMLTags(m.RemoteProfileUser.Summary)
 		bio = util.UnescapeHTML(bio)
+		bio = util.SanitizeRemoteContent(bio)
 		headerText.WriteString(bioStyle.Render(bio))
 		headerText.WriteString("\n")
 	}
@@ -565,6 +567,7 @@ func (m Model) viewRemoteProfile(contentWidth int) string {
 
 			// Format content
 			processedContent := util.StripHTMLTags(post.Content)
+			processedContent = util.SanitizeRemoteContent(processedContent)
 			processedContent = util.TruncateContent(processedContent, common.MaxDisplayContentLength)
 			processedContent = util.UnescapeHTML(processedContent)
 			processedContent = util.MarkdownLinksToTerminal(processedContent)
