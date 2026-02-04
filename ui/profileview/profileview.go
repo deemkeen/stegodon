@@ -502,10 +502,11 @@ func (m Model) viewRemoteProfile(contentWidth int) string {
 
 	if m.RemoteProfileUser.Summary != "" {
 		headerText.WriteString("\n")
-		// Clean HTML from bio
+		// Clean HTML from bio and truncate to local bio limit (200 chars)
 		bio := util.StripHTMLTags(m.RemoteProfileUser.Summary)
 		bio = util.UnescapeHTML(bio)
 		bio = util.SanitizeRemoteContent(bio)
+		bio = util.TruncateContent(bio, 200)
 		headerText.WriteString(bioStyle.Render(bio))
 		headerText.WriteString("\n")
 	}
