@@ -505,7 +505,12 @@ func (m Model) viewRemoteProfile(contentWidth int) string {
 		// Clean HTML from bio and truncate to local bio limit (200 chars)
 		bio := util.StripHTMLTags(m.RemoteProfileUser.Summary)
 		bio = util.UnescapeHTML(bio)
+		// SanitizeRemoteContent converts complex emojis to simple ones by removing
+		// ZWJ, skin tones, and variation selectors (e.g., 🧑‍💻 → 🧑💻, 👋🏽 → 👋)
 		bio = util.SanitizeRemoteContent(bio)
+		// Collapse newlines and multiple spaces for consistent layout
+		bio = strings.ReplaceAll(bio, "\n", " ")
+		bio = strings.Join(strings.Fields(bio), " ")
 		bio = util.TruncateContent(bio, 200)
 		headerText.WriteString(bioStyle.Render(bio))
 		headerText.WriteString("\n")
