@@ -96,22 +96,27 @@ Session state determines which view is active:
 type SessionState uint
 
 const (
-    CreateNoteView     SessionState = iota  // 0 - Default/compose
-    HomeTimelineView                        // 1 - Combined timeline
-    MyPostsView                             // 2 - User's own posts
-    CreateUserView                          // 3 - First-time username
-    UpdateNoteList                          // 4 - Internal refresh signal
-    FollowUserView                          // 5 - Follow remote users
-    FollowersView                           // 6 - View followers
-    FollowingView                           // 7 - View following
-    LocalUsersView                          // 8 - Browse local users
-    AdminPanelView                          // 9 - Admin user management
-    RelayManagementView                     // 10 - Admin relay control
-    DeleteAccountView                       // 11 - Account deletion
-    ThreadView                              // 12 - Thread/conversation
-    NotificationsView                       // 13 - Notifications center
+    CreateNoteView      SessionState = iota  // 0 - Default/compose
+    HomeTimelineView                         // 1 - Combined timeline
+    MyPostsView                              // 2 - User's own posts
+    GlobalPostsView                          // 3 - Global timeline
+    CreateUserView                           // 4 - First-time username
+    UpdateNoteList                           // 5 - Internal refresh signal
+    FollowUserView                           // 6 - Follow remote users
+    FollowersView                            // 7 - View followers
+    FollowingView                            // 8 - View following
+    LocalUsersView                           // 9 - Browse local users
+    AdminPanelView                           // 10 - Admin user management
+    RelayManagementView                      // 11 - Admin relay control
+    AccountSettingsView                      // 12 - Account settings
+    ThreadView                               // 13 - Thread/conversation
+    NotificationsView                        // 14 - Notifications center
+    ProfileView                              // 15 - User profile (NOT in Tab cycle)
+    TermsAcceptanceView                      // 16 - Terms acceptance
 )
 ```
+
+**Note:** `ProfileView` is NOT part of the Tab navigation cycle. It is accessed by pressing Enter on users in Followers/Following/LocalUsers views, and users return to their previous view by pressing Esc.
 
 ### State Transitions
 
@@ -136,7 +141,8 @@ const (
 │                                                              │
 │   Special: Ctrl+N → NotificationsView (from anywhere)       │
 │   Special: Enter → ThreadView (from timeline views)         │
-│   Special: Esc → Return to PreviousState                    │
+│   Special: Enter → ProfileView (from relationship views)    │
+│   Special: Esc → Return to PreviousState/ReturnView         │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -170,6 +176,21 @@ func getNextView(currentState SessionState) SessionState {
     }
 }
 ```
+
+### Profile Navigation Pattern
+
+ProfileView uses a special `ReturnView` mechanism for context-aware navigation:
+
+```
+Followers/Following/LocalUsers → (Enter on user) → ProfileView
+                                                         │
+                                                    (Esc pressed)
+                                                         │
+                                                         ▼
+                                               Return to ReturnView
+```
+
+Unlike Tab navigation, ProfileView tracks where the user came from and returns there on Esc. This is implemented via the `ReturnView` field which stores the source `SessionState`.
 
 ### Activation/Deactivation Messages
 

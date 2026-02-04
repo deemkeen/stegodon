@@ -512,6 +512,63 @@ tx.Exec(sqlInsertInfoBox, ..., enabledInt, ...)
 
 ---
 
+## Remote Profile Queries
+
+### Read Activities by Actor URI
+
+Used by ProfileView to load posts from a remote user:
+
+```go
+// ReadActivitiesByActorURI returns top-level posts from a remote actor
+func (db *DB) ReadActivitiesByActorURI(actorURI string, limit int) (error, *[]domain.Activity)
+```
+
+**SQL Pattern:**
+
+```sql
+SELECT id, activity_type, actor_uri, object_uri, object_url, raw_json,
+       created_at, local, in_reply_to, like_count, boost_count, reply_count
+FROM activities
+WHERE actor_uri = ?
+  AND activity_type = 'Create'
+  AND local = 0
+  AND (in_reply_to IS NULL OR in_reply_to = '')
+ORDER BY created_at DESC
+LIMIT ?
+```
+
+**Features:**
+- Filters to `Create` activities only (posts, not likes/follows)
+- Filters `local = 0` (remote activities only)
+- Excludes replies (`in_reply_to` is NULL or empty)
+- Orders by creation time (newest first)
+- Used for displaying remote user posts in ProfileView
+
+### Read Follow by Account IDs
+
+Used to check if a follow relationship exists between two accounts:
+
+```go
+// ReadFollowByAccountIds checks if a follow relationship exists
+func (db *DB) ReadFollowByAccountIds(accountId, targetAccountId uuid.UUID) (error, *domain.Follow)
+```
+
+**SQL Pattern:**
+
+```sql
+SELECT id, account_id, target_account_id, uri, created_at, accepted, is_local
+FROM follows
+WHERE account_id = ? AND target_account_id = ?
+```
+
+**Features:**
+- Works with both local and remote account IDs
+- Used to determine follow status in ProfileView
+- Returns `Accepted` flag for pending vs established follows
+- Returns `nil` if no follow relationship exists
+
+---
+
 ## Source Files
 
 - `db/db.go` - All query implementations

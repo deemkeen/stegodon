@@ -39,7 +39,7 @@ This document provides a lookup table for all specification documents in the ste
 | HomeTimeline View | Combined local + federated feed with auto-refresh | [ui/hometimeline.md](./ui/hometimeline.md) |
 | GlobalPosts View | Global timeline (all local + federated posts) | [ui/globalposts.md](./ui/globalposts.md) |
 | ThreadView | Conversation/reply thread display | [ui/threadview.md](./ui/threadview.md) |
-| ProfileView | User profile with avatar and recent posts | — |
+| ProfileView | User profile with avatar and recent posts (local and remote) | [ui/profileview.md](./ui/profileview.md) |
 | FollowUser View | WebFinger-based remote user follow | [ui/followuser.md](./ui/followuser.md) |
 | Followers/Following Views | Paginated relationship lists | [ui/relationships.md](./ui/relationships.md) |
 | LocalUsers View | Browse and follow local users | [ui/localusers.md](./ui/localusers.md) |

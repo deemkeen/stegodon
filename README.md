@@ -64,11 +64,17 @@ See [DOCKER.md](DOCKER.md) for complete Docker deployment guide.
 
 ## Navigation
 
+### Global
+
 - **Tab** - Cycle through views
 - **Shift+Tab** - Cycle through views in reverse order
 - **Ctrl+N** - Jump to notifications view
-- **Up/Down** or **j/k** - Navigate lists
-- **Enter** - Open thread view for posts with replies (or delete notification in notifications view)
+- **Ctrl+C** or **q** - Quit
+
+### Timeline Views (Home, My Posts, Global)
+
+- **Up/Down** or **j/k** - Navigate posts
+- **Enter** - Open thread view for posts with replies
 - **Esc** - Return from thread view
 - **r** - Reply to selected post
 - **l** - Like/unlike selected post (federated)
@@ -80,9 +86,32 @@ See [DOCKER.md](DOCKER.md) for complete Docker deployment guide.
   - Cmd+click (Mac) or Ctrl+click (Linux) URL to open in local browser
 - **u** - Edit note (in my posts)
 - **d** - Delete note with confirmation
-- **a** - Delete all notifications (in notifications view)
 - **Ctrl+S** - Save/post note
-- **Ctrl+C** or **q** - Quit
+
+### Followers View
+
+- **Up/Down** or **j/k** - Navigate list
+- **Enter** - View profile of selected follower
+- **f** - Follow back (sends request for remote users)
+
+### Following View
+
+- **Up/Down** or **j/k** - Navigate list
+- **Enter** - View profile of selected user
+- **f** - Unfollow selected user
+
+### Profile View
+
+- **Up/Down** or **j/k** - Navigate posts
+- **Enter** - View thread for selected post
+- **f** - Toggle follow/unfollow
+- **Esc** - Return to previous view
+
+### Notifications View
+
+- **Up/Down** or **j/k** - Navigate notifications
+- **Enter** - Delete selected notification
+- **a** - Delete all notifications
 
 ## Configuration
 
