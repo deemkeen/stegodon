@@ -84,7 +84,7 @@ Built with [bubbletea](https://github.com/charmbracelet/bubbletea) MVC pattern. 
 - `hometimeline` - Combined local + federated timeline
 - `globalposts` - Global timeline (all local + all federated posts, admin-enabled)
 - `threadview` - Thread/conversation view
-- `profileview` - User profile with avatar and recent posts
+- `profileview` - User profile with avatar and recent posts (supports both local and remote/federated users)
 - `followuser` - Follow remote users
 - `followers` / `following` - Relationship lists
 - `localusers` - Browse local users
@@ -157,7 +157,7 @@ stegodon/
 │   ├── accountsettings/ # Profile and account settings
 │   ├── notifications/ # Notifications view
 │   └── terms/       # Terms of service acceptance
-├── util/            # Utilities (config, crypto, helpers, avatar rendering)
+├── util/            # Utilities (config, crypto, helpers, avatar rendering including LoadRemoteAvatarImage)
 ├── web/             # HTTP server (RSS, ActivityPub, web UI)
 │   └── templates/   # HTML templates (embedded)
 └── main.go          # Entry point

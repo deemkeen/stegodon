@@ -74,7 +74,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 					m.Offset = m.Selected - common.DefaultItemsPerPage + 1
 				}
 			}
-		case "u", "enter":
+		case "f":
 			// Unfollow the selected account
 			if len(m.Following) > 0 && m.Selected < len(m.Following) {
 				selectedFollow := m.Following[m.Selected]
@@ -154,6 +154,38 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				m.Status = fmt.Sprintf("Unfollowed %s", displayName)
 				m.Error = ""
 				return m, clearStatusAfter(2 * time.Second)
+			}
+		case "enter":
+			// View profile of selected user
+			if len(m.Following) > 0 && m.Selected < len(m.Following) {
+				selectedFollow := m.Following[m.Selected]
+				database := db.GetDB()
+
+				if selectedFollow.IsLocal {
+					err, localAcc := database.ReadAccById(selectedFollow.TargetAccountId)
+					if err == nil && localAcc != nil {
+						return m, func() tea.Msg {
+							return common.ViewProfileMsg{
+								Username:  localAcc.Username,
+								AccountId: localAcc.Id,
+								IsRemote:  false,
+							}
+						}
+					}
+				} else {
+					err, remoteAcc := database.ReadRemoteAccountById(selectedFollow.TargetAccountId)
+					if err == nil && remoteAcc != nil {
+						return m, func() tea.Msg {
+							return common.ViewProfileMsg{
+								Username:  remoteAcc.Username,
+								AccountId: remoteAcc.Id,
+								IsRemote:  true,
+								ActorURI:  remoteAcc.ActorURI,
+								Domain:    remoteAcc.Domain,
+							}
+						}
+					}
+				}
 			}
 		}
 	}

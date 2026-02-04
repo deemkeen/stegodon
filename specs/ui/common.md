@@ -291,22 +291,27 @@ Session states represent the current active view:
 type SessionState uint
 
 const (
-    CreateNoteView      SessionState = iota
-    HomeTimelineView                  // Unified home timeline
-    MyPostsView                       // User's own posts
-    CreateUserView
-    UpdateNoteList                    // Signal to reload note lists
-    FollowUserView                    // Follow remote users
-    FollowersView                     // View followers
-    FollowingView                     // View following
-    LocalUsersView                    // Browse local users
-    AdminPanelView                    // Admin panel (admin only)
-    RelayManagementView               // Relay management (admin only)
-    DeleteAccountView                 // Account deletion
-    ThreadView                        // Thread/conversation view
-    NotificationsView                 // Notifications
+    CreateNoteView      SessionState = iota  // 0
+    HomeTimelineView                          // 1 - Unified home timeline
+    MyPostsView                               // 2 - User's own posts
+    GlobalPostsView                           // 3 - Global timeline (all posts)
+    CreateUserView                            // 4
+    UpdateNoteList                            // 5 - Signal to reload note lists
+    FollowUserView                            // 6 - Follow remote users
+    FollowersView                             // 7 - View followers
+    FollowingView                             // 8 - View following
+    LocalUsersView                            // 9 - Browse local users
+    AdminPanelView                            // 10 - Admin panel (admin only)
+    RelayManagementView                       // 11 - Relay management (admin only)
+    AccountSettingsView                       // 12 - Account settings (profile, avatar, delete)
+    ThreadView                                // 13 - Thread/conversation view
+    NotificationsView                         // 14 - Notifications
+    ProfileView                               // 15 - User profile with recent posts
+    TermsAcceptanceView                       // 16 - Terms acceptance for existing users
 )
 ```
+
+**Note:** `ProfileView` is NOT part of the Tab navigation cycle. It is accessed by pressing Enter on a user in Followers/Following/LocalUsers views, and users return via Esc.
 
 ---
 
@@ -358,6 +363,21 @@ type ViewThreadMsg struct {
     CreatedAt time.Time
 }
 ```
+
+### Profile Navigation
+
+```go
+// ViewProfileMsg is sent when user presses Enter on a user to view their profile
+type ViewProfileMsg struct {
+    Username  string    // Username for display/lookup
+    AccountId uuid.UUID // Account ID (local or remote)
+    IsRemote  bool      // true for remote/federated users
+    ActorURI  string    // ActivityPub actor URI (remote only)
+    Domain    string    // Domain for display (e.g., "mastodon.social")
+}
+```
+
+This message is used to navigate from Followers/Following/LocalUsers views to ProfileView. The `IsRemote` flag determines whether to load from the local `accounts` table or fetch remote profile data.
 
 ### Engagement
 

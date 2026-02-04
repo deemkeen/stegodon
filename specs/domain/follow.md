@@ -273,8 +273,24 @@ Receive Undo(Follow) Activity
 | `GetFollowing(accountId)` | Get accounts this user follows |
 | `GetFollow(accountId, targetId)` | Check if follow exists |
 | `GetFollowByURI(uri)` | Lookup by ActivityPub URI |
+| `ReadFollowByAccountIds(accountId, targetAccountId)` | Check if follow exists between two accounts |
 | `CountFollowers(accountId)` | Count followers |
 | `CountFollowing(accountId)` | Count following |
+
+### ReadFollowByAccountIds
+
+Used by ProfileView to check follow status:
+
+```go
+// ReadFollowByAccountIds checks if a follow relationship exists
+func (db *DB) ReadFollowByAccountIds(accountId, targetAccountId uuid.UUID) (error, *domain.Follow)
+```
+
+**Use cases:**
+- Checking if viewing user follows the profile user
+- Works with both local and remote account IDs
+- Returns full Follow struct including `Accepted` flag
+- Returns `nil` if no follow relationship exists
 
 ### Write Operations
 

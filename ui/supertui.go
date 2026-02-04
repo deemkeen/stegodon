@@ -358,6 +358,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case common.ViewProfileMsg:
+		// Set return view based on where the profile was opened from
+		m.profileViewModel.ReturnView = m.state
 		// Route ViewProfile message to profileview model and switch to ProfileView
 		m.profileViewModel, cmd = m.profileViewModel.Update(msg)
 		m.state = common.ProfileView
@@ -1026,9 +1028,9 @@ func (m MainModel) View() string {
 		case common.FollowUserView:
 			viewCommands = "enter: follow"
 		case common.FollowersView:
-			viewCommands = "↑/↓: scroll • f: follow back"
+			viewCommands = "↑/↓ • enter: profile • f: follow back"
 		case common.FollowingView:
-			viewCommands = "↑/↓ • u/enter: unfollow"
+			viewCommands = "↑/↓ • enter: profile • f: unfollow"
 		case common.LocalUsersView:
 			viewCommands = "↑/↓ • enter: profile • f: follow"
 		case common.AdminPanelView:

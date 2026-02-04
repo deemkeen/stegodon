@@ -71,6 +71,8 @@ if follow.IsLocal {
 |-----|--------|
 | `↑` / `k` | Move selection up |
 | `↓` / `j` | Move selection down |
+| `Enter` | View profile of selected follower |
+| `f` | Follow back (sends follow request for remote users) |
 
 ### Empty State
 
@@ -147,7 +149,8 @@ if follow.IsLocal {
 |-----|--------|
 | `↑` / `k` | Move selection up |
 | `↓` / `j` | Move selection down |
-| `u` / `Enter` | Unfollow selected account |
+| `Enter` | View profile of selected user |
+| `f` | Unfollow selected account |
 
 ---
 
@@ -181,7 +184,7 @@ Update UI
 ### Unfollow Logic
 
 ```go
-case "u", "enter":
+case "f":
     if len(m.Following) > 0 && m.Selected < len(m.Following) {
         selectedFollow := m.Following[m.Selected]
 
@@ -437,10 +440,53 @@ if len(m.Following) == 0 {
 
 ---
 
+## Profile Navigation
+
+Both Followers and Following views support pressing Enter to view the selected user's profile:
+
+```go
+case "enter":
+    if len(m.Followers) > 0 && m.Selected < len(m.Followers) {
+        follower := m.Followers[m.Selected]
+        database := db.GetDB()
+
+        if follower.IsLocal {
+            err, localAcc := database.ReadAccById(follower.AccountId)
+            if err == nil && localAcc != nil {
+                return m, func() tea.Msg {
+                    return common.ViewProfileMsg{
+                        Username:  localAcc.Username,
+                        AccountId: localAcc.Id,
+                        IsRemote:  false,
+                    }
+                }
+            }
+        } else {
+            err, remoteAcc := database.ReadRemoteAccountById(follower.AccountId)
+            if err == nil && remoteAcc != nil {
+                return m, func() tea.Msg {
+                    return common.ViewProfileMsg{
+                        Username:  remoteAcc.Username,
+                        AccountId: remoteAcc.Id,
+                        IsRemote:  true,
+                        ActorURI:  remoteAcc.ActorURI,
+                        Domain:    remoteAcc.Domain,
+                    }
+                }
+            }
+        }
+    }
+```
+
+The `ViewProfileMsg` includes the `IsRemote` flag to indicate whether the profile is local or federated, allowing ProfileView to load the appropriate data.
+
+---
+
 ## Source Files
 
 - `ui/followers/followers.go` - Followers view implementation
 - `ui/following/following.go` - Following view implementation
 - `ui/common/styles.go` - List styles
+- `ui/common/commands.go` - ViewProfileMsg definition
 - `activitypub/outbox.go` - SendUndo for unfollowing
 - `db/db.go` - ReadFollowersByAccountId, ReadFollowingByAccountId, DeleteFollowByURI

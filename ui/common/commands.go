@@ -82,10 +82,13 @@ type LikeNoteMsg struct {
 	IsLocal bool      // Whether this is a local note
 }
 
-// ViewProfileMsg is sent when user presses Enter on a local user to view their profile
+// ViewProfileMsg is sent when user presses Enter on a user to view their profile
 type ViewProfileMsg struct {
 	Username  string
 	AccountId uuid.UUID
+	IsRemote  bool   // true for remote/federated users
+	ActorURI  string // ActivityPub actor URI for remote users
+	Domain    string // domain for display (e.g., "mastodon.social")
 }
 
 // BoostNoteMsg is sent when user presses 'b' to boost/unboost a post

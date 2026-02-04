@@ -7,9 +7,11 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"math"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/deemkeen/stegodon/assets"
 	"golang.org/x/image/draw"
@@ -151,4 +153,33 @@ func colorDist(r1, g1, b1, r2, g2, b2 uint8) float64 {
 	dg := float64(g1) - float64(g2)
 	db := float64(b1) - float64(b2)
 	return dr*dr + dg*dg + db*db
+}
+
+// LoadRemoteAvatarImage fetches an avatar image from a remote URL.
+// Returns nil if the URL is empty, the request fails, or decoding fails.
+// Uses a 5-second timeout to avoid blocking on slow/unresponsive servers.
+func LoadRemoteAvatarImage(url string) image.Image {
+	if url == "" {
+		return nil
+	}
+
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil
+	}
+
+	img, _, err := image.Decode(resp.Body)
+	if err != nil {
+		return nil
+	}
+	return img
 }
