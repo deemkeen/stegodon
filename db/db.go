@@ -3844,6 +3844,35 @@ func (db *DB) ReadActivitiesByInReplyTo(parentURI string) (error, *[]domain.Acti
 	return nil, &activities
 }
 
+// ReadActivitiesByActorURI returns top-level posts (Create activities) from a specific remote actor
+// Used to display posts on a remote user's profile
+func (db *DB) ReadActivitiesByActorURI(actorURI string, limit int) (error, *[]domain.Activity) {
+	rows, err := db.db.Query(`
+		SELECT id, activity_uri, activity_type, actor_uri, object_uri, COALESCE(object_url, ''), raw_json, processed, local, created_at, COALESCE(like_count, 0), COALESCE(boost_count, 0)
+		FROM activities
+		WHERE actor_uri = ? AND activity_type = 'Create' AND local = 0
+		AND (in_reply_to IS NULL OR in_reply_to = '')
+		ORDER BY created_at DESC LIMIT ?`,
+		actorURI, limit)
+	if err != nil {
+		return err, nil
+	}
+	defer rows.Close()
+
+	var activities []domain.Activity
+	for rows.Next() {
+		var a domain.Activity
+		var idStr string
+		err := rows.Scan(&idStr, &a.ActivityURI, &a.ActivityType, &a.ActorURI, &a.ObjectURI, &a.ObjectURL, &a.RawJSON, &a.Processed, &a.Local, &a.CreatedAt, &a.LikeCount, &a.BoostCount)
+		if err != nil {
+			continue
+		}
+		a.Id, _ = uuid.Parse(idStr)
+		activities = append(activities, a)
+	}
+	return nil, &activities
+}
+
 // CountActivitiesByInReplyTo counts Create activities that are replies to the given URI
 func (db *DB) CountActivitiesByInReplyTo(parentURI string) (int, error) {
 	var count int

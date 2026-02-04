@@ -109,6 +109,38 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 					return m, followRemoteUserByIdCmd(m.AccountId, follower.AccountId)
 				}
 			}
+		case "enter":
+			// View profile of selected follower
+			if len(m.Followers) > 0 && m.Selected < len(m.Followers) {
+				follower := m.Followers[m.Selected]
+				database := db.GetDB()
+
+				if follower.IsLocal {
+					err, localAcc := database.ReadAccById(follower.AccountId)
+					if err == nil && localAcc != nil {
+						return m, func() tea.Msg {
+							return common.ViewProfileMsg{
+								Username:  localAcc.Username,
+								AccountId: localAcc.Id,
+								IsRemote:  false,
+							}
+						}
+					}
+				} else {
+					err, remoteAcc := database.ReadRemoteAccountById(follower.AccountId)
+					if err == nil && remoteAcc != nil {
+						return m, func() tea.Msg {
+							return common.ViewProfileMsg{
+								Username:  remoteAcc.Username,
+								AccountId: remoteAcc.Id,
+								IsRemote:  true,
+								ActorURI:  remoteAcc.ActorURI,
+								Domain:    remoteAcc.Domain,
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 	return m, nil
