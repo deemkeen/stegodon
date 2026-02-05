@@ -1111,6 +1111,43 @@ func (db *DB) ReadActivityByURI(uri string) (error, *domain.Activity) {
 	return nil, &activity
 }
 
+// ReadActivityById reads an activity by its UUID
+func (db *DB) ReadActivityById(id uuid.UUID) (error, *domain.Activity) {
+	row := db.db.QueryRow(
+		`SELECT id, activity_uri, activity_type, actor_uri, object_uri, COALESCE(object_url, ''), raw_json, processed, local, created_at, COALESCE(like_count, 0), COALESCE(boost_count, 0)
+		FROM activities WHERE id = ?`,
+		id.String(),
+	)
+	var activity domain.Activity
+	var idStr string
+	var createdAtStr string
+	err := row.Scan(
+		&idStr,
+		&activity.ActivityURI,
+		&activity.ActivityType,
+		&activity.ActorURI,
+		&activity.ObjectURI,
+		&activity.ObjectURL,
+		&activity.RawJSON,
+		&activity.Processed,
+		&activity.Local,
+		&createdAtStr,
+		&activity.LikeCount,
+		&activity.BoostCount,
+	)
+	if err == sql.ErrNoRows {
+		return err, nil
+	}
+	if err != nil {
+		return err, nil
+	}
+	activity.Id, _ = uuid.Parse(idStr)
+	if parsedTime, parseErr := parseTimestamp(createdAtStr); parseErr == nil {
+		activity.CreatedAt = parsedTime
+	}
+	return nil, &activity
+}
+
 // ReadActivityByObjectURI reads an activity by the object URI
 // First tries exact match on object_uri column, falls back to searching raw_json for older activities
 func (db *DB) ReadActivityByObjectURI(objectURI string) (error, *domain.Activity) {

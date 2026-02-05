@@ -12,12 +12,33 @@ import (
 	"github.com/google/uuid"
 )
 
+// parseReplyToFlag extracts --reply-to value and remaining args
+func parseReplyToFlag(args []string) ([]string, string) {
+	var replyTo string
+	var filtered []string
+
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--reply-to" && i+1 < len(args) {
+			replyTo = args[i+1]
+			i++ // Skip the next arg (the value)
+		} else {
+			filtered = append(filtered, args[i])
+		}
+	}
+
+	return filtered, replyTo
+}
+
 // handlePost creates a new note
 func (h *Handler) handlePost(args []string) error {
 	var message string
+	var inReplyToURI string
+
+	// Parse --reply-to flag
+	args, replyToID := parseReplyToFlag(args)
 
 	if len(args) == 0 {
-		err := fmt.Errorf("usage: post <message> or post -")
+		err := fmt.Errorf("usage: post <message> [--reply-to <id>]")
 		h.output.Error(err)
 		return err
 	}
@@ -56,8 +77,39 @@ func (h *Handler) handlePost(args []string) error {
 		return err
 	}
 
+	// Resolve --reply-to if provided
+	if replyToID != "" {
+		postID, err := uuid.Parse(replyToID)
+		if err != nil {
+			err = fmt.Errorf("invalid reply-to ID: %s", replyToID)
+			h.output.Error(err)
+			return err
+		}
+
+		// Try to find the post - first check if it's a local note
+		dbErr, note := h.db.ReadNoteId(postID)
+		if dbErr == nil && note != nil {
+			inReplyToURI = note.ObjectURI
+		} else {
+			// Try to find it as a remote activity
+			dbErr, activity := h.db.ReadActivityById(postID)
+			if dbErr != nil || activity == nil {
+				err = fmt.Errorf("reply-to post not found: %s", replyToID)
+				h.output.Error(err)
+				return err
+			}
+			inReplyToURI = activity.ObjectURI
+		}
+	}
+
 	// Create the note
-	noteId, err := h.db.CreateNote(h.account.Id, message)
+	var noteId interface{}
+	var err error
+	if inReplyToURI != "" {
+		noteId, err = h.db.CreateNoteWithReply(h.account.Id, message, inReplyToURI)
+	} else {
+		noteId, err = h.db.CreateNote(h.account.Id, message)
+	}
 	if err != nil {
 		h.output.Error(err)
 		return err
@@ -87,11 +139,15 @@ func (h *Handler) handlePost(args []string) error {
 
 	// Output response
 	if h.output.IsJSON() {
-		h.output.JSON(PostResponse{
+		resp := PostResponse{
 			ID:        fmt.Sprintf("%v", noteId),
 			Message:   message,
 			CreatedAt: time.Now(),
-		})
+		}
+		if inReplyToURI != "" {
+			resp.InReplyTo = inReplyToURI
+		}
+		h.output.JSON(resp)
 	} else {
 		// Convert noteId to string for display
 		var idStr string
@@ -101,7 +157,11 @@ func (h *Handler) handlePost(args []string) error {
 		default:
 			idStr = fmt.Sprintf("%v", id)
 		}
-		h.output.Success("Posted: %s\n", idStr)
+		if inReplyToURI != "" {
+			h.output.Success("Reply posted: %s\n", idStr)
+		} else {
+			h.output.Success("Posted: %s\n", idStr)
+		}
 	}
 
 	return nil
