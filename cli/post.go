@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/deemkeen/stegodon/activitypub"
+	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/util"
 	"github.com/google/uuid"
 )
@@ -33,6 +34,7 @@ func parseReplyToFlag(args []string) ([]string, string) {
 func (h *Handler) handlePost(args []string) error {
 	var message string
 	var inReplyToURI string
+	var parentNote *domain.Note // Store parent note for notification
 
 	// Parse --reply-to flag
 	args, replyToID := parseReplyToFlag(args)
@@ -91,6 +93,7 @@ func (h *Handler) handlePost(args []string) error {
 		dbErr, note := h.db.ReadNoteIdWithReplyInfo(postID)
 		if dbErr == nil && note != nil {
 			inReplyToURI = note.ObjectURI
+			parentNote = note // Save for notification
 		} else {
 			// Try to find it as a remote activity
 			dbErr, activity := h.db.ReadActivityById(postID)
@@ -114,6 +117,42 @@ func (h *Handler) handlePost(args []string) error {
 	if err != nil {
 		h.output.Error(err)
 		return err
+	}
+
+	// Create reply notification if replying to a local note
+	if parentNote != nil {
+		// Get parent author
+		dbErr, parentAuthor := h.db.ReadAccByUsername(parentNote.CreatedBy)
+		if dbErr == nil && parentAuthor != nil && parentAuthor.Id != h.account.Id {
+			// Only notify if replier is not the parent author
+			preview := util.StripHTMLTags(message)
+			if len(preview) > 100 {
+				preview = preview[:100] + "..."
+			}
+
+			// Convert noteId to uuid.UUID for notification
+			var noteUUID uuid.UUID
+			switch id := noteId.(type) {
+			case uuid.UUID:
+				noteUUID = id
+			}
+
+			notification := &domain.Notification{
+				Id:               uuid.New(),
+				AccountId:        parentAuthor.Id,
+				NotificationType: domain.NotificationReply,
+				ActorId:          h.account.Id,
+				ActorUsername:    h.account.Username,
+				ActorDomain:      "", // Empty for local users
+				NoteId:           noteUUID,
+				NotePreview:      preview,
+				Read:             false,
+				CreatedAt:        time.Now(),
+			}
+			if err := h.db.CreateNotification(notification); err != nil {
+				log.Printf("CLI: Failed to create reply notification: %v", err)
+			}
+		}
 	}
 
 	// Federate the note via ActivityPub (background task)
