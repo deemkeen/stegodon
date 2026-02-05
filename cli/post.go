@@ -160,6 +160,47 @@ func (h *Handler) handlePost(args []string) error {
 		}
 	}
 
+	// Create mention notifications for local users
+	mentions := util.ParseMentions(message)
+	if len(mentions) > 0 {
+		preview := util.StripHTMLTags(message)
+		if len(preview) > 100 {
+			preview = preview[:100] + "..."
+		}
+
+		// Convert noteId to uuid.UUID for notification
+		var noteUUID uuid.UUID
+		switch id := noteId.(type) {
+		case uuid.UUID:
+			noteUUID = id
+		}
+
+		for _, mention := range mentions {
+			// Check if this is a local user
+			if mention.Domain == "" || strings.EqualFold(mention.Domain, h.conf.Conf.SslDomain) {
+				dbErr, mentionedUser := h.db.ReadAccByUsername(mention.Username)
+				if dbErr == nil && mentionedUser != nil && mentionedUser.Id != h.account.Id {
+					// Only notify if mentioner is not the mentioned user
+					notification := &domain.Notification{
+						Id:               uuid.New(),
+						AccountId:        mentionedUser.Id,
+						NotificationType: domain.NotificationMention,
+						ActorId:          h.account.Id,
+						ActorUsername:    h.account.Username,
+						ActorDomain:      "", // Empty for local users
+						NoteId:           noteUUID,
+						NotePreview:      preview,
+						Read:             false,
+						CreatedAt:        time.Now(),
+					}
+					if err := h.db.CreateNotification(notification); err != nil {
+						log.Printf("CLI: Failed to create mention notification: %v", err)
+					}
+				}
+			}
+		}
+	}
+
 	// Federate the note via ActivityPub (background task)
 	go func() {
 		// Only federate if ActivityPub is enabled
