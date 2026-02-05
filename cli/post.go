@@ -87,7 +87,8 @@ func (h *Handler) handlePost(args []string) error {
 		}
 
 		// Try to find the post - first check if it's a local note
-		dbErr, note := h.db.ReadNoteId(postID)
+		// Use ReadNoteIdWithReplyInfo to get ObjectURI
+		dbErr, note := h.db.ReadNoteIdWithReplyInfo(postID)
 		if dbErr == nil && note != nil {
 			inReplyToURI = note.ObjectURI
 		} else {

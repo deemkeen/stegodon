@@ -91,12 +91,10 @@ func (m *mockDatabase) CreateNoteWithReply(userId interface{}, message string, i
 }
 
 func (m *mockDatabase) ReadNoteIdWithReplyInfo(id interface{}) (error, *domain.Note) {
-	noteId := id.(uuid.UUID)
-	return nil, &domain.Note{
-		Id:        noteId,
-		CreatedBy: "testuser",
-		Message:   "test message",
+	if m.note != nil {
+		return nil, m.note
 	}
+	return fmt.Errorf("note not found"), nil
 }
 
 func (m *mockDatabase) ReadHomeTimelinePosts(accountId interface{}, limit int) (error, *[]domain.HomePost) {
