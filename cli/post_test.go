@@ -200,6 +200,37 @@ func TestPost_ReplyToLocalNote(t *testing.T) {
 	}
 }
 
+func TestPost_ReplyToLocalNoteWithoutObjectURI(t *testing.T) {
+	noteId := uuid.New()
+	db := &mockDatabase{
+		createdNoteID: uuid.New(),
+		note: &domain.Note{
+			Id:        noteId,
+			ObjectURI: "", // Empty ObjectURI
+			Message:   "Original post",
+		},
+	}
+	handler, output := newTestHandlerWithDB("", db)
+
+	err := handler.Execute([]string{"post", "My reply", "--reply-to", noteId.String(), "--json"})
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	var resp PostResponse
+	if err := json.Unmarshal(output.Bytes(), &resp); err != nil {
+		t.Fatalf("Expected valid JSON, got error: %v, output: %s", err, output.String())
+	}
+
+	expectedURI := "local:" + noteId.String()
+	if resp.InReplyTo != expectedURI {
+		t.Errorf("Expected InReplyTo '%s', got %s", expectedURI, resp.InReplyTo)
+	}
+	if db.inReplyToURI != expectedURI {
+		t.Errorf("Expected database to receive inReplyToURI '%s', got %s", expectedURI, db.inReplyToURI)
+	}
+}
+
 func TestPost_ReplyToRemoteActivity(t *testing.T) {
 	activityId := uuid.New()
 	db := &mockDatabase{

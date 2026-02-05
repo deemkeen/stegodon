@@ -92,7 +92,12 @@ func (h *Handler) handlePost(args []string) error {
 		// Use ReadNoteIdWithReplyInfo to get ObjectURI
 		dbErr, note := h.db.ReadNoteIdWithReplyInfo(postID)
 		if dbErr == nil && note != nil {
-			inReplyToURI = note.ObjectURI
+			// Use ObjectURI if available, otherwise use local: prefix
+			if note.ObjectURI != "" {
+				inReplyToURI = note.ObjectURI
+			} else {
+				inReplyToURI = "local:" + postID.String()
+			}
 			parentNote = note // Save for notification
 		} else {
 			// Try to find it as a remote activity
