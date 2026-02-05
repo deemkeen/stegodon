@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/deemkeen/stegodon/activitypub"
+	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/util"
 	"github.com/deemkeen/stegodon/web"
+	"github.com/google/uuid"
 )
 
 // handleFollow toggles a follow on a user
@@ -115,6 +118,21 @@ func (h *Handler) handleLocalFollow(username string) error {
 			err = fmt.Errorf("failed to follow: %v", err)
 			h.output.Error(err)
 			return err
+		}
+
+		// Create notification for the followed user
+		notification := &domain.Notification{
+			Id:               uuid.New(),
+			AccountId:        targetAccount.Id,
+			NotificationType: domain.NotificationFollow,
+			ActorId:          h.account.Id,
+			ActorUsername:    h.account.Username,
+			ActorDomain:      "", // Empty for local users
+			Read:             false,
+			CreatedAt:        time.Now(),
+		}
+		if err := h.db.CreateNotification(notification); err != nil {
+			log.Printf("CLI: Failed to create follow notification: %v", err)
 		}
 
 		// Output response
