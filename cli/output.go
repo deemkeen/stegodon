@@ -93,6 +93,7 @@ type PostResponse struct {
 	ID        string    `json:"id"`
 	Message   string    `json:"message"`
 	CreatedAt time.Time `json:"created_at"`
+	InReplyTo string    `json:"in_reply_to,omitempty"`
 }
 
 // TimelinePost represents a post in timeline output
@@ -105,6 +106,8 @@ type TimelinePost struct {
 	ReplyCount int       `json:"reply_count"`
 	LikeCount  int       `json:"like_count"`
 	BoostCount int       `json:"boost_count"`
+	ObjectURI  string    `json:"object_uri,omitempty"`
+	IsLocal    bool      `json:"is_local"`
 }
 
 // TimelineResponse represents the timeline output
@@ -132,6 +135,29 @@ type NotificationsResponse struct {
 type ClearNotificationsResponse struct {
 	Status  string `json:"status"`
 	Cleared bool   `json:"cleared"`
+}
+
+// LikeResponse represents a like/unlike response
+type LikeResponse struct {
+	PostID  string `json:"post_id"`
+	Liked   bool   `json:"liked"`
+	Message string `json:"message"`
+}
+
+// BoostResponse represents a boost/unboost response
+type BoostResponse struct {
+	PostID  string `json:"post_id"`
+	Boosted bool   `json:"boosted"`
+	Message string `json:"message"`
+}
+
+// FollowResponse represents a follow/unfollow response
+type FollowResponse struct {
+	Username  string `json:"username"`
+	Domain    string `json:"domain,omitempty"`
+	Following bool   `json:"following"`
+	Pending   bool   `json:"pending,omitempty"`
+	Message   string `json:"message"`
 }
 
 // HelpCommand represents a command in help output

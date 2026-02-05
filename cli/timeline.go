@@ -83,6 +83,8 @@ func (h *Handler) handleTimeline(args []string) error {
 				ReplyCount: post.ReplyCount,
 				LikeCount:  post.LikeCount,
 				BoostCount: post.BoostCount,
+				ObjectURI:  post.ObjectURI,
+				IsLocal:    post.IsLocal,
 			})
 		}
 

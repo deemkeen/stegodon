@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -43,6 +44,29 @@ type mockDatabase struct {
 	createdNoteID      uuid.UUID
 	deleteAllCalled    bool
 	deleteAllError     error
+	// For like/boost tests
+	note               *domain.Note
+	activity           *domain.Activity
+	hasLike            bool
+	hasBoost           bool
+	like               *domain.Like
+	boost              *domain.Boost
+	likeCreated        bool
+	boostCreated       bool
+	likeDeleted        bool
+	boostDeleted       bool
+	likeError          error
+	boostError         error
+	// For reply tests
+	inReplyToURI       string
+	// For follow tests
+	remoteAccount      *domain.RemoteAccount
+	follow             *domain.Follow
+	isFollowing        bool
+	followCreated      bool
+	followDeleted      bool
+	followError        error
+	localAccounts      map[string]*domain.Account
 }
 
 func (m *mockDatabase) CreateNote(userId interface{}, message string) (interface{}, error) {
@@ -55,13 +79,22 @@ func (m *mockDatabase) CreateNote(userId interface{}, message string) (interface
 	return m.createdNoteID, nil
 }
 
-func (m *mockDatabase) ReadNoteIdWithReplyInfo(id interface{}) (error, *domain.Note) {
-	noteId := id.(uuid.UUID)
-	return nil, &domain.Note{
-		Id:        noteId,
-		CreatedBy: "testuser",
-		Message:   "test message",
+func (m *mockDatabase) CreateNoteWithReply(userId interface{}, message string, inReplyToURI string) (interface{}, error) {
+	if m.createError != nil {
+		return nil, m.createError
 	}
+	if m.createdNoteID == uuid.Nil {
+		m.createdNoteID = uuid.New()
+	}
+	m.inReplyToURI = inReplyToURI
+	return m.createdNoteID, nil
+}
+
+func (m *mockDatabase) ReadNoteIdWithReplyInfo(id interface{}) (error, *domain.Note) {
+	if m.note != nil {
+		return nil, m.note
+	}
+	return fmt.Errorf("note not found"), nil
 }
 
 func (m *mockDatabase) ReadHomeTimelinePosts(accountId interface{}, limit int) (error, *[]domain.HomePost) {
@@ -87,6 +120,185 @@ func (m *mockDatabase) CountUnreadNotifications(accountId interface{}) (int, err
 func (m *mockDatabase) DeleteAllNotifications(accountId interface{}) error {
 	m.deleteAllCalled = true
 	return m.deleteAllError
+}
+
+// Note/Activity lookups for like/boost
+func (m *mockDatabase) ReadNoteId(id interface{}) (error, *domain.Note) {
+	if m.note != nil {
+		return nil, m.note
+	}
+	return fmt.Errorf("note not found"), nil
+}
+
+func (m *mockDatabase) ReadActivityById(id interface{}) (error, *domain.Activity) {
+	if m.activity != nil {
+		return nil, m.activity
+	}
+	return fmt.Errorf("activity not found"), nil
+}
+
+func (m *mockDatabase) ReadAccByUsername(username string) (error, *domain.Account) {
+	return nil, &domain.Account{Id: uuid.New(), Username: username}
+}
+
+// Like operations
+func (m *mockDatabase) HasLike(accountId, noteId interface{}) (bool, error) {
+	return m.hasLike, m.likeError
+}
+
+func (m *mockDatabase) HasLikeByObjectURI(accountId interface{}, objectURI string) (bool, error) {
+	return m.hasLike, m.likeError
+}
+
+func (m *mockDatabase) CreateLike(like *domain.Like) error {
+	m.likeCreated = true
+	return m.likeError
+}
+
+func (m *mockDatabase) CreateLikeByObjectURI(like *domain.Like, objectURI string) error {
+	m.likeCreated = true
+	return m.likeError
+}
+
+func (m *mockDatabase) DeleteLikeByAccountAndNote(accountId, noteId interface{}) error {
+	m.likeDeleted = true
+	return m.likeError
+}
+
+func (m *mockDatabase) DeleteLikeByAccountAndObjectURI(accountId interface{}, objectURI string) error {
+	m.likeDeleted = true
+	return m.likeError
+}
+
+func (m *mockDatabase) IncrementLikeCountByNoteId(noteId interface{}) error {
+	return nil
+}
+
+func (m *mockDatabase) DecrementLikeCountByNoteId(noteId interface{}) error {
+	return nil
+}
+
+func (m *mockDatabase) IncrementLikeCountByObjectURI(objectURI string) error {
+	return nil
+}
+
+func (m *mockDatabase) DecrementLikeCountByObjectURI(objectURI string) error {
+	return nil
+}
+
+func (m *mockDatabase) ReadLikeByAccountAndNote(accountId, noteId interface{}) (error, *domain.Like) {
+	if m.like != nil {
+		return nil, m.like
+	}
+	return nil, &domain.Like{Id: uuid.New(), URI: "https://example.com/likes/1"}
+}
+
+func (m *mockDatabase) ReadLikeByAccountAndObjectURI(accountId interface{}, objectURI string) (error, *domain.Like) {
+	if m.like != nil {
+		return nil, m.like
+	}
+	return nil, &domain.Like{Id: uuid.New(), URI: "https://example.com/likes/1"}
+}
+
+func (m *mockDatabase) CreateNotification(notification *domain.Notification) error {
+	return nil
+}
+
+// Boost operations
+func (m *mockDatabase) HasBoost(accountId, noteId interface{}) (bool, error) {
+	return m.hasBoost, m.boostError
+}
+
+func (m *mockDatabase) HasBoostByObjectURI(accountId interface{}, objectURI string) (bool, error) {
+	return m.hasBoost, m.boostError
+}
+
+func (m *mockDatabase) CreateBoost(boost *domain.Boost) error {
+	m.boostCreated = true
+	return m.boostError
+}
+
+func (m *mockDatabase) CreateBoostByObjectURI(boost *domain.Boost, objectURI string) error {
+	m.boostCreated = true
+	return m.boostError
+}
+
+func (m *mockDatabase) DeleteBoostByAccountAndNote(accountId, noteId interface{}) error {
+	m.boostDeleted = true
+	return m.boostError
+}
+
+func (m *mockDatabase) DeleteBoostByAccountAndObjectURI(accountId interface{}, objectURI string) error {
+	m.boostDeleted = true
+	return m.boostError
+}
+
+func (m *mockDatabase) IncrementBoostCountByNoteId(noteId interface{}) error {
+	return nil
+}
+
+func (m *mockDatabase) DecrementBoostCountByNoteId(noteId interface{}) error {
+	return nil
+}
+
+func (m *mockDatabase) IncrementBoostCountByObjectURI(objectURI string) error {
+	return nil
+}
+
+func (m *mockDatabase) DecrementBoostCountByObjectURI(objectURI string) error {
+	return nil
+}
+
+func (m *mockDatabase) ReadBoostByAccountAndNote(accountId, noteId interface{}) (error, *domain.Boost) {
+	if m.boost != nil {
+		return nil, m.boost
+	}
+	return nil, &domain.Boost{Id: uuid.New(), URI: "https://example.com/boosts/1"}
+}
+
+func (m *mockDatabase) ReadBoostByAccountAndObjectURI(accountId interface{}, objectURI string) (error, *domain.Boost) {
+	if m.boost != nil {
+		return nil, m.boost
+	}
+	return nil, &domain.Boost{Id: uuid.New(), URI: "https://example.com/boosts/1"}
+}
+
+// Follow operations
+func (m *mockDatabase) ReadRemoteAccountByActorURI(actorURI string) (error, *domain.RemoteAccount) {
+	if m.remoteAccount != nil {
+		return nil, m.remoteAccount
+	}
+	return nil, nil
+}
+
+func (m *mockDatabase) ReadFollowByAccountIds(accountId, targetAccountId interface{}) (error, *domain.Follow) {
+	if m.follow != nil {
+		return nil, m.follow
+	}
+	return fmt.Errorf("not found"), nil
+}
+
+func (m *mockDatabase) CreateLocalFollow(followerAccountId, targetAccountId interface{}) error {
+	m.followCreated = true
+	return m.followError
+}
+
+func (m *mockDatabase) DeleteLocalFollow(followerAccountId, targetAccountId interface{}) error {
+	m.followDeleted = true
+	return m.followError
+}
+
+func (m *mockDatabase) IsFollowingLocal(followerAccountId, targetAccountId interface{}) (bool, error) {
+	return m.isFollowing, m.followError
+}
+
+func (m *mockDatabase) DeleteFollowByURI(uri string) error {
+	m.followDeleted = true
+	return m.followError
+}
+
+func (m *mockDatabase) ReadAccById(id interface{}) (error, *domain.Account) {
+	return nil, &domain.Account{Id: id.(uuid.UUID), Username: "testuser"}
 }
 
 func newTestHandler(input string) (*Handler, *bytes.Buffer) {
