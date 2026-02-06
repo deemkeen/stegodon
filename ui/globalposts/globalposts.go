@@ -65,8 +65,8 @@ var (
 type Model struct {
 	AccountId          uuid.UUID
 	Posts              []domain.GlobalTimelinePost
-	Offset             int  // Pagination offset
-	Selected           int  // Currently selected post index
+	Offset             int // Pagination offset
+	Selected           int // Currently selected post index
 	Width              int
 	Height             int
 	isActive           bool     // Track if this view is currently visible
@@ -133,6 +133,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	case postsLoadedMsg:
 		m.Posts = msg.posts
+		// Pre-process content for terminal display (avoids re-processing on every View() render)
+		for i := range m.Posts {
+			m.Posts[i].ProcessedContent = processGlobalPostContent(m.Posts[i], m.LocalDomain)
+		}
 		if m.Selected >= len(m.Posts) {
 			m.Selected = max(0, len(m.Posts)-1)
 		}
@@ -445,19 +449,12 @@ func (m Model) View() string {
 						s.WriteString(contentFormatted)
 					}
 				} else {
-					// Normal content display
-					processedContent := post.Message
-					processedContent = util.TruncateContent(processedContent, common.MaxDisplayContentLength)
-					if !post.IsRemote {
-						processedContent = util.UnescapeHTML(processedContent)
-						processedContent = util.MarkdownLinksToTerminal(processedContent)
-					} else {
-						// Normalize emojis for remote posts to fix terminal width calculation issues
-						processedContent = util.NormalizeEmojis(processedContent)
+					// Use pre-processed content (cached in postsLoadedMsg), add URL linkification for selected post
+					displayContent := post.ProcessedContent
+					if displayContent == "" {
+						displayContent = processGlobalPostContent(post, m.LocalDomain)
 					}
-					processedContent = util.LinkifyRawURLsTerminal(processedContent)
-					highlightedContent := util.HighlightHashtagsTerminal(processedContent)
-					highlightedContent = util.HighlightMentionsTerminal(highlightedContent, m.LocalDomain)
+					highlightedContent := util.LinkifyRawURLsTerminal(displayContent)
 
 					contentFormatted := selectedBg.Render(selectedContentStyle.Render(highlightedContent))
 					s.WriteString(timeFormatted + "\n")
@@ -474,17 +471,11 @@ func (m Model) View() string {
 				unselectedStyle := lipgloss.NewStyle().
 					Width(contentWidth)
 
-				processedContent := post.Message
-				processedContent = util.TruncateContent(processedContent, common.MaxDisplayContentLength)
-				if !post.IsRemote {
-					processedContent = util.UnescapeHTML(processedContent)
-					processedContent = util.MarkdownLinksToTerminal(processedContent)
-				} else {
-					// Normalize emojis for remote posts to fix terminal width calculation issues
-					processedContent = util.NormalizeEmojis(processedContent)
+				// Use pre-processed content (cached in postsLoadedMsg)
+				highlightedContent := post.ProcessedContent
+				if highlightedContent == "" {
+					highlightedContent = processGlobalPostContent(post, m.LocalDomain)
 				}
-				highlightedContent := util.HighlightHashtagsTerminal(processedContent)
-				highlightedContent = util.HighlightMentionsTerminal(highlightedContent, m.LocalDomain)
 
 				var authorFormatted string
 				if !post.IsRemote {
@@ -512,6 +503,21 @@ func (m Model) View() string {
 	}
 
 	return s.String()
+}
+
+// processGlobalPostContent applies the full text processing pipeline for terminal display.
+// This is called once when posts are loaded (in postsLoadedMsg) and cached in ProcessedContent.
+func processGlobalPostContent(post domain.GlobalTimelinePost, localDomain string) string {
+	processed := util.TruncateContent(post.Message, common.MaxDisplayContentLength)
+	if !post.IsRemote {
+		processed = util.UnescapeHTML(processed)
+		processed = util.MarkdownLinksToTerminal(processed)
+	} else {
+		processed = util.NormalizeEmojis(processed)
+	}
+	processed = util.HighlightHashtagsTerminal(processed)
+	processed = util.HighlightMentionsTerminal(processed, localDomain)
+	return processed
 }
 
 // postsLoadedMsg is sent when posts are loaded

@@ -14,19 +14,20 @@ type SaveNote struct {
 
 // GlobalTimelinePost represents a post in the global timeline (local + federated)
 type GlobalTimelinePost struct {
-	NoteId      string
-	Username    string
-	UserDomain  string
-	ProfileURL  string
-	ObjectURI   string // ActivityPub object id (canonical URI, for replies/likes)
-	ObjectURL   string // ActivityPub object url (human-readable web UI link, preferred for display)
-	IsRemote    bool
-	Message     string
-	CreatedAt   time.Time
-	ReplyCount  int
-	LikeCount   int
-	BoostCount  int
-	BoostedBy   string // if non-empty, this post was boosted by this user (e.g., "@alice" or "@bob@domain")
+	NoteId           string
+	Username         string
+	UserDomain       string
+	ProfileURL       string
+	ObjectURI        string // ActivityPub object id (canonical URI, for replies/likes)
+	ObjectURL        string // ActivityPub object url (human-readable web UI link, preferred for display)
+	IsRemote         bool
+	Message          string
+	ProcessedContent string // Pre-processed content for terminal display (cached to avoid re-processing in View)
+	CreatedAt        time.Time
+	ReplyCount       int
+	LikeCount        int
+	BoostCount       int
+	BoostedBy        string // if non-empty, this post was boosted by this user (e.g., "@alice" or "@bob@domain")
 }
 
 type Note struct {
@@ -54,16 +55,17 @@ func (note *Note) ToString() string {
 
 // HomePost represents a unified post in the home timeline (either local or remote)
 type HomePost struct {
-	ID         uuid.UUID
-	Author     string // @user (local) or @user@domain (remote)
-	Content    string
-	Time       time.Time
-	ObjectURI  string    // ActivityPub object id (canonical URI, returns JSON)
-	ObjectURL  string    // ActivityPub object url (human-readable web UI link, preferred for display)
-	IsLocal    bool      // true = local note, false = remote activity
-	NoteID     uuid.UUID // only set for local posts (for editing/deleting)
-	ReplyCount int       // number of replies to this post
-	LikeCount  int       // number of likes on this post
-	BoostCount int       // number of boosts on this post
-	BoostedBy  string    // if non-empty, this post was boosted by this user (e.g., "@alice" or "@bob@domain")
+	ID               uuid.UUID
+	Author           string // @user (local) or @user@domain (remote)
+	Content          string
+	ProcessedContent string // Pre-processed content for terminal display (cached to avoid re-processing in View)
+	Time             time.Time
+	ObjectURI        string    // ActivityPub object id (canonical URI, returns JSON)
+	ObjectURL        string    // ActivityPub object url (human-readable web UI link, preferred for display)
+	IsLocal          bool      // true = local note, false = remote activity
+	NoteID           uuid.UUID // only set for local posts (for editing/deleting)
+	ReplyCount       int       // number of replies to this post
+	LikeCount        int       // number of likes on this post
+	BoostCount       int       // number of boosts on this post
+	BoostedBy        string    // if non-empty, this post was boosted by this user (e.g., "@alice" or "@bob@domain")
 }

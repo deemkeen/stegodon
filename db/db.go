@@ -1249,201 +1249,96 @@ func (db *DB) ReadFederatedActivities(accountId uuid.UUID, limit int) (error, *[
 
 // Home Timeline queries - combines local notes and remote activities
 const (
-	// Local notes for home timeline: own posts + posts from followed local users (excluding replies)
-	// Includes reply_count, like_count, and boost_count for denormalized counts
-	sqlSelectHomeLocalNotes = `SELECT notes.id, accounts.username, notes.message, notes.created_at, notes.object_uri, COALESCE(notes.reply_count, 0), COALESCE(notes.like_count, 0), COALESCE(notes.boost_count, 0) FROM notes
-		INNER JOIN accounts ON accounts.id = notes.user_id
-		WHERE (notes.in_reply_to_uri IS NULL OR notes.in_reply_to_uri = '')
-		AND (notes.user_id = ? OR notes.user_id IN (
-			SELECT target_account_id FROM follows
-			WHERE account_id = ? AND accepted = 1 AND is_local = 1
-		))
-		ORDER BY notes.created_at DESC LIMIT ?`
-
-	// Remote activities for home timeline: posts from followed remote users
-	// Excludes replies (activities where inReplyTo has a URL value, not null)
-	// Top-level posts have "inReplyTo":null, replies have "inReplyTo":"https://..."
-	// Includes reply_count for denormalized reply counting
-	sqlSelectHomeRemoteActivities = `SELECT a.id, a.actor_uri, a.object_uri, COALESCE(a.object_url, ''), a.raw_json, a.created_at, ra.username, ra.domain, COALESCE(a.reply_count, 0), COALESCE(a.like_count, 0), COALESCE(a.boost_count, 0)
-		FROM activities a
-		INNER JOIN remote_accounts ra ON ra.actor_uri = a.actor_uri
-		INNER JOIN follows f ON f.target_account_id = ra.id
-		WHERE a.activity_type = 'Create' AND a.local = 0 AND f.account_id = ? AND f.accepted = 1 AND f.is_local = 0
-		AND a.raw_json NOT LIKE '%"inReplyTo":"http%'
-		ORDER BY a.created_at DESC LIMIT ?`
-)
-
-// ReadHomeTimelinePosts returns a unified home timeline combining local and remote posts
-func (db *DB) ReadHomeTimelinePosts(accountId uuid.UUID, limit int) (error, *[]domain.HomePost) {
-	var posts []domain.HomePost
-
-	// Fetch local notes (already excludes replies via sqlSelectHomeLocalNotes WHERE clause)
-	localRows, err := db.db.Query(sqlSelectHomeLocalNotes, accountId.String(), accountId.String(), limit)
-	if err != nil {
-		return err, nil
-	}
-	defer localRows.Close()
-
-	for localRows.Next() {
-		var idStr string
-		var username string
-		var message string
-		var createdAtStr string
-		var objectURI sql.NullString
-		var replyCount int
-		var likeCount int
-		var boostCount int
-
-		if err := localRows.Scan(&idStr, &username, &message, &createdAtStr, &objectURI, &replyCount, &likeCount, &boostCount); err != nil {
-			return err, &posts
-		}
-
-		noteId, _ := uuid.Parse(idStr)
-		parsedTime, _ := parseTimestamp(createdAtStr)
-
-		uri := ""
-		if objectURI.Valid {
-			uri = objectURI.String
-		}
-
-		posts = append(posts, domain.HomePost{
-			ID:         noteId,
-			Author:     username,
-			Content:    message,
-			Time:       parsedTime,
-			ObjectURI:  uri,
-			IsLocal:    true,
-			NoteID:     noteId,
-			ReplyCount: replyCount,
-			LikeCount:  likeCount,
-			BoostCount: boostCount,
-		})
-	}
-	if err = localRows.Err(); err != nil {
-		return err, &posts
-	}
-
-	// Fetch remote activities (query excludes all replies - only top-level posts)
-	remoteRows, err := db.db.Query(sqlSelectHomeRemoteActivities, accountId.String(), limit)
-	if err != nil {
-		return err, &posts
-	}
-	defer remoteRows.Close()
-
-	for remoteRows.Next() {
-		var idStr string
-		var actorURI string
-		var objectURI string
-		var objectURL string
-		var rawJSON string
-		var createdAtStr string
-		var username string
-		var remDomain string
-		var replyCount int
-		var likeCount int
-		var boostCount int
-
-		if err := remoteRows.Scan(&idStr, &actorURI, &objectURI, &objectURL, &rawJSON, &createdAtStr, &username, &remDomain, &replyCount, &likeCount, &boostCount); err != nil {
-			return err, &posts
-		}
-
-		activityId, _ := uuid.Parse(idStr)
-		parsedTime, _ := parseTimestamp(createdAtStr)
-
-		// Extract content from raw JSON
-		content := extractContentFromJSON(rawJSON)
-		// If content is empty but we have a URL, show the URL as content
-		if content == "" && objectURL != "" {
-			content = objectURL
-		}
-
-		posts = append(posts, domain.HomePost{
-			ID:         activityId,
-			Author:     "@" + username + "@" + remDomain,
-			Content:    content,
-			Time:       parsedTime,
-			ObjectURI:  objectURI,
-			ObjectURL:  objectURL,
-			IsLocal:    false,
-			NoteID:     uuid.Nil,
-			ReplyCount: replyCount,
-			LikeCount:  likeCount,
-			BoostCount: boostCount,
-		})
-	}
-	if err = remoteRows.Err(); err != nil {
-		return err, &posts
-	}
-
-	// Fetch relay-forwarded activities (marked with from_relay = 1)
-	// These come from both FediBuzz (Announce-wrapped) and YUKIMOCHI (raw Create) relays
-	relayRows, err := db.db.Query(`
-		SELECT a.id, a.actor_uri, a.object_uri, COALESCE(a.object_url, ''), a.raw_json, a.created_at, COALESCE(a.reply_count, 0), COALESCE(a.like_count, 0), COALESCE(a.boost_count, 0)
-		FROM activities a
-		WHERE a.activity_type = 'Create' AND a.local = 0 AND a.from_relay = 1
-		AND a.raw_json NOT LIKE '%"inReplyTo":"http%'
-		ORDER BY a.created_at DESC LIMIT ?`, limit)
-	if err != nil {
-		return err, &posts
-	}
-	defer relayRows.Close()
-
-	for relayRows.Next() {
-		var idStr string
-		var actorURI string
-		var objectURI string
-		var objectURL string
-		var rawJSON string
-		var createdAtStr string
-		var replyCount int
-		var likeCount int
-		var boostCount int
-
-		if err := relayRows.Scan(&idStr, &actorURI, &objectURI, &objectURL, &rawJSON, &createdAtStr, &replyCount, &likeCount, &boostCount); err != nil {
-			return err, &posts
-		}
-
-		activityId, _ := uuid.Parse(idStr)
-		parsedTime, _ := parseTimestamp(createdAtStr)
-
-		// Extract content from raw JSON
-		content := extractContentFromJSON(rawJSON)
-		// If content is empty but we have a URL, show the URL as content
-		if content == "" && objectURL != "" {
-			content = objectURL
-		}
-
-		// Extract author info from actorURI (format: https://domain/users/username)
-		author := extractAuthorFromActorURI(actorURI)
-
-		posts = append(posts, domain.HomePost{
-			ID:         activityId,
-			Author:     author,
-			Content:    content,
-			Time:       parsedTime,
-			ObjectURI:  objectURI,
-			ObjectURL:  objectURL,
-			IsLocal:    false,
-			NoteID:     uuid.Nil,
-			ReplyCount: replyCount,
-			LikeCount:  likeCount,
-			BoostCount: boostCount,
-		})
-	}
-	if err = relayRows.Err(); err != nil {
-		return err, &posts
-	}
-
-	// Fetch posts boosted by the current user or by local users that the current user follows
-	// Uses UNION to allow index usage (OR prevents index optimization)
-	// Excludes self-boosts of your own posts (they already appear as original posts)
-	boostedLocalRows, err := db.db.Query(`
-		SELECT id, username, message, boost_time, object_uri, reply_count, like_count, boost_count, booster_username
+	// Non-boost posts for home timeline: local notes + followed remote + relay activities
+	// Uses UNION ALL for efficient SQL-level sorting and pagination
+	sqlSelectHomeNonBoostPosts = `
+		SELECT id, author, content, created_at, object_uri, object_url,
+		       is_local, reply_count, like_count, boost_count, '' as boosted_by
 		FROM (
-			-- Own boosts of other users' posts
-			SELECT n.id, a.username, n.message, b.created_at as boost_time, n.object_uri,
-			       COALESCE(n.reply_count, 0) as reply_count, COALESCE(n.like_count, 0) as like_count,
-			       COALESCE(n.boost_count, 0) as boost_count, booster.username as booster_username
+			-- Local notes (own + followed local users, excluding replies)
+			SELECT
+				n.id as id,
+				a.username as author,
+				n.message as content,
+				n.created_at as created_at,
+				COALESCE(n.object_uri, '') as object_uri,
+				'' as object_url,
+				1 as is_local,
+				COALESCE(n.reply_count, 0) as reply_count,
+				COALESCE(n.like_count, 0) as like_count,
+				COALESCE(n.boost_count, 0) as boost_count,
+				'' as raw_json
+			FROM notes n
+			INNER JOIN accounts a ON a.id = n.user_id
+			WHERE (n.in_reply_to_uri IS NULL OR n.in_reply_to_uri = '')
+			AND (n.user_id = ? OR n.user_id IN (
+				SELECT target_account_id FROM follows
+				WHERE account_id = ? AND accepted = 1 AND is_local = 1
+			))
+
+			UNION ALL
+
+			-- Remote activities from followed remote users (excluding replies)
+			SELECT
+				act.id as id,
+				'@' || ra.username || '@' || ra.domain as author,
+				act.raw_json as content,
+				act.created_at as created_at,
+				act.object_uri as object_uri,
+				COALESCE(act.object_url, '') as object_url,
+				0 as is_local,
+				COALESCE(act.reply_count, 0) as reply_count,
+				COALESCE(act.like_count, 0) as like_count,
+				COALESCE(act.boost_count, 0) as boost_count,
+				act.raw_json as raw_json
+			FROM activities act
+			INNER JOIN remote_accounts ra ON ra.actor_uri = act.actor_uri
+			INNER JOIN follows f ON f.target_account_id = ra.id
+			WHERE act.activity_type = 'Create' AND act.local = 0
+			AND f.account_id = ? AND f.accepted = 1 AND f.is_local = 0
+			AND (act.in_reply_to IS NULL OR act.in_reply_to = '')
+
+			UNION ALL
+
+			-- Relay-forwarded activities (excluding replies)
+			SELECT
+				act.id as id,
+				act.actor_uri as author,
+				act.raw_json as content,
+				act.created_at as created_at,
+				act.object_uri as object_uri,
+				COALESCE(act.object_url, '') as object_url,
+				0 as is_local,
+				COALESCE(act.reply_count, 0) as reply_count,
+				COALESCE(act.like_count, 0) as like_count,
+				COALESCE(act.boost_count, 0) as boost_count,
+				act.raw_json as raw_json
+			FROM activities act
+			WHERE act.activity_type = 'Create' AND act.local = 0 AND act.from_relay = 1
+			AND (act.in_reply_to IS NULL OR act.in_reply_to = '')
+		) combined
+		ORDER BY created_at DESC LIMIT ?`
+
+	// Boost posts for home timeline: boosted local + boosted remote (local boosters) + boosted remote (remote boosters)
+	// Uses UNION ALL for efficient SQL-level sorting and pagination
+	sqlSelectHomeBoostPosts = `
+		SELECT id, author, content, created_at, object_uri, object_url,
+		       is_local, reply_count, like_count, boost_count, boosted_by
+		FROM (
+			-- Boosted local posts (own boosts + boosts from followed local users)
+			SELECT
+				n.id as id,
+				a.username as author,
+				n.message as content,
+				b.created_at as created_at,
+				COALESCE(n.object_uri, '') as object_uri,
+				'' as object_url,
+				1 as is_local,
+				COALESCE(n.reply_count, 0) as reply_count,
+				COALESCE(n.like_count, 0) as like_count,
+				COALESCE(n.boost_count, 0) as boost_count,
+				'@' || booster.username as boosted_by,
+				'' as raw_json
 			FROM boosts b
 			INNER JOIN accounts booster ON booster.id = b.account_id
 			INNER JOIN notes n ON n.id = b.note_id
@@ -1452,75 +1347,41 @@ func (db *DB) ReadHomeTimelinePosts(accountId uuid.UUID, limit int) (error, *[]d
 
 			UNION
 
-			-- Boosts from followed users
-			SELECT n.id, a.username, n.message, b.created_at as boost_time, n.object_uri,
-			       COALESCE(n.reply_count, 0) as reply_count, COALESCE(n.like_count, 0) as like_count,
-			       COALESCE(n.boost_count, 0) as boost_count, booster.username as booster_username
+			SELECT
+				n.id as id,
+				a.username as author,
+				n.message as content,
+				b.created_at as created_at,
+				COALESCE(n.object_uri, '') as object_uri,
+				'' as object_url,
+				1 as is_local,
+				COALESCE(n.reply_count, 0) as reply_count,
+				COALESCE(n.like_count, 0) as like_count,
+				COALESCE(n.boost_count, 0) as boost_count,
+				'@' || booster.username as boosted_by,
+				'' as raw_json
 			FROM boosts b
 			INNER JOIN accounts booster ON booster.id = b.account_id
 			INNER JOIN notes n ON n.id = b.note_id
 			INNER JOIN accounts a ON a.id = n.user_id
 			INNER JOIN follows f ON f.target_account_id = b.account_id AND f.account_id = ? AND f.accepted = 1
-		)
-		ORDER BY boost_time DESC LIMIT ?`,
-		accountId.String(), accountId.String(), accountId.String(), limit)
-	if err != nil {
-		return err, &posts
-	}
-	defer boostedLocalRows.Close()
 
-	for boostedLocalRows.Next() {
-		var idStr string
-		var username string
-		var message string
-		var createdAtStr string
-		var objectURI sql.NullString
-		var replyCount int
-		var likeCount int
-		var boostCount int
-		var boosterUsername string
+			UNION ALL
 
-		if err := boostedLocalRows.Scan(&idStr, &username, &message, &createdAtStr, &objectURI, &replyCount, &likeCount, &boostCount, &boosterUsername); err != nil {
-			return err, &posts
-		}
-
-		noteId, _ := uuid.Parse(idStr)
-		parsedTime, _ := parseTimestamp(createdAtStr)
-
-		uri := ""
-		if objectURI.Valid {
-			uri = objectURI.String
-		}
-
-		posts = append(posts, domain.HomePost{
-			ID:         noteId,
-			Author:     username,
-			Content:    message,
-			Time:       parsedTime,
-			ObjectURI:  uri,
-			IsLocal:    true,
-			NoteID:     noteId,
-			ReplyCount: replyCount,
-			LikeCount:  likeCount,
-			BoostCount: boostCount,
-			BoostedBy:  "@" + boosterUsername,
-		})
-	}
-	if err = boostedLocalRows.Err(); err != nil {
-		return err, &posts
-	}
-
-	// Fetch remote posts boosted by the current user or by local users that the current user follows
-	// Uses UNION to allow index usage (OR prevents index optimization)
-	boostedRemoteRows, err := db.db.Query(`
-		SELECT id, actor_uri, object_uri, object_url, raw_json, boost_time, username, domain,
-		       reply_count, like_count, boost_count, booster_username
-		FROM (
-			-- Own boosts of remote posts
-			SELECT act.id, act.actor_uri, act.object_uri, COALESCE(act.object_url, '') as object_url,
-			       act.raw_json, b.created_at as boost_time, ra.username, ra.domain,
-			       COALESCE(act.reply_count, 0) as reply_count, COALESCE(act.like_count, 0) as like_count,
-			       COALESCE(act.boost_count, 0) as boost_count, booster.username as booster_username
+			-- Boosted remote posts (local boosters: own + followed)
+			SELECT
+				act.id as id,
+				'@' || ra.username || '@' || ra.domain as author,
+				act.raw_json as content,
+				b.created_at as created_at,
+				act.object_uri as object_uri,
+				COALESCE(act.object_url, '') as object_url,
+				0 as is_local,
+				COALESCE(act.reply_count, 0) as reply_count,
+				COALESCE(act.like_count, 0) as like_count,
+				COALESCE(act.boost_count, 0) as boost_count,
+				'@' || booster.username as boosted_by,
+				act.raw_json as raw_json
 			FROM boosts b
 			INNER JOIN accounts booster ON booster.id = b.account_id
 			INNER JOIN activities act ON act.object_uri = b.object_uri
@@ -1529,140 +1390,141 @@ func (db *DB) ReadHomeTimelinePosts(accountId uuid.UUID, limit int) (error, *[]d
 
 			UNION
 
-			-- Boosts from followed users of remote posts
-			SELECT act.id, act.actor_uri, act.object_uri, COALESCE(act.object_url, '') as object_url,
-			       act.raw_json, b.created_at as boost_time, ra.username, ra.domain,
-			       COALESCE(act.reply_count, 0) as reply_count, COALESCE(act.like_count, 0) as like_count,
-			       COALESCE(act.boost_count, 0) as boost_count, booster.username as booster_username
+			SELECT
+				act.id as id,
+				'@' || ra.username || '@' || ra.domain as author,
+				act.raw_json as content,
+				b.created_at as created_at,
+				act.object_uri as object_uri,
+				COALESCE(act.object_url, '') as object_url,
+				0 as is_local,
+				COALESCE(act.reply_count, 0) as reply_count,
+				COALESCE(act.like_count, 0) as like_count,
+				COALESCE(act.boost_count, 0) as boost_count,
+				'@' || booster.username as boosted_by,
+				act.raw_json as raw_json
 			FROM boosts b
 			INNER JOIN accounts booster ON booster.id = b.account_id
 			INNER JOIN activities act ON act.object_uri = b.object_uri
 			INNER JOIN remote_accounts ra ON ra.actor_uri = act.actor_uri
 			INNER JOIN follows f ON f.target_account_id = b.account_id AND f.account_id = ? AND f.accepted = 1
 			WHERE b.object_uri IS NOT NULL AND b.object_uri != ''
-		)
-		ORDER BY boost_time DESC LIMIT ?`,
-		accountId.String(), accountId.String(), limit)
+
+			UNION ALL
+
+			-- Boosted remote posts (remote boosters from followed remote users)
+			SELECT
+				act.id as id,
+				'@' || ra_author.username || '@' || ra_author.domain as author,
+				act.raw_json as content,
+				b.created_at as created_at,
+				act.object_uri as object_uri,
+				COALESCE(act.object_url, '') as object_url,
+				0 as is_local,
+				COALESCE(act.reply_count, 0) as reply_count,
+				COALESCE(act.like_count, 0) as like_count,
+				COALESCE(act.boost_count, 0) as boost_count,
+				'@' || ra_booster.username || '@' || ra_booster.domain as boosted_by,
+				act.raw_json as raw_json
+			FROM boosts b
+			INNER JOIN remote_accounts ra_booster ON ra_booster.id = b.remote_account_id
+			INNER JOIN activities act ON act.object_uri = b.object_uri
+			INNER JOIN remote_accounts ra_author ON ra_author.actor_uri = act.actor_uri
+			INNER JOIN follows f ON f.target_account_id = b.remote_account_id AND f.account_id = ? AND f.accepted = 1
+			WHERE b.remote_account_id IS NOT NULL AND b.remote_account_id != ''
+			AND b.object_uri IS NOT NULL AND b.object_uri != ''
+		) combined
+		ORDER BY created_at DESC LIMIT ?`
+)
+
+// ReadHomeTimelinePosts returns a unified home timeline combining local and remote posts.
+// Uses 2 UNION ALL queries (non-boost + boost) for efficient SQL-level sorting.
+func (db *DB) ReadHomeTimelinePosts(accountId uuid.UUID, limit int) (error, *[]domain.HomePost) {
+	var posts []domain.HomePost
+	aid := accountId.String()
+
+	// scanRows processes rows from either the non-boost or boost query into HomePosts.
+	// Both queries return the same column shape: id, author, content, created_at,
+	// object_uri, object_url, is_local, reply_count, like_count, boost_count, boosted_by
+	scanRows := func(rows *sql.Rows) error {
+		defer rows.Close()
+		for rows.Next() {
+			var idStr string
+			var author string
+			var content string
+			var createdAtStr string
+			var objectURI string
+			var objectURL string
+			var isLocalInt int
+			var replyCount int
+			var likeCount int
+			var boostCount int
+			var boostedBy string
+
+			if err := rows.Scan(&idStr, &author, &content, &createdAtStr, &objectURI, &objectURL,
+				&isLocalInt, &replyCount, &likeCount, &boostCount, &boostedBy); err != nil {
+				return err
+			}
+
+			postId, _ := uuid.Parse(idStr)
+			parsedTime, _ := parseTimestamp(createdAtStr)
+			isLocal := isLocalInt == 1
+
+			post := domain.HomePost{
+				ID:         postId,
+				Author:     author,
+				Time:       parsedTime,
+				ObjectURI:  objectURI,
+				ObjectURL:  objectURL,
+				IsLocal:    isLocal,
+				ReplyCount: replyCount,
+				LikeCount:  likeCount,
+				BoostCount: boostCount,
+				BoostedBy:  boostedBy,
+			}
+
+			if isLocal {
+				post.Content = content
+				post.NoteID = postId
+			} else {
+				// For remote posts, extract content from raw JSON
+				post.Content = extractContentFromJSON(content)
+				if post.Content == "" && objectURL != "" {
+					post.Content = objectURL
+				}
+				post.NoteID = uuid.Nil
+				// For relay posts, author is the raw actor_uri — convert it
+				if strings.HasPrefix(author, "https://") {
+					post.Author = extractAuthorFromActorURI(author)
+				}
+			}
+
+			posts = append(posts, post)
+		}
+		return rows.Err()
+	}
+
+	// Query A: Non-boost posts (local + remote followed + relay)
+	// Params: accountId x3 (local notes user_id, follows account_id x2), limit
+	nonBoostRows, err := db.db.Query(sqlSelectHomeNonBoostPosts, aid, aid, aid, limit)
+	if err != nil {
+		return err, nil
+	}
+	if err := scanRows(nonBoostRows); err != nil {
+		return err, &posts
+	}
+
+	// Query B: Boost posts (boosted local + boosted remote local boosters + boosted remote remote boosters)
+	// Params: accountId x7 (own boosts x2, followed local boosts, own remote boosts, followed remote boosts, followed remote booster, limit)
+	boostRows, err := db.db.Query(sqlSelectHomeBoostPosts, aid, aid, aid, aid, aid, aid, limit)
 	if err != nil {
 		return err, &posts
 	}
-	defer boostedRemoteRows.Close()
-
-	for boostedRemoteRows.Next() {
-		var idStr string
-		var actorURI string
-		var objectURI string
-		var objectURL string
-		var rawJSON string
-		var createdAtStr string
-		var username string
-		var remDomain string
-		var replyCount int
-		var likeCount int
-		var boostCount int
-		var boosterUsername string
-
-		if err := boostedRemoteRows.Scan(&idStr, &actorURI, &objectURI, &objectURL, &rawJSON, &createdAtStr, &username, &remDomain, &replyCount, &likeCount, &boostCount, &boosterUsername); err != nil {
-			return err, &posts
-		}
-
-		activityId, _ := uuid.Parse(idStr)
-		parsedTime, _ := parseTimestamp(createdAtStr)
-
-		// Extract content from raw JSON
-		content := extractContentFromJSON(rawJSON)
-		// If content is empty but we have a URL, show the URL as content
-		if content == "" && objectURL != "" {
-			content = objectURL
-		}
-
-		posts = append(posts, domain.HomePost{
-			ID:         activityId,
-			Author:     "@" + username + "@" + remDomain,
-			Content:    content,
-			Time:       parsedTime,
-			ObjectURI:  objectURI,
-			ObjectURL:  objectURL,
-			IsLocal:    false,
-			NoteID:     uuid.Nil,
-			ReplyCount: replyCount,
-			LikeCount:  likeCount,
-			BoostCount: boostCount,
-			BoostedBy:  "@" + boosterUsername,
-		})
-	}
-	if err = boostedRemoteRows.Err(); err != nil {
-		return err, &posts
-	}
-
-	// Fetch boosts from followed REMOTE users (remote_account_id is set)
-	// These are boosts where the booster is a remote user that the current user follows
-	remoteBoosterRows, err := db.db.Query(`
-		SELECT act.id, act.actor_uri, act.object_uri, COALESCE(act.object_url, '') as object_url,
-		       act.raw_json, b.created_at as boost_time, ra_author.username, ra_author.domain,
-		       COALESCE(act.reply_count, 0) as reply_count, COALESCE(act.like_count, 0) as like_count,
-		       COALESCE(act.boost_count, 0) as boost_count,
-		       ra_booster.username as booster_username, ra_booster.domain as booster_domain
-		FROM boosts b
-		INNER JOIN remote_accounts ra_booster ON ra_booster.id = b.remote_account_id
-		INNER JOIN activities act ON act.object_uri = b.object_uri
-		INNER JOIN remote_accounts ra_author ON ra_author.actor_uri = act.actor_uri
-		INNER JOIN follows f ON f.target_account_id = b.remote_account_id AND f.account_id = ? AND f.accepted = 1
-		WHERE b.remote_account_id IS NOT NULL AND b.remote_account_id != ''
-		AND b.object_uri IS NOT NULL AND b.object_uri != ''
-		ORDER BY b.created_at DESC LIMIT ?`,
-		accountId.String(), limit)
-	if err != nil {
-		return err, &posts
-	}
-	defer remoteBoosterRows.Close()
-
-	for remoteBoosterRows.Next() {
-		var idStr string
-		var actorURI string
-		var objectURI string
-		var objectURL string
-		var rawJSON string
-		var createdAtStr string
-		var username string
-		var remDomain string
-		var replyCount int
-		var likeCount int
-		var boostCount int
-		var boosterUsername string
-		var boosterDomain string
-
-		if err := remoteBoosterRows.Scan(&idStr, &actorURI, &objectURI, &objectURL, &rawJSON, &createdAtStr, &username, &remDomain, &replyCount, &likeCount, &boostCount, &boosterUsername, &boosterDomain); err != nil {
-			return err, &posts
-		}
-
-		activityId, _ := uuid.Parse(idStr)
-		parsedTime, _ := parseTimestamp(createdAtStr)
-
-		// Extract content from raw JSON
-		content := extractContentFromJSON(rawJSON)
-
-		posts = append(posts, domain.HomePost{
-			ID:         activityId,
-			Author:     "@" + username + "@" + remDomain,
-			Content:    content,
-			Time:       parsedTime,
-			ObjectURI:  objectURI,
-			ObjectURL:  objectURL,
-			IsLocal:    false,
-			NoteID:     uuid.Nil,
-			ReplyCount: replyCount,
-			LikeCount:  likeCount,
-			BoostCount: boostCount,
-			BoostedBy:  "@" + boosterUsername + "@" + boosterDomain,
-		})
-	}
-	if err = remoteBoosterRows.Err(); err != nil {
+	if err := scanRows(boostRows); err != nil {
 		return err, &posts
 	}
 
 	// Deduplicate posts - prefer non-boosted version (original) over boosted
-	// Use a map to track seen posts by ID
 	seen := make(map[uuid.UUID]int) // maps ID to index in posts slice
 	var dedupedPosts []domain.HomePost
 	for _, post := range posts {
@@ -1679,7 +1541,7 @@ func (db *DB) ReadHomeTimelinePosts(accountId uuid.UUID, limit int) (error, *[]d
 	}
 	posts = dedupedPosts
 
-	// Sort combined posts by time (newest first) using efficient sort
+	// Sort combined posts by time (newest first)
 	sort.Slice(posts, func(i, j int) bool {
 		return posts[i].Time.After(posts[j].Time)
 	})
@@ -4855,9 +4717,9 @@ func (db *DB) CountGlobalTimelinePosts() (int, error) {
 // ============================================================================
 
 const (
-	sqlCreateBan      = `INSERT INTO bans(id, username, ip_address, public_key_hash, reason, banned_at) VALUES (?, ?, ?, ?, ?, ?)`
-	sqlReadAllBans    = `SELECT id, username, ip_address, public_key_hash, reason, banned_at FROM bans ORDER BY banned_at DESC`
-	sqlDeleteBan      = `DELETE FROM bans WHERE id = ?`
+	sqlCreateBan   = `INSERT INTO bans(id, username, ip_address, public_key_hash, reason, banned_at) VALUES (?, ?, ?, ?, ?, ?)`
+	sqlReadAllBans = `SELECT id, username, ip_address, public_key_hash, reason, banned_at FROM bans ORDER BY banned_at DESC`
+	sqlDeleteBan   = `DELETE FROM bans WHERE id = ?`
 	// IP bans expire after 60 days - only check recent bans
 	sqlCheckIPBanned  = `SELECT COUNT(*) FROM bans WHERE ip_address = ? AND ip_address != '' AND banned_at >= datetime('now', '-60 days')`
 	sqlCheckKeyBanned = `SELECT COUNT(*) FROM bans WHERE public_key_hash = ?`
@@ -4967,8 +4829,8 @@ func (db *DB) CleanupExpiredIPBans() (int64, error) {
 // ============================================================================
 
 const (
-	sqlInsertTermsAndConditions = `INSERT OR REPLACE INTO terms_and_conditions(id, content, updated_at) VALUES (1, ?, ?)`
-	sqlSelectTermsAndConditions = `SELECT id, content, updated_at FROM terms_and_conditions WHERE id = 1`
+	sqlInsertTermsAndConditions  = `INSERT OR REPLACE INTO terms_and_conditions(id, content, updated_at) VALUES (1, ?, ?)`
+	sqlSelectTermsAndConditions  = `SELECT id, content, updated_at FROM terms_and_conditions WHERE id = 1`
 	sqlInsertUserTermsAcceptance = `INSERT INTO user_terms_acceptance(user_id, terms_id, accepted_at) VALUES (?, 1, ?)`
 	sqlSelectUserTermsAcceptance = `SELECT id, user_id, terms_id, accepted_at FROM user_terms_acceptance WHERE user_id = ?`
 )
@@ -4982,8 +4844,8 @@ func (db *DB) GetCurrentTermsAndConditions() (error, *domain.TermsAndConditions)
 	if err == sql.ErrNoRows {
 		// No terms exist yet, return default terms
 		return nil, &domain.TermsAndConditions{
-			Id:      1,
-			Content: "Default Terms and Conditions",
+			Id:        1,
+			Content:   "Default Terms and Conditions",
 			UpdatedAt: time.Now(),
 		}
 	}

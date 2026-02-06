@@ -105,9 +105,9 @@ type Model struct {
 	parentContent   string    // Original content (for reload)
 	parentCreatedAt time.Time // Original timestamp (for reload)
 	// Fields to restore selection after reload
-	pendingSelection int    // Selection to restore after reload (-2 means no pending restore)
-	pendingOffset    int    // Offset to restore after reload
-	LocalDomain      string // Cached local domain for mention highlighting
+	pendingSelection int                 // Selection to restore after reload (-2 means no pending restore)
+	pendingOffset    int                 // Offset to restore after reload
+	LocalDomain      string              // Cached local domain for mention highlighting
 	ReturnView       common.SessionState // View to return to on Esc (default: HomeTimelineView)
 }
 

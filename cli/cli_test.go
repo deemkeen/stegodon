@@ -37,36 +37,36 @@ func (m *mockSession) Read(p []byte) (n int, err error) {
 
 // mockDatabase implements cli.Database for testing
 type mockDatabase struct {
-	notes              []domain.HomePost
-	notifications      []domain.Notification
-	unreadCount        int
-	createError        error
-	createdNoteID      uuid.UUID
-	deleteAllCalled    bool
-	deleteAllError     error
+	notes           []domain.HomePost
+	notifications   []domain.Notification
+	unreadCount     int
+	createError     error
+	createdNoteID   uuid.UUID
+	deleteAllCalled bool
+	deleteAllError  error
 	// For like/boost tests
-	note               *domain.Note
-	activity           *domain.Activity
-	hasLike            bool
-	hasBoost           bool
-	like               *domain.Like
-	boost              *domain.Boost
-	likeCreated        bool
-	boostCreated       bool
-	likeDeleted        bool
-	boostDeleted       bool
-	likeError          error
-	boostError         error
+	note         *domain.Note
+	activity     *domain.Activity
+	hasLike      bool
+	hasBoost     bool
+	like         *domain.Like
+	boost        *domain.Boost
+	likeCreated  bool
+	boostCreated bool
+	likeDeleted  bool
+	boostDeleted bool
+	likeError    error
+	boostError   error
 	// For reply tests
-	inReplyToURI       string
+	inReplyToURI string
 	// For follow tests
-	remoteAccount      *domain.RemoteAccount
-	follow             *domain.Follow
-	isFollowing        bool
-	followCreated      bool
-	followDeleted      bool
-	followError        error
-	localAccounts      map[string]*domain.Account
+	remoteAccount *domain.RemoteAccount
+	follow        *domain.Follow
+	isFollowing   bool
+	followCreated bool
+	followDeleted bool
+	followError   error
+	localAccounts map[string]*domain.Account
 }
 
 func (m *mockDatabase) CreateNote(userId interface{}, message string) (interface{}, error) {

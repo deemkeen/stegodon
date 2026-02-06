@@ -78,56 +78,56 @@ const (
 
 // remotePost represents a post from a remote user (extracted from activity raw_json)
 type remotePost struct {
-	ObjectURI string
-	ObjectURL string
-	Content   string
-	CreatedAt time.Time
-	Author    string
-	Domain    string
-	LikeCount int
+	ObjectURI  string
+	ObjectURL  string
+	Content    string
+	CreatedAt  time.Time
+	Author     string
+	Domain     string
+	LikeCount  int
 	BoostCount int
 }
 
 type Model struct {
-	AccountId          uuid.UUID
-	ProfileUser        *domain.Account       // Local user data
-	RemoteProfileUser  *domain.RemoteAccount // Remote user data
-	IsRemoteProfile    bool                  // Which type is active
-	Posts              []domain.Note         // Local user posts
-	RemotePosts        []remotePost          // Remote user posts
-	IsFollowing        bool
-	FollowPending      bool // For pending remote follows
-	Selected           int
-	Offset             int
-	Width              int
-	Height             int
-	loading            bool
-	Status             string
-	Error              string
-	LocalDomain        string
-	AvatarRendered     string
-	ReturnView         common.SessionState // Where to return on Esc
+	AccountId         uuid.UUID
+	ProfileUser       *domain.Account       // Local user data
+	RemoteProfileUser *domain.RemoteAccount // Remote user data
+	IsRemoteProfile   bool                  // Which type is active
+	Posts             []domain.Note         // Local user posts
+	RemotePosts       []remotePost          // Remote user posts
+	IsFollowing       bool
+	FollowPending     bool // For pending remote follows
+	Selected          int
+	Offset            int
+	Width             int
+	Height            int
+	loading           bool
+	Status            string
+	Error             string
+	LocalDomain       string
+	AvatarRendered    string
+	ReturnView        common.SessionState // Where to return on Esc
 }
 
 func InitialModel(accountId uuid.UUID, width, height int, localDomain string) Model {
 	return Model{
-		AccountId:       accountId,
-		ProfileUser:     nil,
+		AccountId:         accountId,
+		ProfileUser:       nil,
 		RemoteProfileUser: nil,
-		IsRemoteProfile: false,
-		Posts:           []domain.Note{},
-		RemotePosts:     []remotePost{},
-		IsFollowing:     false,
-		FollowPending:   false,
-		Selected:        0,
-		Offset:          0,
-		Width:           width,
-		Height:          height,
-		loading:         false,
-		Status:          "",
-		Error:           "",
-		LocalDomain:     localDomain,
-		ReturnView:      common.LocalUsersView,
+		IsRemoteProfile:   false,
+		Posts:             []domain.Note{},
+		RemotePosts:       []remotePost{},
+		IsFollowing:       false,
+		FollowPending:     false,
+		Selected:          0,
+		Offset:            0,
+		Width:             width,
+		Height:            height,
+		loading:           false,
+		Status:            "",
+		Error:             "",
+		LocalDomain:       localDomain,
+		ReturnView:        common.LocalUsersView,
 	}
 }
 

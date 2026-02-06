@@ -62,9 +62,9 @@ type Model struct {
 	TermsInput         textarea.Model // Textarea for terms and conditions
 
 	// Ban management
-	Bans         []domain.Ban
-	BanSelected  int
-	BanOffset    int
+	Bans        []domain.Ban
+	BanSelected int
+	BanOffset   int
 
 	Width  int
 	Height int

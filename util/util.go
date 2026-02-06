@@ -25,6 +25,7 @@ var embeddedVersion string
 
 // Pre-compiled regex patterns for performance
 var ansiEscapeRegex = regexp.MustCompile(`\x1b\[[0-9;]*m|\x1b\]8;;[^\x1b]*\x1b\\`)
+var ansiSgrRegex = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`) // SGR sequences only (for SanitizeRemoteContent)
 var hashtagRegex = regexp.MustCompile(`#([a-zA-Z][a-zA-Z0-9_]*)`)
 var mentionRegex = regexp.MustCompile(`@([a-zA-Z0-9_]+)@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})`)
 var markdownLinkRegex = regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
@@ -350,6 +351,23 @@ func LinkifyRawURLsHTML(text string) string {
 // LinkifyRawURLsTerminal converts raw URLs in text to OSC 8 terminal hyperlinks.
 // This should be called AFTER MarkdownLinksToTerminal to avoid double-linkifying.
 func LinkifyRawURLsTerminal(text string) string {
+	// Pre-extract existing OSC-8 URLs into a set for O(1) lookup
+	// This avoids O(n) strings.Contains per URL match (was O(n²) for posts with many URLs)
+	existingOSC8 := make(map[string]struct{})
+	for i := 0; i < len(text); {
+		idx := strings.Index(text[i:], "\033]8;;")
+		if idx < 0 {
+			break
+		}
+		start := i + idx + 5 // skip past "\033]8;;"
+		end := strings.Index(text[start:], "\033\\")
+		if end < 0 {
+			break
+		}
+		existingOSC8[text[start:start+end]] = struct{}{}
+		i = start + end
+	}
+
 	// Replace raw URLs with OSC 8 hyperlinks
 	// The regex captures: $1 = preceding whitespace, $2 = the URL
 	result := rawURLInTextRegex.ReplaceAllStringFunc(text, func(match string) string {
@@ -359,7 +377,7 @@ func LinkifyRawURLsTerminal(text string) string {
 			rawURL := matches[2]
 
 			// Skip if this URL is already inside an OSC 8 sequence
-			if strings.Contains(text, "\033]8;;"+rawURL) {
+			if _, exists := existingOSC8[rawURL]; exists {
 				return match
 			}
 
@@ -724,11 +742,11 @@ func ParseActivityPubURL(urlStr string) (username string, domain string, ok bool
 // - Ambiguous-width characters are replaced with ASCII equivalents:
 //   - Circled numbers (①②③...) → (1)(2)(3)...
 //   - CJK punctuation (「」『』【】〈〉《》etc.) → ASCII quotes/brackets
+//
 // This helps fix rendering issues in terminals.
 func SanitizeRemoteContent(text string) string {
-	// First strip ANSI escape sequences
-	ansiRegex := regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
-	text = ansiRegex.ReplaceAllString(text, "")
+	// First strip ANSI escape sequences (uses pre-compiled regex)
+	text = ansiSgrRegex.ReplaceAllString(text, "")
 
 	var result strings.Builder
 	result.Grow(len(text))

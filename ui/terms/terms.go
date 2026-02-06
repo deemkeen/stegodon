@@ -21,8 +21,8 @@ var (
 type Model struct {
 	TermsContent string
 	UserId       uuid.UUID
-	Accepted    bool
-	Error       string
+	Accepted     bool
+	Error        string
 }
 
 func (m Model) Init() tea.Cmd {
@@ -96,7 +96,7 @@ func (m Model) ViewWithWidth(termWidth, termHeight int) string {
 
 func InitialModel(userId uuid.UUID) Model {
 	return Model{
-		UserId:    userId,
+		UserId:   userId,
 		Accepted: false,
 	}
 }

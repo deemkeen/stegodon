@@ -138,6 +138,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	case postsLoadedMsg:
 		m.Posts = msg.posts
+		// Pre-process content for terminal display (avoids re-processing on every View() render)
+		for i := range m.Posts {
+			m.Posts[i].ProcessedContent = processPostContent(m.Posts[i], m.LocalDomain)
+		}
 		// Keep selection within bounds after reload
 		if m.Selected >= len(m.Posts) {
 			m.Selected = max(0, len(m.Posts)-1)
@@ -439,19 +443,12 @@ func (m Model) View() string {
 					s.WriteString(authorFormatted + "\n")
 					s.WriteString(contentFormatted)
 				} else {
-					// Unescape HTML entities, convert Markdown links, then highlight hashtags (same order as myposts)
-					processedContent := post.Content
-					processedContent = util.TruncateContent(processedContent, common.MaxDisplayContentLength)
-					if post.IsLocal {
-						processedContent = util.UnescapeHTML(processedContent)
-						processedContent = util.MarkdownLinksToTerminal(processedContent)
-					} else {
-						// Normalize emojis for remote posts to fix terminal width calculation issues
-						processedContent = util.NormalizeEmojis(processedContent)
+					// Use pre-processed content (cached in postsLoadedMsg), add URL linkification for selected post
+					displayContent := post.ProcessedContent
+					if displayContent == "" {
+						displayContent = processPostContent(post, m.LocalDomain)
 					}
-					processedContent = util.LinkifyRawURLsTerminal(processedContent)
-					highlightedContent := util.HighlightHashtagsTerminal(processedContent)
-					highlightedContent = util.HighlightMentionsTerminal(highlightedContent, m.LocalDomain)
+					highlightedContent := util.LinkifyRawURLsTerminal(displayContent)
 
 					contentFormatted := selectedBg.Render(selectedContentStyle.Render(highlightedContent))
 					s.WriteString(timeFormatted + "\n")
@@ -466,18 +463,11 @@ func (m Model) View() string {
 				unselectedStyle := lipgloss.NewStyle().
 					Width(contentWidth)
 
-				// Unescape HTML entities, convert Markdown links, then highlight hashtags (same order as myposts)
-				processedContent := post.Content
-				processedContent = util.TruncateContent(processedContent, common.MaxDisplayContentLength)
-				if post.IsLocal {
-					processedContent = util.UnescapeHTML(processedContent)
-					processedContent = util.MarkdownLinksToTerminal(processedContent)
-				} else {
-					// Normalize emojis for remote posts to fix terminal width calculation issues
-					processedContent = util.NormalizeEmojis(processedContent)
+				// Use pre-processed content (cached in postsLoadedMsg)
+				highlightedContent := post.ProcessedContent
+				if highlightedContent == "" {
+					highlightedContent = processPostContent(post, m.LocalDomain)
 				}
-				highlightedContent := util.HighlightHashtagsTerminal(processedContent)
-				highlightedContent = util.HighlightMentionsTerminal(highlightedContent, m.LocalDomain)
 
 				// Use different author color for local vs remote
 				var authorFormatted string
@@ -504,6 +494,21 @@ func (m Model) View() string {
 	}
 
 	return s.String()
+}
+
+// processPostContent applies the full text processing pipeline for terminal display.
+// This is called once when posts are loaded (in postsLoadedMsg) and cached in ProcessedContent.
+func processPostContent(post domain.HomePost, localDomain string) string {
+	processed := util.TruncateContent(post.Content, common.MaxDisplayContentLength)
+	if post.IsLocal {
+		processed = util.UnescapeHTML(processed)
+		processed = util.MarkdownLinksToTerminal(processed)
+	} else {
+		processed = util.NormalizeEmojis(processed)
+	}
+	processed = util.HighlightHashtagsTerminal(processed)
+	processed = util.HighlightMentionsTerminal(processed, localDomain)
+	return processed
 }
 
 // postsLoadedMsg is sent when posts are loaded
