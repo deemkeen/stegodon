@@ -47,6 +47,7 @@ This document provides a lookup table for all specification documents in the ste
 | Relay Management | Admin relay control (add, pause, delete) | [ui/relay.md](./ui/relay.md) |
 | Admin Panel | User management (mute, ban), server message, terms | [ui/admin.md](./ui/admin.md) |
 | AccountSettings View | Profile editing, avatar upload, account deletion | [ui/deleteaccount.md](./ui/deleteaccount.md) |
+| Search Overlay | Full-text search across all posts (FTS5) | [features/search.md](./features/search.md) |
 | Terms View | Terms of service acceptance screen | — |
 | Common Components | Header, styles, layout, commands | [ui/common.md](./ui/common.md) |
 
@@ -134,3 +135,4 @@ This document provides a lookup table for all specification documents in the ste
 | Mention Autocomplete | @user suggestions while composing | [features/autocomplete.md](./features/autocomplete.md) |
 | Auto-Refresh | Timeline refresh patterns, goroutine lifecycle | [features/auto-refresh.md](./features/auto-refresh.md) |
 | Thread Navigation | Reply chains, parent-child relationships | [features/threading.md](./features/threading.md) |
+| Full-Text Search | FTS5 index, search overlay, query sanitization | [features/search.md](./features/search.md) |

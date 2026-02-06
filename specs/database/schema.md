@@ -529,6 +529,56 @@ CREATE INDEX IF NOT EXISTS idx_note_mentions_actor_uri ON note_mentions(mentione
 
 ---
 
+## Full-Text Search Tables
+
+### posts_fts
+
+FTS5 virtual table for full-text search. Stores only the two searchable columns to minimize memory usage.
+
+```sql
+CREATE VIRTUAL TABLE IF NOT EXISTS posts_fts USING fts5(
+    content,
+    author,
+    tokenize='unicode61'
+)
+```
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `content` | TEXT | Post text content (tokenized for search) |
+| `author` | TEXT | Author handle, e.g. `@user` or `@user@domain` (tokenized) |
+
+The `unicode61` tokenizer splits on non-alphanumeric characters and handles Unicode normalization.
+
+---
+
+### posts_fts_lookup
+
+Maps source records to FTS5 rowids and stores metadata that was intentionally kept out of the FTS5 table.
+
+```sql
+CREATE TABLE IF NOT EXISTS posts_fts_lookup(
+    source_id TEXT PRIMARY KEY,
+    fts_rowid INTEGER NOT NULL,
+    source_type TEXT NOT NULL,
+    created_at TEXT
+)
+```
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `source_id` | TEXT | UUID from `notes.id` or `activities.id` |
+| `fts_rowid` | INTEGER | Corresponding rowid in `posts_fts` |
+| `source_type` | TEXT | `note` (local) or `activity` (federated) |
+| `created_at` | TEXT | Timestamp for tiebreaker ordering |
+
+**Indexes:**
+```sql
+CREATE INDEX IF NOT EXISTS idx_posts_fts_lookup_rowid ON posts_fts_lookup(fts_rowid);
+```
+
+---
+
 ## Entity Relationships
 
 ```

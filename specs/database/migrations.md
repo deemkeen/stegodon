@@ -349,6 +349,7 @@ Can be called separately from main migration for existing databases.
 4. **Backfill data** - Object URIs, reply counts
 5. **Fix data** - Orphaned updates, duplicate usernames
 6. **Seed defaults** - Default info boxes
+7. **FTS5 search index** - Create FTS5 virtual table, lookup table, and backfill
 
 ---
 

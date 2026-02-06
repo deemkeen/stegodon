@@ -280,6 +280,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 | `common.LikeNoteMsg` | Like/unlike a note |
 | `notesLoadedMsg` | Notes finished loading |
 | `refreshTickMsg` | Auto-refresh timer tick |
+| `searchResultsMsg` | FTS5 search results loaded |
+| `searchDebounceMsg` | Debounce tick for search input |
 
 ---
 

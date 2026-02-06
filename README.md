@@ -17,6 +17,7 @@ Built with Go and [Charm Tools](https://github.com/charmbracelet).
 - **Relay Support** - Subscribe to ActivityPub relays (FediBuzz, YUKIMOCHI) to discover content beyond direct follows
 - **Threading & Replies** - Reply to posts, view threaded conversations with recursive reply counts
 - **Mentions** - Tag users with `@username@domain`, autocomplete suggestions, highlighted in TUI/web
+- **Full-Text Search** - Press `/` to search across all posts (local and federated) with highlighted snippets
 - **Hashtags** - Use `#tags` in your posts, highlighted in TUI and stored for discovery
 - **RSS Feeds** - Per-user and aggregated feeds with full content
 - **Web Interface** - Browse posts with terminal-themed design and SEO optimization
@@ -76,6 +77,7 @@ See [DOCKER.md](DOCKER.md) for complete Docker deployment guide.
 - **Up/Down** or **j/k** - Navigate posts
 - **Enter** - Open thread view for posts with replies
 - **Esc** - Return from thread view
+- **/** - Open search overlay (search across all local and federated posts)
 - **r** - Reply to selected post
 - **l** - Like/unlike selected post (federated)
 - **b** - Boost/unboost selected post (federated)
@@ -87,6 +89,14 @@ See [DOCKER.md](DOCKER.md) for complete Docker deployment guide.
 - **u** - Edit note (in my posts)
 - **d** - Delete note with confirmation
 - **Ctrl+S** - Save/post note
+
+### Search Overlay
+
+- **/** - Activate search from any timeline view
+- **Type** - Search query (debounced, results update as you type)
+- **Up/Down** - Navigate results
+- **Enter** - Open thread for selected result
+- **Esc** - Close search overlay
 
 ### Followers View
 

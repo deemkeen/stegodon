@@ -261,6 +261,53 @@ const sqlSelectLocalTimelineNotesByFollows = `SELECT notes.id, accounts.username
 
 ---
 
+## Search Queries
+
+### Full-Text Search (FTS5)
+
+```sql
+SELECT
+    l.source_id,
+    l.source_type,
+    f.author,
+    snippet(posts_fts, 0, '<<', '>>', '...', 32),
+    l.created_at,
+    CASE l.source_type
+        WHEN 'note' THEN COALESCE(n.object_uri, '')
+        WHEN 'activity' THEN COALESCE(a.object_uri, '')
+        ELSE ''
+    END,
+    CASE l.source_type
+        WHEN 'activity' THEN COALESCE(a.object_url, '')
+        ELSE ''
+    END
+FROM posts_fts f
+JOIN posts_fts_lookup l ON l.fts_rowid = f.rowid
+LEFT JOIN notes n ON l.source_type = 'note' AND l.source_id = n.id
+LEFT JOIN activities a ON l.source_type = 'activity' AND l.source_id = a.id
+WHERE posts_fts MATCH ?
+ORDER BY rank, l.created_at DESC
+LIMIT ?
+```
+
+**Features:**
+- FTS5 `MATCH` for full-text search with `rank` ordering (BM25 relevance)
+- `snippet()` generates highlighted excerpts with `<<`/`>>` markers
+- LEFT JOINs load `object_uri`/`object_url` from source tables at query time
+- Metadata (`source_type`, `created_at`) from lookup table, not FTS5
+- Tiebreaker ordering by `created_at DESC` for equal relevance scores
+
+### Query Sanitization
+
+User input is sanitized before FTS5 MATCH:
+1. Strip FTS5 operators (`AND`, `OR`, `NOT`, `NEAR`, `*`, `"`, `(`, `)`, `^`, `:`)
+2. Wrap remaining tokens as prefix queries: `"token"*`
+3. Multiple tokens are combined with implicit AND
+
+Example: `hello world` → `"hello"* "world"*`
+
+---
+
 ## Statistics Queries
 
 ### User Counts

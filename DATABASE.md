@@ -221,6 +221,13 @@ erDiagram
     accounts ||--o{ upload_tokens : "owns"
     accounts ||--o{ user_terms_acceptance : "accepts"
     terms_and_conditions ||--o{ user_terms_acceptance : "accepted_by"
+
+    posts_fts_lookup {
+        TEXT source_id PK
+        INTEGER fts_rowid
+        TEXT source_type
+        TEXT created_at
+    }
 ```
 
 ## Tables
@@ -370,6 +377,38 @@ Tracks which users have accepted which version of the terms. When terms are upda
 |--------|-------------|
 | `banned` | Whether the account is banned (0 or 1) |
 | `last_ip` | Last known IP address of the user (for admin visibility) |
+
+## Full-Text Search (FTS5)
+
+Stegodon uses SQLite FTS5 for full-text search across all posts (local notes and federated activities).
+
+### posts_fts
+FTS5 virtual table storing only the searchable columns (content and author). The `unicode61` tokenizer handles Unicode text normalization.
+
+**Columns:**
+| Column | Description |
+|--------|-------------|
+| `content` | Post text content (indexed, tokenized) |
+| `author` | Author handle, e.g. `@user` or `@user@domain` (indexed, tokenized) |
+
+### posts_fts_lookup
+Regular table mapping source IDs (from `notes` or `activities`) to FTS5 rowids, plus metadata.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `source_id` | TEXT (PK) | UUID from `notes.id` or `activities.id` |
+| `fts_rowid` | INTEGER | Corresponding rowid in `posts_fts` |
+| `source_type` | TEXT | `note` (local) or `activity` (federated) |
+| `created_at` | TEXT | Timestamp for result ordering |
+
+**Indexes:**
+```
+idx_posts_fts_lookup_rowid ON posts_fts_lookup(fts_rowid)
+```
+
+**Design rationale:** Only `content` and `author` are stored in the FTS5 table to minimize memory usage. Metadata (`source_type`, `created_at`) lives in the lookup table. `object_uri` and `object_url` are loaded via LEFT JOIN from the source tables (`notes`, `activities`) at query time.
+
+**FTS sync:** The index is updated synchronously on every note/activity create, update, and delete operation.
 
 ## Indexes
 

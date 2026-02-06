@@ -91,10 +91,11 @@ Built with [bubbletea](https://github.com/charmbracelet/bubbletea) MVC pattern. 
 - `notifications` - View and manage notifications
 - `relay` - Manage ActivityPub relay subscriptions (admin)
 - `admin` - Admin panel
+- `search` - Full-text search overlay (FTS5, activated with `/` from timelines)
 - `accountsettings` - Profile editing, avatar upload, account deletion
 - `terms` - Terms of service acceptance screen
 
-**Navigation:** Tab cycles forward, Shift+Tab backward. Press Ctrl+N for notifications. Enter opens threads, Esc returns.
+**Navigation:** Tab cycles forward, Shift+Tab backward. Press Ctrl+N for notifications. Enter opens threads, Esc returns. Press `/` to search from any timeline view.
 
 ### Database Layer
 
@@ -105,6 +106,8 @@ SQLite with WAL mode. Singleton pattern with connection pooling (max 25 connecti
 **ActivityPub tables:** `follows`, `remote_accounts`, `activities`, `likes`, `boosts`, `delivery_queue`, `note_mentions`, `relays`
 
 **Admin/feature tables:** `bans`, `notifications`, `info_boxes`, `server_message`, `upload_tokens`, `terms_and_conditions`, `user_terms_acceptance`
+
+**Full-text search tables:** `posts_fts` (FTS5 virtual table, content + author only), `posts_fts_lookup` (source_id → fts_rowid mapping with source_type and created_at)
 
 **Denormalized counters:** `reply_count`, `like_count`, `boost_count` on notes and activities for performance.
 
@@ -151,6 +154,7 @@ stegodon/
 │   ├── followers/   # Followers list
 │   ├── following/   # Following list
 │   ├── localusers/  # Local user browser
+│   ├── search/      # Full-text search overlay (FTS5)
 │   ├── relay/       # Relay management (admin)
 │   ├── admin/       # Admin panel
 │   ├── header/      # Navigation bar
