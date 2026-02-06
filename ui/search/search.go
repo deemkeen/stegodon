@@ -175,10 +175,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.lastQuery = currentQuery
 			if len(currentQuery) >= 2 {
 				q := currentQuery
-				debounceCmd := tea.Tick(time.Millisecond*searchDebounceMs, func(t time.Time) tea.Msg {
+				return m, tea.Tick(time.Millisecond*searchDebounceMs, func(t time.Time) tea.Msg {
 					return searchDebounceMsg{query: q}
 				})
-				return m, tea.Batch(cmd, debounceCmd)
 			}
 			// Clear results for short queries
 			m.Results = nil
