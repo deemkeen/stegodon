@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/deemkeen/stegodon/activitypub"
@@ -26,6 +27,7 @@ import (
 	"github.com/deemkeen/stegodon/ui/notifications"
 	"github.com/deemkeen/stegodon/ui/profileview"
 	"github.com/deemkeen/stegodon/ui/relay"
+	"github.com/deemkeen/stegodon/ui/search"
 	"github.com/deemkeen/stegodon/ui/terms"
 	"github.com/deemkeen/stegodon/ui/threadview"
 	"github.com/deemkeen/stegodon/ui/writenote"
@@ -66,6 +68,7 @@ type MainModel struct {
 	threadViewModel      threadview.Model
 	profileViewModel     profileview.Model
 	notificationsModel   notifications.Model
+	searchModel          search.Model
 }
 
 type userUpdateErrorMsg struct {
@@ -146,7 +149,6 @@ func NewModel(acc domain.Account, width int, height int) MainModel {
 	threadViewModel := threadview.InitialModel(acc.Id, width, height, localDomain)
 	profileViewModel := profileview.InitialModel(acc.Id, width, height, localDomain)
 	notificationsModel := notifications.InitialModel(acc.Id, width, height)
-
 	m := MainModel{state: common.CreateUserView}
 	m.config = config
 	m.newUserModel = createuser.InitialModel()
@@ -165,6 +167,7 @@ func NewModel(acc domain.Account, width int, height int) MainModel {
 	m.threadViewModel = threadViewModel
 	m.profileViewModel = profileViewModel
 	m.notificationsModel = notificationsModel
+	m.searchModel = search.InitialModel(localDomain)
 	m.headerModel = headerModel
 	m.account = acc
 	m.width = width
@@ -263,6 +266,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.profileViewModel.Width = msg.Width
 		m.profileViewModel.Height = msg.Height
 		m.accountSettingsModel.Width = msg.Width
+		m.searchModel.Width = msg.Width
+		m.searchModel.Height = msg.Height
 		return m, nil
 
 	case tea.MouseMsg:
@@ -374,9 +379,22 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, boostNoteCmd(m.account.Id, msg.NoteURI, msg.NoteID, msg.IsLocal, &m.account)
 
 	case tea.KeyMsg:
+		// When search overlay is active, route all keys to search model
+		// (except ctrl+c which always quits)
+		if m.searchModel.Active && msg.String() != "ctrl+c" {
+			m.searchModel, cmd = m.searchModel.Update(msg)
+			return m, cmd
+		}
+
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
+		case "/":
+			// Activate search overlay from timeline views (not when typing in textarea)
+			if (m.state == common.HomeTimelineView || m.state == common.MyPostsView || m.state == common.GlobalPostsView) && !m.createModel.IsReplying() {
+				m.searchModel.Activate()
+				return m, textinput.Blink
+			}
 		case "ctrl+n":
 			// Navigate to notifications (global shortcut, works from any view)
 			if m.state != common.NotificationsView {
@@ -399,6 +417,10 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Note: No need to activate notifications - it's always active
 			}
 		case "tab":
+			// Deactivate search overlay on tab navigation
+			if m.searchModel.Active {
+				m.searchModel.Deactivate()
+			}
 			// Cycle through main views (excluding create user)
 			// Order: write -> home -> my posts -> [global posts] -> [follow] -> followers -> following -> users -> [admin -> relay] -> delete
 			// AP-only views: follow remote user, relay management
@@ -498,6 +520,10 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, cmd)
 			}
 		case "shift+tab":
+			// Deactivate search overlay on tab navigation
+			if m.searchModel.Active {
+				m.searchModel.Deactivate()
+			}
 			// Cycle backwards through views
 			// AP-only views: follow remote user, relay management
 			// Optional views: global posts (when ShowGlobal is enabled)
@@ -682,6 +708,12 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 		m.notificationsModel, cmd = m.notificationsModel.Update(msg)
 		cmds = append(cmds, cmd)
+
+		// Route to search model when active (for async search results)
+		if m.searchModel.Active {
+			m.searchModel, cmd = m.searchModel.Update(msg)
+			cmds = append(cmds, cmd)
+		}
 
 		// Only route to admin/relay/thread/profile models when active (leak prevention)
 		switch m.state {
@@ -949,24 +981,57 @@ func (m MainModel) View() string {
 		navContainer := lipgloss.NewStyle().Render(m.headerModel.View())
 		s += navContainer + "\n"
 
+		// Search overlay (rendered only when active, replaces right panel in timeline views)
+		searchStyleStr := lipgloss.NewStyle().
+			MaxHeight(availableHeight).
+			Height(availableHeight).
+			Width(rightPanelWidth).
+			MaxWidth(rightPanelWidth).
+			Margin(1).
+			Render(m.searchModel.View())
+
 		// Render current view
 		switch m.state {
 		case common.CreateNoteView:
-			s += lipgloss.JoinHorizontal(lipgloss.Top,
-				focusedModelStyle.Render(createStyleStr),
-				modelStyle.Render(homeTimelineStyleStr))
+			if m.searchModel.Active {
+				s += lipgloss.JoinHorizontal(lipgloss.Top,
+					modelStyle.Render(createStyleStr),
+					focusedModelStyle.Render(searchStyleStr))
+			} else {
+				s += lipgloss.JoinHorizontal(lipgloss.Top,
+					focusedModelStyle.Render(createStyleStr),
+					modelStyle.Render(homeTimelineStyleStr))
+			}
 		case common.HomeTimelineView:
-			s += lipgloss.JoinHorizontal(lipgloss.Top,
-				modelStyle.Render(createStyleStr),
-				focusedModelStyle.Render(homeTimelineStyleStr))
+			if m.searchModel.Active {
+				s += lipgloss.JoinHorizontal(lipgloss.Top,
+					modelStyle.Render(createStyleStr),
+					focusedModelStyle.Render(searchStyleStr))
+			} else {
+				s += lipgloss.JoinHorizontal(lipgloss.Top,
+					modelStyle.Render(createStyleStr),
+					focusedModelStyle.Render(homeTimelineStyleStr))
+			}
 		case common.MyPostsView:
-			s += lipgloss.JoinHorizontal(lipgloss.Top,
-				modelStyle.Render(createStyleStr),
-				focusedModelStyle.Render(myPostsStyleStr))
+			if m.searchModel.Active {
+				s += lipgloss.JoinHorizontal(lipgloss.Top,
+					modelStyle.Render(createStyleStr),
+					focusedModelStyle.Render(searchStyleStr))
+			} else {
+				s += lipgloss.JoinHorizontal(lipgloss.Top,
+					modelStyle.Render(createStyleStr),
+					focusedModelStyle.Render(myPostsStyleStr))
+			}
 		case common.GlobalPostsView:
-			s += lipgloss.JoinHorizontal(lipgloss.Top,
-				modelStyle.Render(createStyleStr),
-				focusedModelStyle.Render(globalPostsStyleStr))
+			if m.searchModel.Active {
+				s += lipgloss.JoinHorizontal(lipgloss.Top,
+					modelStyle.Render(createStyleStr),
+					focusedModelStyle.Render(searchStyleStr))
+			} else {
+				s += lipgloss.JoinHorizontal(lipgloss.Top,
+					modelStyle.Render(createStyleStr),
+					focusedModelStyle.Render(globalPostsStyleStr))
+			}
 		case common.FollowUserView:
 			s += lipgloss.JoinHorizontal(lipgloss.Top,
 				modelStyle.Render(createStyleStr),
@@ -1020,11 +1085,11 @@ func (m MainModel) View() string {
 		var viewCommands string
 		switch m.state {
 		case common.HomeTimelineView:
-			viewCommands = "↑/↓ • enter: thread • r: reply • l: ⭐ • b: 🔁 • i: info • o: link"
+			viewCommands = "↑/↓ • enter: thread • r: reply • l: ⭐ • b: 🔁 • i: info • o: link • /: search"
 		case common.MyPostsView:
-			viewCommands = "↑/↓ • u: edit • d: delete • l: ⭐ • b: 🔁"
+			viewCommands = "↑/↓ • u: edit • d: delete • l: ⭐ • b: 🔁 • /: search"
 		case common.GlobalPostsView:
-			viewCommands = "↑/↓ • enter: thread • r: reply • l: ⭐ • b: 🔁 • i: info • o: link • f: follow"
+			viewCommands = "↑/↓ • enter: thread • r: reply • l: ⭐ • b: 🔁 • i: info • o: link • f: follow • /: search"
 		case common.FollowUserView:
 			viewCommands = "enter: follow"
 		case common.FollowersView:

@@ -69,3 +69,18 @@ type HomePost struct {
 	BoostCount       int       // number of boosts on this post
 	BoostedBy        string    // if non-empty, this post was boosted by this user (e.g., "@alice" or "@bob@domain")
 }
+
+// SearchResult represents a post found via full-text search
+type SearchResult struct {
+	ID         uuid.UUID
+	Author     string    // @user or @user@domain
+	Content    string    // Plain text
+	Snippet    string    // FTS5 snippet with highlight markers (<<…>>)
+	Time       time.Time
+	ObjectURI  string
+	ObjectURL  string
+	IsLocal    bool
+	NoteID     uuid.UUID // Only set for local notes
+	SourceID   string    // ID in posts_fts (notes.id or activities.id)
+	SourceType string    // "note" or "activity"
+}

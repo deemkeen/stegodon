@@ -165,20 +165,42 @@ func (db *DB) CreateNoteWithReply(userId uuid.UUID, message string, inReplyToURI
 		noteId = id
 		return nil
 	})
+	if err == nil {
+		// Index in FTS (best-effort)
+		err2, acc := db.ReadAccById(userId)
+		if err2 == nil {
+			author := "@" + acc.Username
+			createdAt := time.Now().Format("2006-01-02 15:04:05")
+			db.InsertNoteFTS(noteId, author, message, createdAt, "")
+		}
+	}
 	return noteId, err
 }
 
 func (db *DB) UpdateNote(noteId uuid.UUID, message string) error {
-	return db.wrapTransaction(func(tx *sql.Tx) error {
+	err := db.wrapTransaction(func(tx *sql.Tx) error {
 		err := db.updateNote(tx, noteId, message)
 		if err != nil {
 			return err
 		}
 		return nil
 	})
+	if err == nil {
+		// Update FTS index (best-effort)
+		err2, note := db.ReadNoteId(noteId)
+		if err2 == nil {
+			author := "@" + note.CreatedBy
+			createdAt := note.CreatedAt.Format("2006-01-02 15:04:05")
+			db.UpdateNoteFTS(noteId, author, message, createdAt, note.ObjectURI)
+		}
+	}
+	return err
 }
 
 func (db *DB) DeleteNoteById(noteId uuid.UUID) error {
+	// Delete from FTS before deleting from DB (need row data for standalone FTS delete)
+	db.DeleteFromFTS(noteId.String())
+
 	return db.wrapTransaction(func(tx *sql.Tx) error {
 		err := db.deleteNote(tx, noteId)
 		if err != nil {
@@ -1055,7 +1077,7 @@ const (
 )
 
 func (db *DB) CreateActivity(activity *domain.Activity) error {
-	return db.wrapTransaction(func(tx *sql.Tx) error {
+	err := db.wrapTransaction(func(tx *sql.Tx) error {
 		_, err := tx.Exec(sqlInsertActivity,
 			activity.Id.String(),
 			activity.ActivityURI,
@@ -1072,10 +1094,22 @@ func (db *DB) CreateActivity(activity *domain.Activity) error {
 		)
 		return err
 	})
+	if err == nil && activity.ActivityType == "Create" && !activity.Local {
+		// Index in FTS (best-effort)
+		db.InsertActivityFTS(
+			activity.Id,
+			activity.ActorURI,
+			activity.RawJSON,
+			activity.CreatedAt.Format("2006-01-02 15:04:05"),
+			activity.ObjectURI,
+			activity.ObjectURL,
+		)
+	}
+	return err
 }
 
 func (db *DB) UpdateActivity(activity *domain.Activity) error {
-	return db.wrapTransaction(func(tx *sql.Tx) error {
+	err := db.wrapTransaction(func(tx *sql.Tx) error {
 		_, err := tx.Exec(sqlUpdateActivity,
 			activity.RawJSON,
 			activity.Processed,
@@ -1084,6 +1118,19 @@ func (db *DB) UpdateActivity(activity *domain.Activity) error {
 		)
 		return err
 	})
+	if err == nil && activity.ActivityType == "Create" {
+		// Update FTS index (best-effort): delete old + insert new
+		db.DeleteFromFTS(activity.Id.String())
+		db.InsertActivityFTS(
+			activity.Id,
+			activity.ActorURI,
+			activity.RawJSON,
+			activity.CreatedAt.Format("2006-01-02 15:04:05"),
+			activity.ObjectURI,
+			activity.ObjectURL,
+		)
+	}
+	return err
 }
 
 func (db *DB) ReadActivityByURI(uri string) (error, *domain.Activity) {
@@ -2151,6 +2198,9 @@ func (db *DB) ReadLocalFollowsByAccountId(accountId uuid.UUID) (error, *[]domain
 
 // DeleteActivity deletes an activity by ID
 func (db *DB) DeleteActivity(id uuid.UUID) error {
+	// Delete from FTS before deleting from DB (need row data for standalone FTS delete)
+	db.DeleteFromFTS(id.String())
+
 	_, err := db.db.Exec("DELETE FROM activities WHERE id = ?", id.String())
 	if err != nil {
 		return fmt.Errorf("failed to delete activity: %w", err)
@@ -3986,6 +4036,9 @@ func (db *DB) UpdateRelayPaused(id uuid.UUID, paused bool) error {
 
 // DeleteRelayActivities deletes all activities that were forwarded by relays (from_relay=1)
 func (db *DB) DeleteRelayActivities() (int64, error) {
+	// Clean up FTS index before deleting relay activities
+	db.DeleteRelayActivitiesFTS()
+
 	var count int64
 	err := db.wrapTransaction(func(tx *sql.Tx) error {
 		result, err := tx.Exec(`DELETE FROM activities WHERE from_relay = 1`)
@@ -4939,4 +4992,201 @@ func (db *DB) UserNeedsToAcceptTerms(userId uuid.UUID) (bool, error) {
 	}
 
 	return false, nil
+}
+
+// ============================================================================
+// Full-Text Search (FTS5)
+// ============================================================================
+
+// sanitizeFTSQuery removes FTS5 operators and converts to prefix-match tokens
+func sanitizeFTSQuery(query string) string {
+	// Remove FTS5 special characters
+	replacer := strings.NewReplacer(
+		`"`, ``,
+		`(`, ``,
+		`)`, ``,
+		`*`, ``,
+		`{`, ``,
+		`}`, ``,
+		`:`, ``,
+		`^`, ``,
+	)
+	query = replacer.Replace(query)
+
+	// Split into tokens and wrap each for prefix matching
+	tokens := strings.Fields(query)
+	if len(tokens) == 0 {
+		return ""
+	}
+
+	var parts []string
+	for _, token := range tokens {
+		token = strings.TrimSpace(token)
+		if token == "" {
+			continue
+		}
+		// Wrap in quotes and add wildcard for prefix matching
+		parts = append(parts, `"`+token+`"*`)
+	}
+	return strings.Join(parts, " ")
+}
+
+// SearchPosts searches the FTS5 index for posts matching the query
+func (db *DB) SearchPosts(query string, maxResults int) (error, []domain.SearchResult) {
+	ftsQuery := sanitizeFTSQuery(query)
+	if ftsQuery == "" {
+		return nil, nil
+	}
+
+	rows, err := db.db.Query(`
+		SELECT
+			l.source_id,
+			f.source_type,
+			f.author,
+			f.content,
+			snippet(posts_fts, 0, '<<', '>>', '...', 32),
+			f.created_at,
+			f.object_uri,
+			f.object_url
+		FROM posts_fts f
+		JOIN posts_fts_lookup l ON l.fts_rowid = f.rowid
+		WHERE posts_fts MATCH ?
+		ORDER BY rank
+		LIMIT ?
+	`, ftsQuery, maxResults)
+	if err != nil {
+		return fmt.Errorf("FTS5 search failed: %w", err), nil
+	}
+	defer rows.Close()
+
+	var results []domain.SearchResult
+	for rows.Next() {
+		var sourceID, sourceType, author, content, snippet, createdAtStr, objectURI, objectURL string
+		if err := rows.Scan(&sourceID, &sourceType, &author, &content, &snippet, &createdAtStr, &objectURI, &objectURL); err != nil {
+			log.Printf("Warning: Failed to scan search result: %v", err)
+			continue
+		}
+
+		createdAt, err := parseTimestamp(createdAtStr)
+		if err != nil {
+			createdAt = time.Time{}
+		}
+
+		result := domain.SearchResult{
+			Author:     author,
+			Content:    content,
+			Snippet:    snippet,
+			Time:       createdAt,
+			ObjectURI:  objectURI,
+			ObjectURL:  objectURL,
+			IsLocal:    sourceType == "note",
+			SourceID:   sourceID,
+			SourceType: sourceType,
+		}
+
+		// Parse source ID as UUID
+		if parsed, err := uuid.Parse(sourceID); err == nil {
+			result.ID = parsed
+			if sourceType == "note" {
+				result.NoteID = parsed
+			}
+		}
+
+		results = append(results, result)
+	}
+
+	return rows.Err(), results
+}
+
+// InsertNoteFTS adds a local note to the FTS index
+func (db *DB) InsertNoteFTS(noteId uuid.UUID, author, message, createdAt, objectURI string) {
+	result, err := db.db.Exec(
+		`INSERT INTO posts_fts(content, author, source_type, created_at, object_uri, object_url) VALUES (?, ?, 'note', ?, ?, '')`,
+		message, author, createdAt, objectURI,
+	)
+	if err != nil {
+		log.Printf("Warning: Failed to insert note %s into FTS: %v", noteId, err)
+		return
+	}
+	if ftsRowid, err := result.LastInsertId(); err == nil {
+		_, err = db.db.Exec(`INSERT OR REPLACE INTO posts_fts_lookup(source_id, fts_rowid) VALUES (?, ?)`, noteId.String(), ftsRowid)
+		if err != nil {
+			log.Printf("Warning: Failed to insert FTS lookup for note %s: %v", noteId, err)
+		}
+	}
+}
+
+// InsertActivityFTS adds a remote activity to the FTS index
+func (db *DB) InsertActivityFTS(activityId uuid.UUID, actorURI, rawJSON, createdAt, objectURI, objectURL string) {
+	content := extractContentFromJSON(rawJSON)
+	if content == "" {
+		return
+	}
+	author := extractAuthorFromActorURI(actorURI)
+
+	result, err := db.db.Exec(
+		`INSERT INTO posts_fts(content, author, source_type, created_at, object_uri, object_url) VALUES (?, ?, 'activity', ?, ?, ?)`,
+		content, author, createdAt, objectURI, objectURL,
+	)
+	if err != nil {
+		log.Printf("Warning: Failed to insert activity %s into FTS: %v", activityId, err)
+		return
+	}
+	if ftsRowid, err := result.LastInsertId(); err == nil {
+		_, err = db.db.Exec(`INSERT OR REPLACE INTO posts_fts_lookup(source_id, fts_rowid) VALUES (?, ?)`, activityId.String(), ftsRowid)
+		if err != nil {
+			log.Printf("Warning: Failed to insert FTS lookup for activity %s: %v", activityId, err)
+		}
+	}
+}
+
+// DeleteFromFTS removes a post from the FTS index by source_id.
+// Uses the lookup table to find the FTS rowid, then deletes by rowid.
+func (db *DB) DeleteFromFTS(sourceID string) {
+	// Look up the FTS rowid from the mapping table
+	var ftsRowid int64
+	err := db.db.QueryRow(`SELECT fts_rowid FROM posts_fts_lookup WHERE source_id = ?`, sourceID).Scan(&ftsRowid)
+	if err != nil {
+		// Row may not exist in FTS (e.g. table doesn't exist, or activity with empty content was never indexed)
+		return
+	}
+
+	// Delete from standalone FTS5 table by rowid
+	_, err = db.db.Exec(`DELETE FROM posts_fts WHERE rowid = ?`, ftsRowid)
+	if err != nil {
+		log.Printf("Warning: Failed to delete %s from FTS: %v", sourceID, err)
+	}
+
+	// Remove the lookup entry
+	db.db.Exec(`DELETE FROM posts_fts_lookup WHERE source_id = ?`, sourceID)
+}
+
+// UpdateNoteFTS updates a note in the FTS index (delete + re-insert)
+func (db *DB) UpdateNoteFTS(noteId uuid.UUID, author, message, createdAt, objectURI string) {
+	db.DeleteFromFTS(noteId.String())
+	db.InsertNoteFTS(noteId, author, message, createdAt, objectURI)
+}
+
+// DeleteRelayActivitiesFTS removes all relay-forwarded activities from the FTS index
+func (db *DB) DeleteRelayActivitiesFTS() {
+	// Get all relay activity IDs
+	rows, err := db.db.Query(`SELECT id FROM activities WHERE from_relay = 1`)
+	if err != nil {
+		log.Printf("Warning: Failed to query relay activities for FTS cleanup: %v", err)
+		return
+	}
+	defer rows.Close()
+
+	deleted := 0
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			continue
+		}
+		db.DeleteFromFTS(id)
+		deleted++
+	}
+	if deleted > 0 {
+		log.Printf("Deleted %d relay activities from FTS index", deleted)
+	}
 }

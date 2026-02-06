@@ -173,6 +173,22 @@ func setupTestDB(t *testing.T) *DB {
 		FOREIGN KEY (terms_id) REFERENCES terms_and_conditions(id)
 	)`)
 
+	// FTS5 search tables
+	db.db.Exec(`CREATE VIRTUAL TABLE IF NOT EXISTS posts_fts USING fts5(
+		content,
+		author,
+		source_type UNINDEXED,
+		created_at UNINDEXED,
+		object_uri UNINDEXED,
+		object_url UNINDEXED,
+		tokenize='unicode61'
+	)`)
+
+	db.db.Exec(`CREATE TABLE IF NOT EXISTS posts_fts_lookup(
+		source_id TEXT PRIMARY KEY,
+		fts_rowid INTEGER NOT NULL
+	)`)
+
 	return db
 }
 
@@ -4048,5 +4064,120 @@ func TestUserNeedsToAcceptTerms_TermsUpdatedAfterAcceptance(t *testing.T) {
 	}
 	if !needs {
 		t.Error("Expected user to need acceptance after terms were updated")
+	}
+}
+
+func TestFTSSearchCreateAndDelete(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.db.Close()
+
+	// Create a test account
+	userId := uuid.New()
+	createTestAccount(t, db, userId, "searcher", "ssh-rsa SEARCH...", "webpub", "webpriv")
+
+	// Create a note (this also inserts into FTS)
+	noteId, err := db.CreateNote(userId, "the quick brown fox jumps over the lazy dog")
+	if err != nil {
+		t.Fatalf("CreateNote failed: %v", err)
+	}
+
+	// Search should find it
+	err, results := db.SearchPosts("quick brown", 10)
+	if err != nil {
+		t.Fatalf("SearchPosts failed: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("Expected 1 search result, got %d", len(results))
+	}
+	if results[0].NoteID != noteId {
+		t.Errorf("Expected NoteID %s, got %s", noteId, results[0].NoteID)
+	}
+	if results[0].Author != "@searcher" {
+		t.Errorf("Expected author @searcher, got %s", results[0].Author)
+	}
+	if results[0].IsLocal != true {
+		t.Error("Expected IsLocal=true for local note")
+	}
+
+	// Delete the note
+	err = db.DeleteNoteById(noteId)
+	if err != nil {
+		t.Fatalf("DeleteNoteById failed: %v", err)
+	}
+
+	// Search should no longer find it
+	err, results = db.SearchPosts("quick brown", 10)
+	if err != nil {
+		t.Fatalf("SearchPosts after delete failed: %v", err)
+	}
+	if len(results) != 0 {
+		t.Errorf("Expected 0 search results after delete, got %d", len(results))
+	}
+}
+
+func TestFTSSearchUpdate(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.db.Close()
+
+	userId := uuid.New()
+	createTestAccount(t, db, userId, "editor", "ssh-rsa EDIT...", "webpub", "webpriv")
+
+	noteId, err := db.CreateNote(userId, "original content here")
+	if err != nil {
+		t.Fatalf("CreateNote failed: %v", err)
+	}
+
+	// Search for original content
+	err, results := db.SearchPosts("original", 10)
+	if err != nil {
+		t.Fatalf("SearchPosts failed: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("Expected 1 result for 'original', got %d", len(results))
+	}
+
+	// Update the note
+	err = db.UpdateNote(noteId, "updated replacement text")
+	if err != nil {
+		t.Fatalf("UpdateNote failed: %v", err)
+	}
+
+	// Old content should not be found
+	err, results = db.SearchPosts("original", 10)
+	if err != nil {
+		t.Fatalf("SearchPosts for old content failed: %v", err)
+	}
+	if len(results) != 0 {
+		t.Errorf("Expected 0 results for old content, got %d", len(results))
+	}
+
+	// New content should be found
+	err, results = db.SearchPosts("replacement", 10)
+	if err != nil {
+		t.Fatalf("SearchPosts for new content failed: %v", err)
+	}
+	if len(results) != 1 {
+		t.Errorf("Expected 1 result for new content, got %d", len(results))
+	}
+}
+
+func TestFTSSanitizeQuery(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"hello", `"hello"*`},
+		{"hello world", `"hello"* "world"*`},
+		{`he"llo`, `"hello"*`},
+		{"", ""},
+		{"   ", ""},
+		{`a(b)c*d{e}f:g`, `"abcdefg"*`},
+	}
+
+	for _, tt := range tests {
+		result := sanitizeFTSQuery(tt.input)
+		if result != tt.expected {
+			t.Errorf("sanitizeFTSQuery(%q) = %q, expected %q", tt.input, result, tt.expected)
+		}
 	}
 }

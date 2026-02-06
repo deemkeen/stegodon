@@ -1048,3 +1048,141 @@ On federated services like Mastodon people now can follow you, when searching fo
 	log.Printf("Seeded %d default info boxes", len(defaultBoxes))
 	return nil
 }
+
+// MigrateFTS5Search creates the FTS5 virtual table for full-text search and backfills existing data
+func (db *DB) MigrateFTS5Search() error {
+	log.Println("Checking FTS5 search index...")
+
+	// Create the FTS5 virtual table (standalone, not external-content)
+	_, err := db.db.Exec(`CREATE VIRTUAL TABLE IF NOT EXISTS posts_fts USING fts5(
+		content,
+		author,
+		source_type UNINDEXED,
+		created_at UNINDEXED,
+		object_uri UNINDEXED,
+		object_url UNINDEXED,
+		tokenize='unicode61'
+	)`)
+	if err != nil {
+		return fmt.Errorf("failed to create posts_fts table: %w", err)
+	}
+
+	// Lookup table maps source IDs to FTS rowids (needed for delete/update)
+	_, err = db.db.Exec(`CREATE TABLE IF NOT EXISTS posts_fts_lookup(
+		source_id TEXT PRIMARY KEY,
+		fts_rowid INTEGER NOT NULL
+	)`)
+	if err != nil {
+		return fmt.Errorf("failed to create posts_fts_lookup table: %w", err)
+	}
+
+	// Check if backfill is needed
+	var count int
+	err = db.db.QueryRow(`SELECT COUNT(*) FROM posts_fts`).Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to check posts_fts count: %w", err)
+	}
+	if count > 0 {
+		log.Printf("FTS5 index already populated (%d entries), skipping backfill", count)
+		return nil
+	}
+
+	log.Println("Backfilling FTS5 search index...")
+
+	// Backfill local notes
+	notesBackfilled, err := db.backfillNotesFTS()
+	if err != nil {
+		log.Printf("Warning: Failed to backfill notes FTS: %v", err)
+	}
+
+	// Backfill remote activities
+	activitiesBackfilled, err := db.backfillActivitiesFTS()
+	if err != nil {
+		log.Printf("Warning: Failed to backfill activities FTS: %v", err)
+	}
+
+	log.Printf("FTS5 backfill complete: %d notes, %d activities", notesBackfilled, activitiesBackfilled)
+	return nil
+}
+
+// backfillNotesFTS inserts all existing local notes into the FTS index
+func (db *DB) backfillNotesFTS() (int, error) {
+	rows, err := db.db.Query(`
+		SELECT n.id, a.username, n.message, n.created_at, COALESCE(n.object_uri, '')
+		FROM notes n
+		JOIN accounts a ON a.id = n.user_id
+	`)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	inserted := 0
+	for rows.Next() {
+		var id, username, message, createdAt, objectURI string
+		if err := rows.Scan(&id, &username, &message, &createdAt, &objectURI); err != nil {
+			log.Printf("Warning: Failed to scan note for FTS backfill: %v", err)
+			continue
+		}
+
+		author := "@" + username
+		result, err := db.db.Exec(
+			`INSERT INTO posts_fts(content, author, source_type, created_at, object_uri, object_url) VALUES (?, ?, 'note', ?, ?, '')`,
+			message, author, createdAt, objectURI,
+		)
+		if err != nil {
+			log.Printf("Warning: Failed to insert note %s into FTS: %v", id, err)
+			continue
+		}
+		if ftsRowid, err := result.LastInsertId(); err == nil {
+			db.db.Exec(`INSERT OR REPLACE INTO posts_fts_lookup(source_id, fts_rowid) VALUES (?, ?)`, id, ftsRowid)
+		}
+		inserted++
+	}
+
+	return inserted, rows.Err()
+}
+
+// backfillActivitiesFTS inserts all existing remote Create activities into the FTS index
+func (db *DB) backfillActivitiesFTS() (int, error) {
+	rows, err := db.db.Query(`
+		SELECT id, actor_uri, raw_json, created_at, COALESCE(object_uri, ''), COALESCE(object_url, '')
+		FROM activities
+		WHERE activity_type = 'Create' AND local = 0
+	`)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	inserted := 0
+	for rows.Next() {
+		var id, actorURI, rawJSON, createdAt, objectURI, objectURL string
+		if err := rows.Scan(&id, &actorURI, &rawJSON, &createdAt, &objectURI, &objectURL); err != nil {
+			log.Printf("Warning: Failed to scan activity for FTS backfill: %v", err)
+			continue
+		}
+
+		content := extractContentFromJSON(rawJSON)
+		if content == "" {
+			continue
+		}
+
+		author := extractAuthorFromActorURI(actorURI)
+
+		result, err := db.db.Exec(
+			`INSERT INTO posts_fts(content, author, source_type, created_at, object_uri, object_url) VALUES (?, ?, 'activity', ?, ?, ?)`,
+			content, author, createdAt, objectURI, objectURL,
+		)
+		if err != nil {
+			log.Printf("Warning: Failed to insert activity %s into FTS: %v", id, err)
+			continue
+		}
+		if ftsRowid, err := result.LastInsertId(); err == nil {
+			db.db.Exec(`INSERT OR REPLACE INTO posts_fts_lookup(source_id, fts_rowid) VALUES (?, ?)`, id, ftsRowid)
+		}
+		inserted++
+	}
+
+	return inserted, rows.Err()
+}

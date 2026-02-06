@@ -91,6 +91,11 @@ func (a *App) Initialize() error {
 		log.Printf("Warning: Performance indexes migration encountered errors: %v", err)
 	}
 
+	// Run FTS5 search index migration
+	if err := database.MigrateFTS5Search(); err != nil {
+		log.Printf("Warning: FTS5 search migration encountered errors: %v", err)
+	}
+
 	// Run orphan activities cleanup migration (fixes bug where Create activities
 	// were stored before checking follow relationships)
 	log.Println("Checking for orphan activities...")
