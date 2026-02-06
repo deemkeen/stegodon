@@ -42,10 +42,17 @@ var (
 	highlightEnd   = "\033[22m"
 )
 
+const searchDebounceMs = 200
+
 // searchResultsMsg carries search results back from an async search
 type searchResultsMsg struct {
 	query   string
 	results []domain.SearchResult
+}
+
+// searchDebounceMsg is sent after the debounce timer expires
+type searchDebounceMsg struct {
+	query string
 }
 
 // Model is the search overlay model
@@ -99,6 +106,13 @@ func (m *Model) Deactivate() {
 // Update handles messages for the search overlay
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case searchDebounceMsg:
+		// Debounce timer expired — run search if query still matches
+		if msg.query == m.lastQuery && m.Active {
+			return m, performSearch(msg.query)
+		}
+		return m, nil
+
 	case searchResultsMsg:
 		// Only apply results if query still matches (prevents stale results)
 		if msg.query == m.lastQuery {
@@ -155,12 +169,16 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.Input, cmd = m.Input.Update(msg)
 
-		// Check if query changed
+		// Check if query changed — debounce search
 		currentQuery := m.Input.Value()
 		if currentQuery != m.lastQuery {
 			m.lastQuery = currentQuery
 			if len(currentQuery) >= 2 {
-				return m, tea.Batch(cmd, performSearch(currentQuery))
+				q := currentQuery
+				debounceCmd := tea.Tick(time.Millisecond*searchDebounceMs, func(t time.Time) tea.Msg {
+					return searchDebounceMsg{query: q}
+				})
+				return m, tea.Batch(cmd, debounceCmd)
 			}
 			// Clear results for short queries
 			m.Results = nil

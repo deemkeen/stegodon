@@ -981,19 +981,14 @@ func (m MainModel) View() string {
 		navContainer := lipgloss.NewStyle().Render(m.headerModel.View())
 		s += navContainer + "\n"
 
-		// Search overlay (rendered only when active, replaces right panel in timeline views)
-		searchStyleStr := lipgloss.NewStyle().
-			MaxHeight(availableHeight).
-			Height(availableHeight).
-			Width(rightPanelWidth).
-			MaxWidth(rightPanelWidth).
-			Margin(1).
-			Render(m.searchModel.View())
-
 		// Render current view
 		switch m.state {
 		case common.CreateNoteView:
 			if m.searchModel.Active {
+				searchStyleStr := lipgloss.NewStyle().
+					MaxHeight(availableHeight).Height(availableHeight).
+					Width(rightPanelWidth).MaxWidth(rightPanelWidth).
+					Margin(1).Render(m.searchModel.View())
 				s += lipgloss.JoinHorizontal(lipgloss.Top,
 					modelStyle.Render(createStyleStr),
 					focusedModelStyle.Render(searchStyleStr))
@@ -1004,6 +999,10 @@ func (m MainModel) View() string {
 			}
 		case common.HomeTimelineView:
 			if m.searchModel.Active {
+				searchStyleStr := lipgloss.NewStyle().
+					MaxHeight(availableHeight).Height(availableHeight).
+					Width(rightPanelWidth).MaxWidth(rightPanelWidth).
+					Margin(1).Render(m.searchModel.View())
 				s += lipgloss.JoinHorizontal(lipgloss.Top,
 					modelStyle.Render(createStyleStr),
 					focusedModelStyle.Render(searchStyleStr))
@@ -1014,6 +1013,10 @@ func (m MainModel) View() string {
 			}
 		case common.MyPostsView:
 			if m.searchModel.Active {
+				searchStyleStr := lipgloss.NewStyle().
+					MaxHeight(availableHeight).Height(availableHeight).
+					Width(rightPanelWidth).MaxWidth(rightPanelWidth).
+					Margin(1).Render(m.searchModel.View())
 				s += lipgloss.JoinHorizontal(lipgloss.Top,
 					modelStyle.Render(createStyleStr),
 					focusedModelStyle.Render(searchStyleStr))
@@ -1024,6 +1027,10 @@ func (m MainModel) View() string {
 			}
 		case common.GlobalPostsView:
 			if m.searchModel.Active {
+				searchStyleStr := lipgloss.NewStyle().
+					MaxHeight(availableHeight).Height(availableHeight).
+					Width(rightPanelWidth).MaxWidth(rightPanelWidth).
+					Margin(1).Render(m.searchModel.View())
 				s += lipgloss.JoinHorizontal(lipgloss.Top,
 					modelStyle.Render(createStyleStr),
 					focusedModelStyle.Render(searchStyleStr))

@@ -1076,6 +1076,9 @@ func (db *DB) MigrateFTS5Search() error {
 		return fmt.Errorf("failed to create posts_fts_lookup table: %w", err)
 	}
 
+	// Index on fts_rowid for efficient JOIN in search queries
+	db.db.Exec(`CREATE INDEX IF NOT EXISTS idx_posts_fts_lookup_rowid ON posts_fts_lookup(fts_rowid)`)
+
 	// Check if backfill is needed
 	var count int
 	err = db.db.QueryRow(`SELECT COUNT(*) FROM posts_fts`).Scan(&count)
