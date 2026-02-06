@@ -1049,28 +1049,49 @@ On federated services like Mastodon people now can follow you, when searching fo
 	return nil
 }
 
-// MigrateFTS5Search creates the FTS5 virtual table for full-text search and backfills existing data
+// MigrateFTS5Search creates the FTS5 virtual table for full-text search and backfills existing data.
+// The FTS5 table only stores content and author (the searchable columns).
+// Metadata (source_type, created_at) lives in the lookup table.
+// object_uri/object_url are loaded from notes/activities at query time.
 func (db *DB) MigrateFTS5Search() error {
 	log.Println("Checking FTS5 search index...")
 
-	// Create the FTS5 virtual table (standalone, not external-content)
-	_, err := db.db.Exec(`CREATE VIRTUAL TABLE IF NOT EXISTS posts_fts USING fts5(
+	// Check if we need to migrate from the old 6-column FTS schema to the slim 2-column schema.
+	// The old schema had source_type, created_at, object_uri, object_url as UNINDEXED columns
+	// which still consumed memory. The new schema only stores content + author in FTS5.
+	needsRebuild := false
+	var oldLookupCols int
+	err := db.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('posts_fts_lookup') WHERE name IN ('source_type', 'created_at')`).Scan(&oldLookupCols)
+	if err == nil && oldLookupCols < 2 {
+		// Old lookup table without source_type/created_at columns — needs rebuild
+		var ftsExists int
+		if err := db.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='posts_fts'`).Scan(&ftsExists); err == nil && ftsExists > 0 {
+			needsRebuild = true
+		}
+	}
+
+	if needsRebuild {
+		log.Println("Migrating FTS5 index to slim schema (content + author only)...")
+		db.db.Exec(`DROP TABLE IF EXISTS posts_fts`)
+		db.db.Exec(`DROP TABLE IF EXISTS posts_fts_lookup`)
+	}
+
+	// Create the FTS5 virtual table (standalone, only searchable columns)
+	_, err = db.db.Exec(`CREATE VIRTUAL TABLE IF NOT EXISTS posts_fts USING fts5(
 		content,
 		author,
-		source_type UNINDEXED,
-		created_at UNINDEXED,
-		object_uri UNINDEXED,
-		object_url UNINDEXED,
 		tokenize='unicode61'
 	)`)
 	if err != nil {
 		return fmt.Errorf("failed to create posts_fts table: %w", err)
 	}
 
-	// Lookup table maps source IDs to FTS rowids (needed for delete/update)
+	// Lookup table maps source IDs to FTS rowids and stores metadata
 	_, err = db.db.Exec(`CREATE TABLE IF NOT EXISTS posts_fts_lookup(
 		source_id TEXT PRIMARY KEY,
-		fts_rowid INTEGER NOT NULL
+		fts_rowid INTEGER NOT NULL,
+		source_type TEXT NOT NULL,
+		created_at TEXT
 	)`)
 	if err != nil {
 		return fmt.Errorf("failed to create posts_fts_lookup table: %w", err)
@@ -1111,7 +1132,7 @@ func (db *DB) MigrateFTS5Search() error {
 // backfillNotesFTS inserts all existing local notes into the FTS index
 func (db *DB) backfillNotesFTS() (int, error) {
 	rows, err := db.db.Query(`
-		SELECT n.id, a.username, n.message, n.created_at, COALESCE(n.object_uri, '')
+		SELECT n.id, a.username, n.message, n.created_at
 		FROM notes n
 		JOIN accounts a ON a.id = n.user_id
 	`)
@@ -1122,23 +1143,23 @@ func (db *DB) backfillNotesFTS() (int, error) {
 
 	inserted := 0
 	for rows.Next() {
-		var id, username, message, createdAt, objectURI string
-		if err := rows.Scan(&id, &username, &message, &createdAt, &objectURI); err != nil {
+		var id, username, message, createdAt string
+		if err := rows.Scan(&id, &username, &message, &createdAt); err != nil {
 			log.Printf("Warning: Failed to scan note for FTS backfill: %v", err)
 			continue
 		}
 
 		author := "@" + username
 		result, err := db.db.Exec(
-			`INSERT INTO posts_fts(content, author, source_type, created_at, object_uri, object_url) VALUES (?, ?, 'note', ?, ?, '')`,
-			message, author, createdAt, objectURI,
+			`INSERT INTO posts_fts(content, author) VALUES (?, ?)`,
+			message, author,
 		)
 		if err != nil {
 			log.Printf("Warning: Failed to insert note %s into FTS: %v", id, err)
 			continue
 		}
 		if ftsRowid, err := result.LastInsertId(); err == nil {
-			db.db.Exec(`INSERT OR REPLACE INTO posts_fts_lookup(source_id, fts_rowid) VALUES (?, ?)`, id, ftsRowid)
+			db.db.Exec(`INSERT OR REPLACE INTO posts_fts_lookup(source_id, fts_rowid, source_type, created_at) VALUES (?, ?, 'note', ?)`, id, ftsRowid, createdAt)
 		}
 		inserted++
 	}
@@ -1149,7 +1170,7 @@ func (db *DB) backfillNotesFTS() (int, error) {
 // backfillActivitiesFTS inserts all existing remote Create activities into the FTS index
 func (db *DB) backfillActivitiesFTS() (int, error) {
 	rows, err := db.db.Query(`
-		SELECT id, actor_uri, raw_json, created_at, COALESCE(object_uri, ''), COALESCE(object_url, '')
+		SELECT id, actor_uri, raw_json, created_at
 		FROM activities
 		WHERE activity_type = 'Create' AND local = 0
 	`)
@@ -1160,8 +1181,8 @@ func (db *DB) backfillActivitiesFTS() (int, error) {
 
 	inserted := 0
 	for rows.Next() {
-		var id, actorURI, rawJSON, createdAt, objectURI, objectURL string
-		if err := rows.Scan(&id, &actorURI, &rawJSON, &createdAt, &objectURI, &objectURL); err != nil {
+		var id, actorURI, rawJSON, createdAt string
+		if err := rows.Scan(&id, &actorURI, &rawJSON, &createdAt); err != nil {
 			log.Printf("Warning: Failed to scan activity for FTS backfill: %v", err)
 			continue
 		}
@@ -1174,15 +1195,15 @@ func (db *DB) backfillActivitiesFTS() (int, error) {
 		author := extractAuthorFromActorURI(actorURI)
 
 		result, err := db.db.Exec(
-			`INSERT INTO posts_fts(content, author, source_type, created_at, object_uri, object_url) VALUES (?, ?, 'activity', ?, ?, ?)`,
-			content, author, createdAt, objectURI, objectURL,
+			`INSERT INTO posts_fts(content, author) VALUES (?, ?)`,
+			content, author,
 		)
 		if err != nil {
 			log.Printf("Warning: Failed to insert activity %s into FTS: %v", id, err)
 			continue
 		}
 		if ftsRowid, err := result.LastInsertId(); err == nil {
-			db.db.Exec(`INSERT OR REPLACE INTO posts_fts_lookup(source_id, fts_rowid) VALUES (?, ?)`, id, ftsRowid)
+			db.db.Exec(`INSERT OR REPLACE INTO posts_fts_lookup(source_id, fts_rowid, source_type, created_at) VALUES (?, ?, 'activity', ?)`, id, ftsRowid, createdAt)
 		}
 		inserted++
 	}

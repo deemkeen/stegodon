@@ -332,12 +332,15 @@ func loadThreadByID(noteID uuid.UUID, noteURI string, author string, content str
 		// Count replies for parent (local + remote)
 		parentReplyCount, _ := database.CountRepliesByNoteId(noteID)
 
-		// Get like count and boost count from database
+		// Get like count, boost count, and content from database
 		parentLikeCount := 0
 		parentBoostCount := 0
 		if err, note := database.ReadNoteId(noteID); err == nil && note != nil {
 			parentLikeCount = note.LikeCount
 			parentBoostCount = note.BoostCount
+			if content == "" {
+				content = note.Message
+			}
 		}
 
 		// Create parent from the provided data

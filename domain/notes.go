@@ -74,7 +74,6 @@ type HomePost struct {
 type SearchResult struct {
 	ID         uuid.UUID
 	Author     string    // @user or @user@domain
-	Content    string    // Plain text
 	Snippet    string    // FTS5 snippet with highlight markers (<<…>>)
 	Time       time.Time
 	ObjectURI  string

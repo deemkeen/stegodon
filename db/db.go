@@ -5031,7 +5031,9 @@ func sanitizeFTSQuery(query string) string {
 	return strings.Join(parts, " ")
 }
 
-// SearchPosts searches the FTS5 index for posts matching the query
+// SearchPosts searches the FTS5 index for posts matching the query.
+// The FTS5 table only stores content+author. Metadata comes from the lookup table,
+// and object_uri/object_url are loaded from the source tables (notes/activities).
 func (db *DB) SearchPosts(query string, maxResults int) (error, []domain.SearchResult) {
 	ftsQuery := sanitizeFTSQuery(query)
 	if ftsQuery == "" {
@@ -5041,17 +5043,25 @@ func (db *DB) SearchPosts(query string, maxResults int) (error, []domain.SearchR
 	rows, err := db.db.Query(`
 		SELECT
 			l.source_id,
-			f.source_type,
+			l.source_type,
 			f.author,
-			f.content,
 			snippet(posts_fts, 0, '<<', '>>', '...', 32),
-			f.created_at,
-			f.object_uri,
-			f.object_url
+			l.created_at,
+			CASE l.source_type
+				WHEN 'note' THEN COALESCE(n.object_uri, '')
+				WHEN 'activity' THEN COALESCE(a.object_uri, '')
+				ELSE ''
+			END,
+			CASE l.source_type
+				WHEN 'activity' THEN COALESCE(a.object_url, '')
+				ELSE ''
+			END
 		FROM posts_fts f
 		JOIN posts_fts_lookup l ON l.fts_rowid = f.rowid
+		LEFT JOIN notes n ON l.source_type = 'note' AND l.source_id = n.id
+		LEFT JOIN activities a ON l.source_type = 'activity' AND l.source_id = a.id
 		WHERE posts_fts MATCH ?
-		ORDER BY rank, f.created_at DESC
+		ORDER BY rank, l.created_at DESC
 		LIMIT ?
 	`, ftsQuery, maxResults)
 	if err != nil {
@@ -5061,8 +5071,8 @@ func (db *DB) SearchPosts(query string, maxResults int) (error, []domain.SearchR
 
 	var results []domain.SearchResult
 	for rows.Next() {
-		var sourceID, sourceType, author, content, snippet, createdAtStr, objectURI, objectURL string
-		if err := rows.Scan(&sourceID, &sourceType, &author, &content, &snippet, &createdAtStr, &objectURI, &objectURL); err != nil {
+		var sourceID, sourceType, author, snippet, createdAtStr, objectURI, objectURL string
+		if err := rows.Scan(&sourceID, &sourceType, &author, &snippet, &createdAtStr, &objectURI, &objectURL); err != nil {
 			log.Printf("Warning: Failed to scan search result: %v", err)
 			continue
 		}
@@ -5074,7 +5084,6 @@ func (db *DB) SearchPosts(query string, maxResults int) (error, []domain.SearchR
 
 		result := domain.SearchResult{
 			Author:     author,
-			Content:    content,
 			Snippet:    snippet,
 			Time:       createdAt,
 			ObjectURI:  objectURI,
@@ -5101,15 +5110,15 @@ func (db *DB) SearchPosts(query string, maxResults int) (error, []domain.SearchR
 // InsertNoteFTS adds a local note to the FTS index
 func (db *DB) InsertNoteFTS(noteId uuid.UUID, author, message, createdAt, objectURI string) {
 	result, err := db.db.Exec(
-		`INSERT INTO posts_fts(content, author, source_type, created_at, object_uri, object_url) VALUES (?, ?, 'note', ?, ?, '')`,
-		message, author, createdAt, objectURI,
+		`INSERT INTO posts_fts(content, author) VALUES (?, ?)`,
+		message, author,
 	)
 	if err != nil {
 		log.Printf("Warning: Failed to insert note %s into FTS: %v", noteId, err)
 		return
 	}
 	if ftsRowid, err := result.LastInsertId(); err == nil {
-		_, err = db.db.Exec(`INSERT OR REPLACE INTO posts_fts_lookup(source_id, fts_rowid) VALUES (?, ?)`, noteId.String(), ftsRowid)
+		_, err = db.db.Exec(`INSERT OR REPLACE INTO posts_fts_lookup(source_id, fts_rowid, source_type, created_at) VALUES (?, ?, 'note', ?)`, noteId.String(), ftsRowid, createdAt)
 		if err != nil {
 			log.Printf("Warning: Failed to insert FTS lookup for note %s: %v", noteId, err)
 		}
@@ -5125,15 +5134,15 @@ func (db *DB) InsertActivityFTS(activityId uuid.UUID, actorURI, rawJSON, created
 	author := extractAuthorFromActorURI(actorURI)
 
 	result, err := db.db.Exec(
-		`INSERT INTO posts_fts(content, author, source_type, created_at, object_uri, object_url) VALUES (?, ?, 'activity', ?, ?, ?)`,
-		content, author, createdAt, objectURI, objectURL,
+		`INSERT INTO posts_fts(content, author) VALUES (?, ?)`,
+		content, author,
 	)
 	if err != nil {
 		log.Printf("Warning: Failed to insert activity %s into FTS: %v", activityId, err)
 		return
 	}
 	if ftsRowid, err := result.LastInsertId(); err == nil {
-		_, err = db.db.Exec(`INSERT OR REPLACE INTO posts_fts_lookup(source_id, fts_rowid) VALUES (?, ?)`, activityId.String(), ftsRowid)
+		_, err = db.db.Exec(`INSERT OR REPLACE INTO posts_fts_lookup(source_id, fts_rowid, source_type, created_at) VALUES (?, ?, 'activity', ?)`, activityId.String(), ftsRowid, createdAt)
 		if err != nil {
 			log.Printf("Warning: Failed to insert FTS lookup for activity %s: %v", activityId, err)
 		}

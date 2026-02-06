@@ -157,7 +157,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 						NoteID:    result.NoteID,
 						IsLocal:   result.IsLocal,
 						Author:    result.Author,
-						Content:   result.Content,
 						CreatedAt: result.Time,
 					}
 				}
