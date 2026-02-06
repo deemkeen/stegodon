@@ -47,7 +47,8 @@ type HomePost struct {
     ReplyCount int          // Number of replies to this post
     LikeCount  int          // Number of likes on this post
     BoostCount int          // Number of boosts on this post
-    BoostedBy  string       // "@user@domain" if this is a boosted post from a followed user
+    BoostedBy        string  // "@user@domain" if this is a boosted post from a followed user
+    ProcessedContent string  // Pre-processed content for terminal display (cached to avoid re-processing in View)
 }
 ```
 

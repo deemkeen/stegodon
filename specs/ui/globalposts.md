@@ -54,7 +54,8 @@ type GlobalTimelinePost struct {
     ReplyCount  int
     LikeCount   int
     BoostCount  int
-    BoostedBy   string       // "@user@domain" if this is a boosted post
+    BoostedBy        string  // "@user@domain" if this is a boosted post
+    ProcessedContent string  // Pre-processed content for terminal display (cached to avoid re-processing in View)
 }
 ```
 

@@ -170,6 +170,27 @@ func (db *DB) backfillActivityObjectURIs(tx *sql.Tx) error {
 
 **Purpose**: Enables efficient deduplication queries on `object_uri`.
 
+### Backfill Activity Object URIs (Performance Migration)
+
+Re-runs `object_uri` extraction as part of `MigratePerformanceIndexes` to catch any activities that were missed by the initial backfill or ingested without `object_uri` populated:
+
+```go
+func (db *DB) backfillActivitiesObjectURI() {
+    rows, err := db.db.Query(`SELECT id, raw_json FROM activities
+                               WHERE (object_uri IS NULL OR object_uri = '')
+                               AND activity_type = 'Create'
+                               AND raw_json IS NOT NULL AND raw_json != ''`)
+
+    for rows.Next() {
+        // Parse raw_json
+        // Extract object.id or top-level id
+        // Update object_uri column
+    }
+}
+```
+
+**Purpose**: Ensures `ReadActivityByObjectURI` always finds existing activities via the fast indexed `object_uri = ?` query, making the slow `LIKE` fallback on `raw_json` unreachable.
+
 ### Backfill Reply Counts
 
 Calculates denormalized `reply_count` for notes and activities:

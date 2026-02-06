@@ -70,6 +70,8 @@ erDiagram
         TEXT activity_type
         TEXT actor_uri
         TEXT object_uri
+        TEXT object_url
+        TEXT in_reply_to
         TEXT raw_json
         INTEGER processed
         TIMESTAMP created_at
@@ -389,6 +391,7 @@ Tracks which users have accepted which version of the terms. When terms are upda
 | activities | idx_activities_created_at | created_at DESC |
 | activities | idx_activities_object_uri | object_uri |
 | activities | idx_activities_from_relay | from_relay |
+| activities | idx_activities_in_reply_to | in_reply_to |
 | likes | idx_likes_note_id | note_id |
 | likes | idx_likes_account_id | account_id |
 | likes | idx_likes_object_uri | object_uri |
