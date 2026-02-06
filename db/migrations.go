@@ -820,6 +820,10 @@ func (db *DB) MigratePerformanceIndexes() error {
 	// Backfill object_url from raw_json for existing activities
 	db.backfillActivitiesObjectURL()
 
+	// Backfill object_uri from raw_json for existing activities that are missing it.
+	// This eliminates the need for the slow LIKE fallback in ReadActivityByObjectURI.
+	db.backfillActivitiesObjectURI()
+
 	log.Println("Performance indexes migration complete")
 	return nil
 }
@@ -896,6 +900,68 @@ func (db *DB) backfillActivitiesObjectURL() {
 	if updated > 0 {
 		log.Printf("Backfilled object_url for %d activities", updated)
 	}
+}
+
+// backfillActivitiesObjectURI extracts the object id from raw_json and populates the object_uri column.
+// After this migration, ReadActivityByObjectURI's exact-match query always finds existing activities,
+// making the slow LIKE fallback on raw_json unreachable.
+func (db *DB) backfillActivitiesObjectURI() {
+	// Only backfill rows where object_uri is NULL or empty but raw_json contains an id
+	rows, err := db.db.Query(`
+		SELECT id, raw_json FROM activities
+		WHERE (object_uri IS NULL OR object_uri = '')
+		AND activity_type = 'Create'
+		AND raw_json IS NOT NULL AND raw_json != ''
+	`)
+	if err != nil {
+		log.Printf("Warning: Failed to query activities for object_uri backfill: %v", err)
+		return
+	}
+	defer rows.Close()
+
+	updated := 0
+	for rows.Next() {
+		var id, rawJSON string
+		if err := rows.Scan(&id, &rawJSON); err != nil {
+			continue
+		}
+
+		// Extract the object id from JSON (this is the object_uri)
+		objectURI := extractObjectURIFromJSON(rawJSON)
+		if objectURI != "" {
+			_, err := db.db.Exec(`UPDATE activities SET object_uri = ? WHERE id = ?`, objectURI, id)
+			if err == nil {
+				updated++
+			}
+		}
+	}
+
+	if updated > 0 {
+		log.Printf("Backfilled object_uri for %d activities", updated)
+	}
+}
+
+// extractObjectURIFromJSON extracts the object.id field from ActivityPub JSON
+func extractObjectURIFromJSON(rawJSON string) string {
+	var data map[string]any
+	if err := json.Unmarshal([]byte(rawJSON), &data); err != nil {
+		return ""
+	}
+
+	// The raw_json may contain the Note/Article directly (with top-level "id")
+	// or may be wrapped in a Create activity (with object.id)
+	if obj, ok := data["object"].(map[string]any); ok {
+		if id, ok := obj["id"].(string); ok {
+			return id
+		}
+	}
+
+	// Top-level id (when raw_json is the Note itself, not the wrapping activity)
+	if id, ok := data["id"].(string); ok {
+		return id
+	}
+
+	return ""
 }
 
 // extractObjectURLFromJSON extracts the object.url field from ActivityPub JSON

@@ -4508,127 +4508,145 @@ func (db *DB) UpdateServerMessage(message string, enabled bool, webEnabled bool)
 // ReadGlobalTimelinePosts returns posts for the global timeline (local notes + remote activities)
 // excluding replies. Uses UNION ALL for efficient SQL-level sorting and pagination.
 func (db *DB) ReadGlobalTimelinePosts(limit, offset int) (error, *[]domain.GlobalTimelinePost) {
-	// Use UNION ALL to combine local, remote, and boosted posts with SQL-level sorting and pagination
+	// Use UNION ALL to combine local, remote, and boosted posts with SQL-level sorting and pagination.
+	// Each branch has its own ORDER BY/LIMIT to avoid full table scans — per-branch limit is
+	// (limit + offset) which guarantees identical results to an unlimited UNION ALL.
+	branchLimit := limit + offset
 	rows, err := db.db.Query(`
 		SELECT
 			id, username, user_domain, profile_url, object_uri, object_url,
 			is_remote, message, created_at, reply_count, like_count, boost_count, boosted_by
 		FROM (
 			-- Local posts (excluding replies)
-			SELECT
-				n.id as id,
-				a.username as username,
-				'' as user_domain,
-				'/u/' || a.username as profile_url,
-				COALESCE(n.object_uri, '') as object_uri,
-				'' as object_url,
-				0 as is_remote,
-				n.message as message,
-				n.created_at as created_at,
-				COALESCE(n.reply_count, 0) as reply_count,
-				COALESCE(n.like_count, 0) as like_count,
-				COALESCE(n.boost_count, 0) as boost_count,
-				'' as boosted_by
-			FROM notes n
-			INNER JOIN accounts a ON a.id = n.user_id
-			WHERE (n.in_reply_to_uri IS NULL OR n.in_reply_to_uri = '')
+			SELECT * FROM (
+				SELECT
+					n.id as id,
+					a.username as username,
+					'' as user_domain,
+					'/u/' || a.username as profile_url,
+					COALESCE(n.object_uri, '') as object_uri,
+					'' as object_url,
+					0 as is_remote,
+					n.message as message,
+					n.created_at as created_at,
+					COALESCE(n.reply_count, 0) as reply_count,
+					COALESCE(n.like_count, 0) as like_count,
+					COALESCE(n.boost_count, 0) as boost_count,
+					'' as boosted_by
+				FROM notes n
+				INNER JOIN accounts a ON a.id = n.user_id
+				WHERE (n.in_reply_to_uri IS NULL OR n.in_reply_to_uri = '')
+				ORDER BY n.created_at DESC LIMIT ?
+			)
 
 			UNION ALL
 
 			-- Remote posts (excluding replies, using indexed in_reply_to column)
-			SELECT
-				act.id as id,
-				ra.username as username,
-				ra.domain as user_domain,
-				ra.actor_uri as profile_url,
-				COALESCE(act.object_uri, '') as object_uri,
-				COALESCE(act.object_url, '') as object_url,
-				1 as is_remote,
-				act.raw_json as message,
-				act.created_at as created_at,
-				COALESCE(act.reply_count, 0) as reply_count,
-				COALESCE(act.like_count, 0) as like_count,
-				COALESCE(act.boost_count, 0) as boost_count,
-				'' as boosted_by
-			FROM activities act
-			INNER JOIN remote_accounts ra ON ra.actor_uri = act.actor_uri
-			WHERE act.activity_type = 'Create'
-			AND act.local = 0
-			AND (act.in_reply_to IS NULL OR act.in_reply_to = '')
+			SELECT * FROM (
+				SELECT
+					act.id as id,
+					ra.username as username,
+					ra.domain as user_domain,
+					ra.actor_uri as profile_url,
+					COALESCE(act.object_uri, '') as object_uri,
+					COALESCE(act.object_url, '') as object_url,
+					1 as is_remote,
+					act.raw_json as message,
+					act.created_at as created_at,
+					COALESCE(act.reply_count, 0) as reply_count,
+					COALESCE(act.like_count, 0) as like_count,
+					COALESCE(act.boost_count, 0) as boost_count,
+					'' as boosted_by
+				FROM activities act
+				INNER JOIN remote_accounts ra ON ra.actor_uri = act.actor_uri
+				WHERE act.activity_type = 'Create'
+				AND act.local = 0
+				AND (act.in_reply_to IS NULL OR act.in_reply_to = '')
+				ORDER BY act.created_at DESC LIMIT ?
+			)
 
 			UNION ALL
 
 			-- Boosted local posts (show who boosted them)
-			SELECT
-				n.id as id,
-				a.username as username,
-				'' as user_domain,
-				'/u/' || a.username as profile_url,
-				COALESCE(n.object_uri, '') as object_uri,
-				'' as object_url,
-				0 as is_remote,
-				n.message as message,
-				b.created_at as created_at,
-				COALESCE(n.reply_count, 0) as reply_count,
-				COALESCE(n.like_count, 0) as like_count,
-				COALESCE(n.boost_count, 0) as boost_count,
-				'@' || booster.username as boosted_by
-			FROM boosts b
-			INNER JOIN accounts booster ON booster.id = b.account_id
-			INNER JOIN notes n ON n.id = b.note_id
-			INNER JOIN accounts a ON a.id = n.user_id
-			WHERE b.account_id != n.user_id
+			SELECT * FROM (
+				SELECT
+					n.id as id,
+					a.username as username,
+					'' as user_domain,
+					'/u/' || a.username as profile_url,
+					COALESCE(n.object_uri, '') as object_uri,
+					'' as object_url,
+					0 as is_remote,
+					n.message as message,
+					b.created_at as created_at,
+					COALESCE(n.reply_count, 0) as reply_count,
+					COALESCE(n.like_count, 0) as like_count,
+					COALESCE(n.boost_count, 0) as boost_count,
+					'@' || booster.username as boosted_by
+				FROM boosts b
+				INNER JOIN accounts booster ON booster.id = b.account_id
+				INNER JOIN notes n ON n.id = b.note_id
+				INNER JOIN accounts a ON a.id = n.user_id
+				WHERE b.account_id != n.user_id
+				ORDER BY b.created_at DESC LIMIT ?
+			)
 
 			UNION ALL
 
 			-- Boosted remote posts (show who boosted them - local boosters)
-			SELECT
-				act.id as id,
-				ra.username as username,
-				ra.domain as user_domain,
-				ra.actor_uri as profile_url,
-				COALESCE(act.object_uri, '') as object_uri,
-				COALESCE(act.object_url, '') as object_url,
-				1 as is_remote,
-				act.raw_json as message,
-				b.created_at as created_at,
-				COALESCE(act.reply_count, 0) as reply_count,
-				COALESCE(act.like_count, 0) as like_count,
-				COALESCE(act.boost_count, 0) as boost_count,
-				'@' || booster.username as boosted_by
-			FROM boosts b
-			INNER JOIN accounts booster ON booster.id = b.account_id
-			INNER JOIN activities act ON act.object_uri = b.object_uri
-			INNER JOIN remote_accounts ra ON ra.actor_uri = act.actor_uri
-			WHERE b.object_uri IS NOT NULL AND b.object_uri != ''
-			AND (b.account_id IS NOT NULL AND b.account_id != '')
+			SELECT * FROM (
+				SELECT
+					act.id as id,
+					ra.username as username,
+					ra.domain as user_domain,
+					ra.actor_uri as profile_url,
+					COALESCE(act.object_uri, '') as object_uri,
+					COALESCE(act.object_url, '') as object_url,
+					1 as is_remote,
+					act.raw_json as message,
+					b.created_at as created_at,
+					COALESCE(act.reply_count, 0) as reply_count,
+					COALESCE(act.like_count, 0) as like_count,
+					COALESCE(act.boost_count, 0) as boost_count,
+					'@' || booster.username as boosted_by
+				FROM boosts b
+				INNER JOIN accounts booster ON booster.id = b.account_id
+				INNER JOIN activities act ON act.object_uri = b.object_uri
+				INNER JOIN remote_accounts ra ON ra.actor_uri = act.actor_uri
+				WHERE b.object_uri IS NOT NULL AND b.object_uri != ''
+				AND (b.account_id IS NOT NULL AND b.account_id != '')
+				ORDER BY b.created_at DESC LIMIT ?
+			)
 
 			UNION ALL
 
 			-- Boosted remote posts (show who boosted them - remote boosters)
-			SELECT
-				act.id as id,
-				ra_author.username as username,
-				ra_author.domain as user_domain,
-				ra_author.actor_uri as profile_url,
-				COALESCE(act.object_uri, '') as object_uri,
-				COALESCE(act.object_url, '') as object_url,
-				1 as is_remote,
-				act.raw_json as message,
-				b.created_at as created_at,
-				COALESCE(act.reply_count, 0) as reply_count,
-				COALESCE(act.like_count, 0) as like_count,
-				COALESCE(act.boost_count, 0) as boost_count,
-				'@' || ra_booster.username || '@' || ra_booster.domain as boosted_by
-			FROM boosts b
-			INNER JOIN remote_accounts ra_booster ON ra_booster.id = b.remote_account_id
-			INNER JOIN activities act ON act.object_uri = b.object_uri
-			INNER JOIN remote_accounts ra_author ON ra_author.actor_uri = act.actor_uri
-			WHERE b.remote_account_id IS NOT NULL AND b.remote_account_id != ''
-			AND b.object_uri IS NOT NULL AND b.object_uri != ''
+			SELECT * FROM (
+				SELECT
+					act.id as id,
+					ra_author.username as username,
+					ra_author.domain as user_domain,
+					ra_author.actor_uri as profile_url,
+					COALESCE(act.object_uri, '') as object_uri,
+					COALESCE(act.object_url, '') as object_url,
+					1 as is_remote,
+					act.raw_json as message,
+					b.created_at as created_at,
+					COALESCE(act.reply_count, 0) as reply_count,
+					COALESCE(act.like_count, 0) as like_count,
+					COALESCE(act.boost_count, 0) as boost_count,
+					'@' || ra_booster.username || '@' || ra_booster.domain as boosted_by
+				FROM boosts b
+				INNER JOIN remote_accounts ra_booster ON ra_booster.id = b.remote_account_id
+				INNER JOIN activities act ON act.object_uri = b.object_uri
+				INNER JOIN remote_accounts ra_author ON ra_author.actor_uri = act.actor_uri
+				WHERE b.remote_account_id IS NOT NULL AND b.remote_account_id != ''
+				AND b.object_uri IS NOT NULL AND b.object_uri != ''
+				ORDER BY b.created_at DESC LIMIT ?
+			)
 		) combined
 		ORDER BY created_at DESC
-		LIMIT ? OFFSET ?`, limit, offset)
+		LIMIT ? OFFSET ?`, branchLimit, branchLimit, branchLimit, branchLimit, branchLimit, limit, offset)
 	if err != nil {
 		return err, nil
 	}
