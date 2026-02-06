@@ -121,19 +121,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		case "up", "ctrl+p":
 			if m.Selected > 0 {
 				m.Selected--
-				if m.Selected < m.Offset {
-					m.Offset = m.Selected
-				}
+				m.Offset = m.Selected
 			}
 			return m, nil
 
 		case "down", "ctrl+n":
 			if len(m.Results) > 0 && m.Selected < len(m.Results)-1 {
 				m.Selected++
-				itemsPerPage := m.itemsPerPage()
-				if m.Selected >= m.Offset+itemsPerPage {
-					m.Offset = m.Selected - itemsPerPage + 1
-				}
+				m.Offset = m.Selected
 			}
 			return m, nil
 

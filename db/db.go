@@ -5051,7 +5051,7 @@ func (db *DB) SearchPosts(query string, maxResults int) (error, []domain.SearchR
 		FROM posts_fts f
 		JOIN posts_fts_lookup l ON l.fts_rowid = f.rowid
 		WHERE posts_fts MATCH ?
-		ORDER BY rank
+		ORDER BY rank, f.created_at DESC
 		LIMIT ?
 	`, ftsQuery, maxResults)
 	if err != nil {
