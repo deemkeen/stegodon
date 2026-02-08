@@ -1929,6 +1929,56 @@ func TestSanitizeRemoteContent_BiDi(t *testing.T) {
 	}
 }
 
+// Tests for SanitizeRemoteContent keycap emoji stripping
+
+func TestSanitizeRemoteContent_Keycap(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Keycap 1 stripped to digit",
+			input:    "1\uFE0F\u20E3",
+			expected: "1",
+		},
+		{
+			name:     "Keycap 2 stripped to digit",
+			input:    "2\uFE0F\u20E3",
+			expected: "2",
+		},
+		{
+			name:     "Keycap hash stripped",
+			input:    "#\uFE0F\u20E3",
+			expected: "#",
+		},
+		{
+			name:     "Keycap asterisk stripped",
+			input:    "*\uFE0F\u20E3",
+			expected: "*",
+		},
+		{
+			name:     "Multiple keycaps in text",
+			input:    "Step 1\uFE0F\u20E3 then 2\uFE0F\u20E3 then 3\uFE0F\u20E3",
+			expected: "Step 1 then 2 then 3",
+		},
+		{
+			name:     "Keycap without variation selector",
+			input:    "1\u20E3",
+			expected: "1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := SanitizeRemoteContent(tt.input)
+			if result != tt.expected {
+				t.Errorf("SanitizeRemoteContent(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
 // Tests for SanitizeRemoteContent CJK punctuation replacement
 
 func TestSanitizeRemoteContent_CJKPunctuation(t *testing.T) {

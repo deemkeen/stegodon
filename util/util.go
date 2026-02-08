@@ -738,6 +738,7 @@ func ParseActivityPubURL(urlStr string) (username string, domain string, ok bool
 // - Variation selectors (U+FE0E text, U+FE0F emoji)
 // - Zero Width Joiner (U+200D) - splits compound emojis into individual ones
 // - Zero-width characters (U+200B, U+FEFF)
+// - Combining Enclosing Keycap (U+20E3): strips keycap box from 1️⃣ 2️⃣ #️⃣ etc.
 // - Unicode BiDi control characters (U+200E-200F, U+202A-202E, U+2066-2069)
 // - Ambiguous-width characters are replaced with ASCII equivalents:
 //   - Circled numbers (①②③...) → (1)(2)(3)...
@@ -774,6 +775,11 @@ func SanitizeRemoteContent(text string) string {
 		}
 		// Skip Zero Width Space (U+200B) and BOM (U+FEFF)
 		if r == 0x200B || r == 0xFEFF {
+			continue
+		}
+		// Skip Combining Enclosing Keycap (U+20E3)
+		// Used in keycap emoji sequences like 1️⃣ 2️⃣ #️⃣ — terminals can't render the keycap box
+		if r == 0x20E3 {
 			continue
 		}
 		// Skip Unicode Bidirectional control characters
