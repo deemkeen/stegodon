@@ -11,6 +11,7 @@ import (
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
+	"github.com/deemkeen/stegodon/util"
 )
 
 const maxSearchResults = 20
@@ -261,7 +262,8 @@ func (m Model) View() string {
 		}
 
 		// Render snippet with highlights (replace <<>> markers with ANSI bold)
-		snippet := renderSnippet(result.Snippet)
+		// Sanitize before renderSnippet since renderSnippet adds ANSI sequences
+		snippet := renderSnippet(util.SanitizeRemoteContent(result.Snippet))
 
 		// Truncate snippet to fit content width
 		if len(snippet) > contentWidth*2 {

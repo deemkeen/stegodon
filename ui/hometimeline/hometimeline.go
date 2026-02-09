@@ -499,16 +499,7 @@ func (m Model) View() string {
 // processPostContent applies the full text processing pipeline for terminal display.
 // This is called once when posts are loaded (in postsLoadedMsg) and cached in ProcessedContent.
 func processPostContent(post domain.HomePost, localDomain string) string {
-	processed := util.TruncateContent(post.Content, common.MaxDisplayContentLength)
-	if post.IsLocal {
-		processed = util.UnescapeHTML(processed)
-		processed = util.MarkdownLinksToTerminal(processed)
-	} else {
-		processed = util.NormalizeEmojis(processed)
-	}
-	processed = util.HighlightHashtagsTerminal(processed)
-	processed = util.HighlightMentionsTerminal(processed, localDomain)
-	return processed
+	return common.ProcessPostContent(post.Content, post.IsLocal, localDomain, false)
 }
 
 // postsLoadedMsg is sent when posts are loaded

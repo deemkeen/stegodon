@@ -835,19 +835,8 @@ func (m Model) View() string {
 			author = "@" + author
 		}
 
-		// Format content - Unescape HTML entities, convert Markdown links, then highlight hashtags and mentions (same order as myposts)
-		processedContent := post.Content
-		processedContent = util.TruncateContent(processedContent, common.MaxDisplayContentLength)
-		if post.IsLocal {
-			processedContent = util.UnescapeHTML(processedContent)
-			processedContent = util.MarkdownLinksToTerminal(processedContent)
-		} else {
-			// Normalize emojis for remote posts to fix terminal width calculation issues
-			processedContent = util.NormalizeEmojis(processedContent)
-		}
-		processedContent = util.LinkifyRawURLsTerminal(processedContent)
-		highlightedContent := util.HighlightHashtagsTerminal(processedContent)
-		highlightedContent = util.HighlightMentionsTerminal(highlightedContent, m.LocalDomain)
+		// Format content
+		highlightedContent := common.ProcessPostContent(post.Content, post.IsLocal, m.LocalDomain, true)
 
 		if isSelected {
 			// Create a style that fills the full width (same approach as myposts/hometimeline)

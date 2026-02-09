@@ -439,13 +439,7 @@ func (m Model) viewLocalProfile(contentWidth int) string {
 			author := "@" + post.CreatedBy
 
 			// Format content
-			processedContent := util.SanitizeRemoteContent(post.Message)
-			processedContent = util.TruncateContent(processedContent, common.MaxDisplayContentLength)
-			processedContent = util.UnescapeHTML(processedContent)
-			processedContent = util.MarkdownLinksToTerminal(processedContent)
-			processedContent = util.LinkifyRawURLsTerminal(processedContent)
-			highlightedContent := util.HighlightHashtagsTerminal(processedContent)
-			highlightedContent = util.HighlightMentionsTerminal(highlightedContent, m.LocalDomain)
+			highlightedContent := common.ProcessPostContent(post.Message, true, m.LocalDomain, true)
 
 			if isSelected {
 				selectedBg := lipgloss.NewStyle().
@@ -572,14 +566,8 @@ func (m Model) viewRemoteProfile(contentWidth int) string {
 			author := fmt.Sprintf("@%s@%s", post.Author, post.Domain)
 
 			// Format content
-			processedContent := util.StripHTMLTags(post.Content)
-			processedContent = util.SanitizeRemoteContent(processedContent)
-			processedContent = util.TruncateContent(processedContent, common.MaxDisplayContentLength)
-			processedContent = util.UnescapeHTML(processedContent)
-			processedContent = util.MarkdownLinksToTerminal(processedContent)
-			processedContent = util.LinkifyRawURLsTerminal(processedContent)
-			highlightedContent := util.HighlightHashtagsTerminal(processedContent)
-			highlightedContent = util.HighlightMentionsTerminal(highlightedContent, m.LocalDomain)
+			stripped := util.StripHTMLTags(post.Content)
+			highlightedContent := common.ProcessPostContent(stripped, false, m.LocalDomain, true)
 
 			if isSelected {
 				selectedBg := lipgloss.NewStyle().

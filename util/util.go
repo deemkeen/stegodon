@@ -901,11 +901,6 @@ func SanitizeRemoteContent(text string) string {
 	return result.String()
 }
 
-// NormalizeEmojis is an alias for SanitizeRemoteContent for backwards compatibility
-func NormalizeEmojis(text string) string {
-	return SanitizeRemoteContent(text)
-}
-
 // TruncateContent truncates content to maxLen characters, adding "[more]" indicator.
 // Users can press 'o' to view full content via original link.
 func TruncateContent(s string, maxLen int) string {
