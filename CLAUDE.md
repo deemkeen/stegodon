@@ -75,7 +75,7 @@ Both servers support graceful shutdown on SIGTERM/SIGINT.
 
 ### TUI Architecture
 
-Built with [bubbletea](https://github.com/charmbracelet/bubbletea) MVC pattern. Main orchestrator in `ui/supertui.go`.
+Built with [bubbletea](https://github.com/charmbracelet/bubbletea) MVC pattern. Main orchestrator in `ui/supertui.go`. Social interaction commands (like/boost) are in `ui/engagement_commands.go`.
 
 **Views:**
 - `createuser` - First-time username selection
@@ -100,6 +100,24 @@ Built with [bubbletea](https://github.com/charmbracelet/bubbletea) MVC pattern. 
 ### Database Layer
 
 SQLite with WAL mode. Singleton pattern with connection pooling (max 25 connections).
+
+The `db/` package is split by feature (one file = one mental model):
+
+| File | Purpose |
+|------|---------|
+| `db.go` | Core infrastructure: DB struct, GetDB singleton, CreateDB, parseTimestamp, wrapTransaction |
+| `accounts.go` | Account CRUD, upload tokens, local follows, muting, IP tracking |
+| `notes.go` | Note CRUD, hashtags, mentions |
+| `activitypub.go` | Remote accounts, follows, activities, federation queries, AP migrations |
+| `timeline.go` | Home, local, global, federated timeline queries + content extraction helpers |
+| `engagement.go` | Likes, boosts, reply counting, liker/booster info |
+| `delivery.go` | ActivityPub delivery queue operations |
+| `notifications.go` | User notification CRUD |
+| `admin.go` | Info boxes, server messages, bans |
+| `relay.go` | Relay subscription management |
+| `search.go` | FTS5 full-text search indexing and querying |
+| `terms.go` | Terms and conditions management |
+| `migrations.go` | Schema migrations |
 
 **Core tables:** `accounts`, `notes`, `hashtags`, `note_hashtags`
 
@@ -138,7 +156,7 @@ stegodon/
 ├── activitypub/     # ActivityPub federation protocol
 ├── assets/          # Shared embedded assets (logo)
 ├── cli/             # Non-interactive SSH CLI commands
-├── db/              # Database layer (SQLite operations, migrations)
+├── db/              # Database layer — feature-oriented file split (see Database Layer section)
 ├── domain/          # Domain models (Account, Note, Activity, Relay, etc.)
 ├── middleware/      # SSH middleware (auth, TUI handler)
 ├── ui/              # TUI components

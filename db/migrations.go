@@ -1,3 +1,6 @@
+// migrations.go — Schema migrations for ActivityPub tables, columns, and indexes.
+// Principle: Explicit over Magic — each migration step is a named, idempotent function
+// that runs in order. No ORM magic, no auto-detection — just explicit ALTER/CREATE statements.
 package db
 
 import (
