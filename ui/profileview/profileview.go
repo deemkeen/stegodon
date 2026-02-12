@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/deemkeen/stegodon/activitypub"
@@ -107,9 +108,13 @@ type Model struct {
 	LocalDomain       string
 	AvatarRendered    string
 	ReturnView        common.SessionState // Where to return on Esc
+	spinner           spinner.Model
 }
 
 func InitialModel(accountId uuid.UUID, width, height int, localDomain string) Model {
+	s := spinner.New()
+	s.Spinner = spinner.Pulse
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(common.COLOR_SECONDARY))
 	return Model{
 		AccountId:         accountId,
 		ProfileUser:       nil,
@@ -128,6 +133,7 @@ func InitialModel(accountId uuid.UUID, width, height int, localDomain string) Mo
 		Error:             "",
 		LocalDomain:       localDomain,
 		ReturnView:        common.LocalUsersView,
+		spinner:           s,
 	}
 }
 
@@ -167,6 +173,14 @@ type followToggledMsg struct {
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case spinner.TickMsg:
+		if m.loading {
+			var cmd tea.Cmd
+			m.spinner, cmd = m.spinner.Update(msg)
+			return m, cmd
+		}
+		return m, nil
+
 	case common.ViewProfileMsg:
 		m.loading = true
 		m.Error = ""
@@ -182,9 +196,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.FollowPending = false
 
 		if msg.IsRemote {
-			return m, loadRemoteProfile(m.AccountId, msg.ActorURI, msg.Username, msg.Domain)
+			return m, tea.Batch(loadRemoteProfile(m.AccountId, msg.ActorURI, msg.Username, msg.Domain), m.spinner.Tick)
 		}
-		return m, loadProfile(m.AccountId, msg.Username)
+		return m, tea.Batch(loadProfile(m.AccountId, msg.Username), m.spinner.Tick)
 
 	case profileLoadedMsg:
 		m.loading = false
@@ -319,7 +333,7 @@ func (m Model) View() string {
 	s.WriteString("\n")
 
 	if m.loading {
-		s.WriteString(emptyStyle.Render("Loading profile..."))
+		s.WriteString(m.spinner.View() + " Loading profile...")
 		return s.String()
 	}
 

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/deemkeen/stegodon/db"
@@ -67,9 +68,14 @@ type Model struct {
 	engagementLikers   []string // List of users who liked the selected post
 	engagementBoosters []string // List of users who boosted the selected post
 	LocalDomain        string   // Cached local domain for mention highlighting
+	spinner            spinner.Model
+	initialLoad        bool // true until first postsLoadedMsg arrives
 }
 
 func InitialModel(accountId uuid.UUID, width, height int, localDomain string) Model {
+	s := spinner.New()
+	s.Spinner = spinner.Pulse
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(common.COLOR_SECONDARY))
 	return Model{
 		AccountId:   accountId,
 		Posts:       []domain.HomePost{},
@@ -80,6 +86,8 @@ func InitialModel(accountId uuid.UUID, width, height int, localDomain string) Mo
 		isActive:    false, // Start inactive, will be activated when view is shown
 		showingURL:  false, // Start in content mode
 		LocalDomain: localDomain,
+		spinner:     s,
+		initialLoad: false, // Set to true on ActivateViewMsg
 	}
 }
 
@@ -101,6 +109,14 @@ func tickRefresh() tea.Cmd {
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case spinner.TickMsg:
+		if m.initialLoad {
+			var cmd tea.Cmd
+			m.spinner, cmd = m.spinner.Update(msg)
+			return m, cmd
+		}
+		return m, nil
+
 	case common.DeactivateViewMsg:
 		// View is becoming inactive (user navigated away)
 		m.isActive = false
@@ -111,13 +127,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		// View is becoming active (user navigated here)
 		m.isActive = true
 		m.tickerRunning = false // Reset ticker state, will be started when data loads
+		m.initialLoad = true
 		// Reset scroll position to top when switching to this view
 		m.Selected = 0
 		m.Offset = 0
 		m.showingURL = false
 		m.showingEngagement = false
 		// Load data first, tick will be scheduled when data arrives
-		return m, loadHomePosts(m.AccountId)
+		return m, tea.Batch(loadHomePosts(m.AccountId), m.spinner.Tick)
 
 	case common.SessionState:
 		// Handle UpdateNoteList to refresh when notes are created/updated
@@ -137,6 +154,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, nil
 
 	case postsLoadedMsg:
+		m.initialLoad = false
 		m.Posts = msg.posts
 		// Pre-process content for terminal display (avoids re-processing on every View() render)
 		for i := range m.Posts {
@@ -320,7 +338,9 @@ func (m Model) View() string {
 	s.WriteString(common.CaptionStyle.Render(fmt.Sprintf("home (%d posts)", len(m.Posts))))
 	s.WriteString("\n\n")
 
-	if len(m.Posts) == 0 {
+	if m.initialLoad {
+		s.WriteString(m.spinner.View() + " Loading...")
+	} else if len(m.Posts) == 0 {
 		s.WriteString(emptyStyle.Render("No posts yet.\nFollow some accounts to see their posts here!"))
 	} else {
 		// Calculate right panel width using layout helpers

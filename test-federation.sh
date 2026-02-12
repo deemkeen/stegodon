@@ -14,7 +14,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-BORE_ID="${BORE_ID:-stegodon}"
+BORE_ID="${BORE_ID:-stegodon-$(LC_ALL=C tr -dc 'a-z0-9' </dev/urandom | head -c 10)}"
 BORE_DOMAIN="${BORE_ID}.bore.digital"
 LOCAL_PORT=9999
 

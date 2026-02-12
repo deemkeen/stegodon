@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/deemkeen/stegodon/db"
@@ -98,6 +99,7 @@ type Model struct {
 	loading      bool
 	errorMessage string
 	showingURL   bool // Track if URL is displayed instead of content for selected post
+	spinner      spinner.Model
 	// Fields to support reloading
 	parentNoteID    uuid.UUID // Local note ID (for local notes)
 	parentIsLocal   bool      // Whether the parent is a local note
@@ -113,6 +115,9 @@ type Model struct {
 
 // InitialModel creates a new thread view model
 func InitialModel(accountId uuid.UUID, width, height int, localDomain string) Model {
+	s := spinner.New()
+	s.Spinner = spinner.Pulse
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(common.COLOR_SECONDARY))
 	return Model{
 		AccountId:        accountId,
 		ParentURI:        "",
@@ -129,6 +134,7 @@ func InitialModel(accountId uuid.UUID, width, height int, localDomain string) Mo
 		pendingOffset:    -2,
 		LocalDomain:      localDomain,
 		ReturnView:       common.HomeTimelineView,
+		spinner:          s,
 	}
 }
 
@@ -479,6 +485,14 @@ func parseActivityContent(activity *domain.Activity) (string, string) {
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case spinner.TickMsg:
+		if m.loading {
+			var cmd tea.Cmd
+			m.spinner, cmd = m.spinner.Update(msg)
+			return m, cmd
+		}
+		return m, nil
+
 	case common.DeactivateViewMsg:
 		m.isActive = false
 		return m, nil
@@ -515,9 +529,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.parentCreatedAt = msg.CreatedAt
 		// For local notes, use loadThreadByID which doesn't rely on object_uri in DB
 		if msg.IsLocal && msg.NoteID != uuid.Nil {
-			return m, loadThreadByID(msg.NoteID, msg.NoteURI, msg.Author, msg.Content, msg.CreatedAt)
+			return m, tea.Batch(loadThreadByID(msg.NoteID, msg.NoteURI, msg.Author, msg.Content, msg.CreatedAt), m.spinner.Tick)
 		}
-		return m, loadThread(msg.NoteURI)
+		return m, tea.Batch(loadThread(msg.NoteURI), m.spinner.Tick)
 
 	case threadLoadedMsg:
 		m.loading = false
@@ -756,7 +770,7 @@ func (m Model) View() string {
 	s.WriteString("\n\n")
 
 	if m.loading {
-		s.WriteString(emptyStyle.Render("Loading thread..."))
+		s.WriteString(m.spinner.View() + " Loading thread...")
 		return s.String()
 	}
 

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/deemkeen/stegodon/activitypub"
@@ -62,6 +63,8 @@ type Model struct {
 	confirmingDelete bool      // True when showing delete confirmation
 	deleteTargetId   uuid.UUID // ID of note pending deletion
 	LocalDomain      string    // Cached local domain for mention highlighting
+	spinner          spinner.Model
+	initialLoad      bool // true until first notesLoadedMsg arrives
 }
 
 func (m Model) Init() tea.Cmd {
@@ -70,14 +73,23 @@ func (m Model) Init() tea.Cmd {
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case spinner.TickMsg:
+		if m.initialLoad {
+			var cmd tea.Cmd
+			m.spinner, cmd = m.spinner.Update(msg)
+			return m, cmd
+		}
+		return m, nil
+
 	case common.ActivateViewMsg:
 		// View is becoming active (user navigated here)
 		// Reset scroll position to top when switching to this view
 		m.Selected = 0
 		m.Offset = 0
+		m.initialLoad = true
 		m.confirmingDelete = false
 		m.deleteTargetId = uuid.Nil
-		return m, loadNotes(m.userId)
+		return m, tea.Batch(loadNotes(m.userId), m.spinner.Tick)
 
 	case common.SessionState:
 		// Handle UpdateNoteList to refresh when notes are created/updated/liked
@@ -87,6 +99,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, nil
 
 	case notesLoadedMsg:
+		m.initialLoad = false
 		m.Notes = msg.notes
 		// Restore selection after reload, but make sure it's within bounds
 		if m.Selected >= len(m.Notes) {
@@ -196,7 +209,9 @@ func (m Model) View() string {
 	s.WriteString(common.CaptionStyle.Render(fmt.Sprintf("my posts (%d notes)", len(m.Notes))))
 	s.WriteString("\n\n")
 
-	if len(m.Notes) == 0 {
+	if m.initialLoad {
+		s.WriteString(m.spinner.View() + " Loading...")
+	} else if len(m.Notes) == 0 {
 		s.WriteString(emptyStyle.Render("No notes yet.\nCreate your first note!"))
 	} else {
 		// Calculate right panel width using layout helpers
@@ -377,6 +392,9 @@ func truncate(s string, maxLen int) string {
 }
 
 func NewPager(userId uuid.UUID, width int, height int, localDomain string) Model {
+	s := spinner.New()
+	s.Spinner = spinner.Pulse
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(common.COLOR_SECONDARY))
 	return Model{
 		Notes:            []domain.Note{},
 		Offset:           0,
@@ -387,5 +405,7 @@ func NewPager(userId uuid.UUID, width int, height int, localDomain string) Model
 		confirmingDelete: false,
 		deleteTargetId:   uuid.Nil,
 		LocalDomain:      localDomain,
+		spinner:          s,
+		initialLoad:      false, // Set to true on ActivateViewMsg
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/deemkeen/stegodon/db"
@@ -76,9 +77,14 @@ type Model struct {
 	engagementLikers   []string // List of users who liked the selected post
 	engagementBoosters []string // List of users who boosted the selected post
 	LocalDomain        string
+	spinner            spinner.Model
+	initialLoad        bool // true until first postsLoadedMsg arrives
 }
 
 func InitialModel(accountId uuid.UUID, width, height int, localDomain string) Model {
+	s := spinner.New()
+	s.Spinner = spinner.Pulse
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(common.COLOR_SECONDARY))
 	return Model{
 		AccountId:   accountId,
 		Posts:       []domain.GlobalTimelinePost{},
@@ -88,6 +94,8 @@ func InitialModel(accountId uuid.UUID, width, height int, localDomain string) Mo
 		Height:      height,
 		isActive:    false,
 		LocalDomain: localDomain,
+		spinner:     s,
+		initialLoad: false, // Set to true on ActivateViewMsg
 	}
 }
 
@@ -107,6 +115,14 @@ func tickRefresh() tea.Cmd {
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case spinner.TickMsg:
+		if m.initialLoad {
+			var cmd tea.Cmd
+			m.spinner, cmd = m.spinner.Update(msg)
+			return m, cmd
+		}
+		return m, nil
+
 	case common.DeactivateViewMsg:
 		m.isActive = false
 		m.tickerRunning = false // Stop ticker chain
@@ -115,9 +131,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case common.ActivateViewMsg:
 		m.isActive = true
 		m.tickerRunning = false // Reset ticker state
+		m.initialLoad = true
 		m.Selected = 0
 		m.Offset = 0
-		return m, loadGlobalPosts()
+		return m, tea.Batch(loadGlobalPosts(), m.spinner.Tick)
 
 	case common.SessionState:
 		if msg == common.UpdateNoteList {
@@ -132,6 +149,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, nil
 
 	case postsLoadedMsg:
+		m.initialLoad = false
 		m.Posts = msg.posts
 		// Pre-process content for terminal display (avoids re-processing on every View() render)
 		for i := range m.Posts {
@@ -334,7 +352,9 @@ func (m Model) View() string {
 	s.WriteString(common.CaptionStyle.Render(fmt.Sprintf("global (%d posts)", len(m.Posts))))
 	s.WriteString("\n\n")
 
-	if len(m.Posts) == 0 {
+	if m.initialLoad {
+		s.WriteString(m.spinner.View() + " Loading...")
+	} else if len(m.Posts) == 0 {
 		s.WriteString(emptyStyle.Render("No posts yet."))
 	} else {
 		leftPanelWidth := common.CalculateLeftPanelWidth(m.Width)
