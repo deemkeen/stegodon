@@ -282,7 +282,7 @@ Key coverage areas:
 
 ## Development Notes
 
-- Go 1.25+
+- Go 1.26+
 - Single binary distribution (assets embedded via `embed` package)
 - SSH host key auto-generated on first run
 - Terminal: 24-bit color, minimum 115x28

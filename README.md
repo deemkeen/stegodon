@@ -252,7 +252,7 @@ go build
 ```
 
 **Requirements:**
-- Go 1.25+
+- Go 1.26+
 - Terminal with 24-bit color, 115x28 minimum
 - OSC 8 support for clickable links (optional: Ghostty, iTerm2, Kitty)
 

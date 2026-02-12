@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # test-federation.sh
-# Helper script to set up stegodon with ngrok for local federation testing
+# Helper script to set up stegodon with bore for local federation testing
+# Uses https://github.com/jkuri/bore for tunneling
 
 set -e
 
@@ -11,6 +12,11 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+# Configuration
+BORE_ID="${BORE_ID:-stegodon}"
+BORE_DOMAIN="${BORE_ID}.bore.digital"
+LOCAL_PORT=9999
 
 # Function to print colored output
 print_info() {
@@ -29,6 +35,29 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Cleanup function
+cleanup() {
+    echo ""
+    print_info "Shutting down..."
+
+    # Stop bore first
+    if [ -n "$BORE_PID" ] && kill -0 "$BORE_PID" 2>/dev/null; then
+        print_info "Stopping bore tunnel (PID: $BORE_PID)"
+        kill "$BORE_PID" 2>/dev/null || true
+    fi
+
+    # Stop stegodon
+    if [ -n "$STEGODON_PID" ] && kill -0 "$STEGODON_PID" 2>/dev/null; then
+        print_info "Stopping stegodon (PID: $STEGODON_PID)"
+        kill "$STEGODON_PID" 2>/dev/null || true
+        wait "$STEGODON_PID" 2>/dev/null || true
+    fi
+
+    print_success "Cleanup complete"
+}
+
+trap cleanup EXIT INT TERM
+
 # Check if stegodon binary exists
 if [ ! -f "./stegodon" ]; then
     print_error "stegodon binary not found. Please run 'go build' first."
@@ -37,78 +66,16 @@ fi
 
 print_success "Found stegodon binary"
 
-# Check if ngrok is installed
-if ! command -v ngrok &> /dev/null; then
-    print_error "ngrok is not installed."
-    echo "Install with: brew install ngrok"
+# Check if bore is installed
+if ! command -v bore &> /dev/null; then
+    print_error "bore is not installed."
+    echo "Install from: https://github.com/jkuri/bore"
+    echo "  brew install jkuri/tap/bore"
+    echo "  or download from GitHub releases"
     exit 1
 fi
 
-print_success "Found ngrok at $(which ngrok)"
-
-# Check if .env file exists for ngrok domain
-if [ -f ".ngrok_domain" ]; then
-    SAVED_DOMAIN=$(cat .ngrok_domain)
-    print_info "Last used ngrok domain: $SAVED_DOMAIN"
-fi
-
-# Start ngrok in background if not already running
-NGROK_RUNNING=$(pgrep -f "ngrok http" || echo "")
-
-if [ -n "$NGROK_RUNNING" ]; then
-    print_warning "ngrok is already running (PID: $NGROK_RUNNING)"
-    print_info "Getting ngrok URL from API..."
-
-    # Wait a moment for ngrok API to be ready
-    sleep 2
-
-    # Get the public URL from ngrok API
-    NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | grep -o '"public_url":"https://[^"]*' | grep -o 'https://.*' | head -1)
-
-    if [ -z "$NGROK_URL" ]; then
-        print_error "Could not get ngrok URL from API. Is ngrok running correctly?"
-        echo "Try: pkill -f ngrok && ngrok http 9999"
-        exit 1
-    fi
-
-    # Extract domain without https://
-    NGROK_DOMAIN=$(echo $NGROK_URL | sed 's|https://||')
-    print_success "Using ngrok domain: $NGROK_DOMAIN"
-else
-    print_info "Starting ngrok tunnel on port 9999..."
-    ngrok http 9999 > /dev/null &
-    NGROK_PID=$!
-
-    print_info "Waiting for ngrok to start..."
-    sleep 3
-
-    # Get the public URL from ngrok API
-    NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | grep -o '"public_url":"https://[^"]*' | grep -o 'https://.*' | head -1)
-
-    if [ -z "$NGROK_URL" ]; then
-        print_error "Failed to get ngrok URL. Check if ngrok started correctly."
-        echo "Visit http://localhost:4040 to see ngrok status"
-        exit 1
-    fi
-
-    # Extract domain without https://
-    NGROK_DOMAIN=$(echo $NGROK_URL | sed 's|https://||')
-    print_success "ngrok started with domain: $NGROK_DOMAIN"
-
-    # Save domain for reference
-    echo $NGROK_DOMAIN > .ngrok_domain
-fi
-
-# Display connection info
-echo ""
-echo "======================================================================"
-echo -e "${GREEN}ngrok Tunnel Active${NC}"
-echo "======================================================================"
-echo "Public URL:    https://$NGROK_DOMAIN"
-echo "Local:         http://localhost:9999"
-echo "Web Interface: http://localhost:4040"
-echo "======================================================================"
-echo ""
+print_success "Found bore at $(which bore)"
 
 # Check if database exists
 if [ -f "database.db" ]; then
@@ -124,7 +91,7 @@ if [ -f "database.db" ]; then
         if [ -n "$USERNAMES" ]; then
             echo "Existing users:"
             echo "$USERNAMES" | while read -r user; do
-                echo "  - @$user@$NGROK_DOMAIN"
+                echo "  - @$user@${BORE_DOMAIN}"
             done
         fi
     fi
@@ -133,13 +100,13 @@ else
 fi
 
 echo ""
-print_info "Starting stegodon with ActivityPub enabled..."
-echo ""
 
-# Start stegodon with proper configuration
+# Set up stegodon environment
 export STEGODON_WITH_AP=true
-export STEGODON_SSLDOMAIN=$NGROK_DOMAIN
+export STEGODON_SSLDOMAIN=${BORE_DOMAIN}
 export STEGODON_WITH_PPROF=true
+export STEGODON_SHOW_GLOBAL=true
+export STEGODON_SHOW_TOS=true
 
 # Display configuration
 echo "======================================================================"
@@ -147,24 +114,69 @@ echo -e "${GREEN}stegodon Configuration${NC}"
 echo "======================================================================"
 echo "Host:          127.0.0.1"
 echo "SSH Port:      23232"
-echo "HTTP Port:     9999"
-echo "SSL Domain:    $NGROK_DOMAIN"
+echo "HTTP Port:     ${LOCAL_PORT}"
+echo "SSL Domain:    ${BORE_DOMAIN}"
 echo "ActivityPub:   enabled"
 echo "======================================================================"
 echo ""
 
-print_info "Connect via SSH with: ${GREEN}ssh localhost -p 23232${NC}"
+# Step 1: Start stegodon in background
+print_info "Starting stegodon..."
+./stegodon &
+STEGODON_PID=$!
+
+# Wait for stegodon to start listening
+print_info "Waiting for stegodon to start..."
+sleep 2
+
+# Check if stegodon is still running
+if ! kill -0 "$STEGODON_PID" 2>/dev/null; then
+    print_error "stegodon failed to start"
+    exit 1
+fi
+
+print_success "stegodon started (PID: $STEGODON_PID)"
+
+# Step 2: Start bore tunnel
+print_info "Starting bore tunnel: localhost:${LOCAL_PORT} -> https://${BORE_DOMAIN}"
+bore -lp ${LOCAL_PORT} -id ${BORE_ID} &
+BORE_PID=$!
+
+sleep 2
+
+# Check if bore is still running
+if ! kill -0 "$BORE_PID" 2>/dev/null; then
+    print_error "bore failed to start. Check if the ID '${BORE_ID}' is available."
+    exit 1
+fi
+
+print_success "bore tunnel established (PID: $BORE_PID)"
+
+# Display connection info
 echo ""
-print_info "To stop stegodon: Press Ctrl+C"
-print_info "To stop ngrok: ${YELLOW}pkill -f ngrok${NC}"
-echo ""
-print_success "Starting server..."
+echo "======================================================================"
+echo -e "${GREEN}Federation Testing Ready${NC}"
+echo "======================================================================"
+echo "Public URL:    https://${BORE_DOMAIN}"
+echo "Local:         http://localhost:${LOCAL_PORT}"
+echo "Tunnel ID:     ${BORE_ID}"
+echo "======================================================================"
 echo ""
 
-# Run stegodon (this will block until Ctrl+C)
-./stegodon
-
-# Cleanup message (only shown if stegodon exits cleanly)
+print_info "Connect via SSH: ${GREEN}ssh localhost -p 23232${NC}"
+print_info "Web UI:          ${GREEN}https://${BORE_DOMAIN}${NC}"
 echo ""
-print_info "stegodon stopped"
-print_warning "ngrok is still running. Stop it with: ${YELLOW}pkill -f ngrok${NC}"
+print_info "To stop: Press Ctrl+C (stops both stegodon and bore)"
+echo ""
+
+# Custom bore ID usage
+if [ "$BORE_ID" = "stegodon" ]; then
+    print_info "Tip: Use a custom ID with: ${YELLOW}BORE_ID=myname ./test-federation.sh${NC}"
+    echo ""
+fi
+
+print_success "Ready for federation testing!"
+echo ""
+
+# Wait for either process to exit
+wait $STEGODON_PID $BORE_PID

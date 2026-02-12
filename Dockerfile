@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.25-alpine3.21 AS builder
+FROM golang:1.26-alpine3.23 AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git
@@ -20,7 +20,7 @@ COPY . .
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o stegodon .
 
 # Final stage
-FROM alpine:3.21
+FROM alpine:3.23
 
 # Install runtime dependencies
 RUN apk add --no-cache ca-certificates wget ncurses-terminfo-base

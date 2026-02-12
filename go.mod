@@ -1,6 +1,6 @@
 module github.com/deemkeen/stegodon
 
-go 1.25
+go 1.26
 
 require (
 	code.superseriousbusiness.org/httpsig v1.5.0

@@ -28,8 +28,8 @@ Images are automatically built and published on every commit.
 
 | Stage | Image | Purpose |
 |-------|-------|---------|
-| Builder | `golang:1.25-alpine3.21` | Compile Go binary |
-| Runtime | `alpine:3.21` | Minimal production image |
+| Builder | `golang:1.26-alpine3.23` | Compile Go binary |
+| Runtime | `alpine:3.23` | Minimal production image |
 
 ---
 
@@ -39,7 +39,7 @@ Images are automatically built and published on every commit.
 
 ```dockerfile
 # Build stage
-FROM golang:1.25-alpine3.21 AS builder
+FROM golang:1.26-alpine3.23 AS builder
 RUN apk add --no-cache git
 WORKDIR /build
 COPY go.mod go.sum ./
