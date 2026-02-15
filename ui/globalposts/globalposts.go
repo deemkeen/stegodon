@@ -130,7 +130,15 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	case common.ActivateViewMsg:
 		m.isActive = true
-		m.tickerRunning = false // Reset ticker state
+		m.showingURL = false
+		m.showingEngagement = false
+		if len(m.Posts) > 0 {
+			// Posts already loaded (view was visible but unfocused) — just start refresh ticker
+			m.tickerRunning = false
+			return m, tickRefresh()
+		}
+		// First activation or no data yet — full load with spinner
+		m.tickerRunning = false
 		m.initialLoad = true
 		m.Selected = 0
 		m.Offset = 0
