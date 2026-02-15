@@ -1350,7 +1350,7 @@ const (
 			-- Relay-forwarded activities (excluding replies)
 			SELECT
 				act.id as id,
-				act.actor_uri as author,
+				COALESCE('@' || ra.username || '@' || ra.domain, act.actor_uri) as author,
 				act.raw_json as content,
 				act.created_at as created_at,
 				act.object_uri as object_uri,
@@ -1361,6 +1361,7 @@ const (
 				COALESCE(act.boost_count, 0) as boost_count,
 				act.raw_json as raw_json
 			FROM activities act
+			LEFT JOIN remote_accounts ra ON ra.actor_uri = act.actor_uri
 			WHERE act.activity_type = 'Create' AND act.local = 0 AND act.from_relay = 1
 			AND (act.in_reply_to IS NULL OR act.in_reply_to = '')
 		) combined
@@ -1650,7 +1651,7 @@ func extractAuthorFromActorURI(actorURI string) string {
 	domain := parts[0]
 	path := parts[1]
 
-	// Extract username from path (common patterns: /users/X, /@X, /u/X)
+	// Extract username from path (common patterns: /users/X, /@X, /u/X, /ap/users/X)
 	var username string
 	if strings.HasPrefix(path, "users/") {
 		username = strings.TrimPrefix(path, "users/")
@@ -1658,6 +1659,10 @@ func extractAuthorFromActorURI(actorURI string) string {
 		username = strings.TrimPrefix(path, "@")
 	} else if strings.HasPrefix(path, "u/") {
 		username = strings.TrimPrefix(path, "u/")
+	} else if strings.Contains(path, "ap/users/") {
+		// Mastodon-style /ap/users/<id> — extract last segment (may be numeric ID)
+		pathParts := strings.Split(path, "/")
+		username = pathParts[len(pathParts)-1]
 	} else {
 		// Just use last path segment as username
 		pathParts := strings.Split(path, "/")
