@@ -126,14 +126,18 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case common.ActivateViewMsg:
 		// View is becoming active (user navigated here)
 		m.isActive = true
-		m.tickerRunning = false // Reset ticker state, will be started when data loads
-		m.initialLoad = true
-		// Reset scroll position to top when switching to this view
-		m.Selected = 0
-		m.Offset = 0
 		m.showingURL = false
 		m.showingEngagement = false
-		// Load data first, tick will be scheduled when data arrives
+		if len(m.Posts) > 0 {
+			// Posts already loaded (view was visible but unfocused) — just start refresh ticker
+			m.tickerRunning = false
+			return m, tickRefresh()
+		}
+		// First activation or no data yet — full load with spinner
+		m.tickerRunning = false
+		m.initialLoad = true
+		m.Selected = 0
+		m.Offset = 0
 		return m, tea.Batch(loadHomePosts(m.AccountId), m.spinner.Tick)
 
 	case common.SessionState:
