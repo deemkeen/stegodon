@@ -66,11 +66,11 @@ func ParseHashtags(text string) []string {
 ```go
 func HighlightHashtagsTerminal(text string) string {
     return hashtagRegex.ReplaceAllString(text,
-        "\033[38;5;75m#$1\033[39m")
+        AnsiHashtagStart+"#$1"+AnsiColorReset)
 }
 ```
 
-Uses ANSI 75 (`#5fafff`) color.
+Uses true-color `#5fafff` via `AnsiHashtagStart`.
 
 ### HighlightHashtagsHTML
 
@@ -144,7 +144,7 @@ func HighlightMentionsTerminal(text string, localDomain string) string {
 }
 ```
 
-Uses ANSI 48 (`#00ff87`) color with OSC 8 hyperlinks.
+Uses true-color `#00ff87` via `AnsiMentionStart` with OSC 8 hyperlinks.
 
 ### HighlightMentionsHTML
 
@@ -234,7 +234,7 @@ Creates OSC 8 hyperlink for terminal display.
 func FormatClickableURL(url string, maxWidth int, prefix string) string {
     linkText := prefix + url
     truncatedLinkText := TruncateVisibleLength(linkText, maxWidth)
-    return fmt.Sprintf("\033[38;2;0;255;135;4m\033]8;;%s\033\\%s\033]8;;\033\\\033[39;24m",
+    return fmt.Sprintf(AnsiLinkStart+"\033]8;;%s\033\\%s\033]8;;\033\\"+AnsiColorULReset,
         url, truncatedLinkText)
 }
 ```
@@ -343,11 +343,16 @@ func NormalizeInput(text string) string {
 
 ## ANSI Color Constants
 
+True-color escape sequences defined in `util/util.go`:
+
 ```go
 const (
-    ansiHashtagColor = "75"        // #5fafff - blue
-    ansiMentionColor = "48"        // #00ff87 - green
-    ansiLinkRGB      = "0;255;135" // RGB for links
+    AnsiHashtagStart = "\033[38;2;95;175;255m"   // #5fafff - matches COLOR_HASHTAG
+    AnsiMentionStart = "\033[38;2;0;255;135;4m"  // #00ff87 + underline - matches COLOR_MENTION
+    AnsiLinkStart    = "\033[38;2;0;255;135;4m"  // #00ff87 + underline - matches COLOR_LINK
+    AnsiWarningStart = "\033[38;2;255;175;0m"    // #ffaf00 - matches COLOR_WARNING
+    AnsiColorReset   = "\033[39m"                // Reset foreground to default
+    AnsiColorULReset = "\033[39;24m"             // Reset foreground + underline
 )
 ```
 
@@ -371,7 +376,7 @@ const (
 
 ```go
 // COLOR_START + OSC8_START + TEXT + OSC8_END + COLOR_RESET
-fmt.Sprintf("\033[38;5;48;4m\033]8;;%s\033\\%s\033]8;;\033\\\033[39;24m",
+fmt.Sprintf(AnsiMentionStart+"\033]8;;%s\033\\%s\033]8;;\033\\"+AnsiColorULReset,
     profileURL, displayMention)
 ```
 

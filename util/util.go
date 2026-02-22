@@ -31,11 +31,15 @@ var mentionRegex = regexp.MustCompile(`@([a-zA-Z0-9_]+)@([a-zA-Z0-9.-]+\.[a-zA-Z
 var markdownLinkRegex = regexp.MustCompile(`\[([^\]]+)\]\(([^)]+)\)`)
 var htmlTagRegex = regexp.MustCompile(`<[^>]*>`)
 
-// ANSI color codes for terminal highlighting (must match ui/common/styles.go values)
+// ANSI true-color escape sequences for terminal highlighting.
+// Defined here (not in ui/common) to avoid import cycles. Values must match ui/common/styles.go.
 const (
-	ansiHashtagColor = "75"        // ANSI 75 (#5fafff) - matches COLOR_HASHTAG
-	ansiMentionColor = "48"        // ANSI 48 (#00ff87) - matches COLOR_MENTION
-	ansiLinkRGB      = "0;255;135" // RGB for links (#00ff87) - matches COLOR_LINK_RGB
+	AnsiHashtagStart = "\033[38;2;95;175;255m"  // #5fafff - matches COLOR_HASHTAG
+	AnsiMentionStart = "\033[38;2;0;255;135;4m" // #00ff87 + underline - matches COLOR_MENTION
+	AnsiLinkStart    = "\033[38;2;0;255;135;4m" // #00ff87 + underline - matches COLOR_LINK
+	AnsiWarningStart = "\033[38;2;255;175;0m"   // #ffaf00 - matches COLOR_WARNING
+	AnsiColorReset   = "\033[39m"               // Reset foreground to default
+	AnsiColorULReset = "\033[39;24m"            // Reset foreground + underline
 )
 
 var urlRegex = regexp.MustCompile(`^https?://[^\s]+$`)
@@ -284,10 +288,7 @@ func MarkdownLinksToTerminal(text string) string {
 		if len(matches) == 3 {
 			linkText := matches[1]
 			linkURL := matches[2]
-			// OSC 8 format with link color (RGB) and underline
-			// Format: COLOR_START + OSC8_START + TEXT + OSC8_END + COLOR_RESET
-			// Use \033[39;24m to reset only foreground color and underline, not background
-			return fmt.Sprintf("\033[38;2;"+ansiLinkRGB+";4m\033]8;;%s\033\\%s\033]8;;\033\\\033[39;24m", linkURL, linkText)
+			return fmt.Sprintf(AnsiLinkStart+"\033]8;;%s\033\\%s\033]8;;\033\\"+AnsiColorULReset, linkURL, linkText)
 		}
 		return match
 	})
@@ -301,10 +302,7 @@ func MarkdownLinksToTerminal(text string) string {
 func FormatClickableURL(url string, maxWidth int, prefix string) string {
 	linkText := prefix + url
 	truncatedLinkText := TruncateVisibleLength(linkText, maxWidth)
-	// OSC 8 format with link color (RGB) and underline
-	// Format: COLOR_START + OSC8_START + TEXT + OSC8_END + COLOR_RESET
-	// Use \033[39;24m to reset only foreground color and underline, not background
-	return fmt.Sprintf("\033[38;2;"+ansiLinkRGB+";4m\033]8;;%s\033\\%s\033]8;;\033\\\033[39;24m",
+	return fmt.Sprintf(AnsiLinkStart+"\033]8;;%s\033\\%s\033]8;;\033\\"+AnsiColorULReset,
 		url, truncatedLinkText)
 }
 
@@ -381,9 +379,7 @@ func LinkifyRawURLsTerminal(text string) string {
 				return match
 			}
 
-			// OSC 8 format with link color (RGB) and underline
-			// Format: PREFIX + COLOR_START + OSC8_START + TEXT + OSC8_END + COLOR_RESET
-			return fmt.Sprintf("%s\033[38;2;"+ansiLinkRGB+";4m\033]8;;%s\033\\%s\033]8;;\033\\\033[39;24m",
+			return fmt.Sprintf("%s"+AnsiLinkStart+"\033]8;;%s\033\\%s\033]8;;\033\\"+AnsiColorULReset,
 				prefix, rawURL, rawURL)
 		}
 		return match
@@ -394,7 +390,7 @@ func LinkifyRawURLsTerminal(text string) string {
 
 // CountVisibleChars counts only the visible characters (runes) in text, ignoring:
 // - Markdown links [text](url) - only the 'text' portion is counted
-// - ANSI escape sequences (SGR codes like \033[38;5;75m)
+// - ANSI escape sequences (SGR codes like \033[38;2;95;175;255m)
 // - OSC 8 hyperlinks (\033]8;;url\033\\text\033]8;;\033\\)
 // This function counts Unicode runes, not bytes, so multi-byte characters like
 // "·" (middle dot) are counted as 1 visible character.
@@ -508,7 +504,7 @@ func ParseHashtags(text string) []string {
 // Uses secondary color for hashtags to make them visually distinct.
 func HighlightHashtagsTerminal(text string) string {
 	// Use the same regex pattern as hashtagRegex
-	return hashtagRegex.ReplaceAllString(text, "\033[38;5;"+ansiHashtagColor+"m#$1\033[39m")
+	return hashtagRegex.ReplaceAllString(text, AnsiHashtagStart+"#$1"+AnsiColorReset)
 }
 
 // HighlightHashtagsHTML converts hashtags in text to clickable HTML links.
@@ -590,7 +586,7 @@ func HighlightMentionsTerminal(text string, localDomain string) string {
 
 			// OSC 8 format with mention color and underline
 			// Format: COLOR_START + OSC8_START + TEXT + OSC8_END + COLOR_RESET
-			return fmt.Sprintf("\033[38;5;"+ansiMentionColor+";4m\033]8;;%s\033\\%s\033]8;;\033\\\033[39;24m", profileURL, displayMention)
+			return fmt.Sprintf(AnsiMentionStart+"\033]8;;%s\033\\%s\033]8;;\033\\"+AnsiColorULReset, profileURL, displayMention)
 		}
 		return match
 	})

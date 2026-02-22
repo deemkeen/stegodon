@@ -10,7 +10,7 @@ Stegodon provides Docker deployment via:
 - Multi-stage Dockerfile for minimal images
 - Docker Compose for orchestration
 - GitHub Container Registry for pre-built images
-- ANSI256 color fallback for terminal compatibility
+- TrueColor (24-bit) rendering for consistent colors
 
 ---
 
@@ -164,7 +164,7 @@ environment:
 
 ---
 
-## ANSI256 Color Fallback
+## TrueColor Rendering
 
 ### Terminal Configuration
 
@@ -175,13 +175,13 @@ ENV TERM=xterm-256color
 ### Color Profile in Code
 
 ```go
-lipgloss.SetColorProfile(termenv.ANSI256)
+lipgloss.SetColorProfile(termenv.TrueColor)
 ```
 
-Uses ANSI256 (8-bit color) instead of TrueColor for Docker compatibility:
-- Works in most terminal emulators
-- Consistent across SSH connections
-- Avoids color detection issues in containers
+Uses TrueColor (24-bit) for palette-independent color rendering:
+- Hex colors render identically across all terminals
+- No dependency on terminal's 256-color palette mapping
+- `TERM=xterm-256color` ensures the terminal advertises color support
 
 ---
 

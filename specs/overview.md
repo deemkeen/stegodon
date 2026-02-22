@@ -116,7 +116,7 @@ This document provides a lookup table for all specification documents in the ste
 
 | Topic | Description | Spec File |
 |-------|-------------|-----------|
-| Docker Deployment | Container configuration, ANSI256 fallback | [ops/docker.md](./ops/docker.md) |
+| Docker Deployment | Container configuration, TrueColor rendering | [ops/docker.md](./ops/docker.md) |
 | Single Binary | Embedded assets, distribution | [ops/distribution.md](./ops/distribution.md) |
 | Logging | Standard logging, journald integration | [ops/logging.md](./ops/logging.md) |
 | Monitoring | pprof profiling, NodeInfo statistics | [ops/monitoring.md](./ops/monitoring.md) |

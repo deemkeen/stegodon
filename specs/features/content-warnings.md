@@ -97,9 +97,9 @@ Content warnings are displayed with warning styling:
 
 ```go
 const (
-    COLOR_WARNING      = "214" // ANSI 214 (#ffaf00) - Content warnings, caution (amber)
-    ANSI_WARNING_START = "\033[38;5;214m"
-    ANSI_COLOR_RESET   = "\033[39m"
+    COLOR_WARNING      = "#ffaf00"              // Content warnings, caution (amber)
+    ANSI_WARNING_START = "\033[38;2;255;175;0m" // True-color #ffaf00
+    ANSI_COLOR_RESET   = "\033[39m"             // Reset foreground to default
 )
 ```
 

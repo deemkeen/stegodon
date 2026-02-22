@@ -3,43 +3,41 @@ package common
 import "github.com/charmbracelet/lipgloss"
 
 const (
-	// === Primary UI Colors ===
-	COLOR_ACCENT    = "69" // ANSI 69 (#5f87ff) - Primary accent: borders, selections, header
-	COLOR_SECONDARY = "75" // ANSI 75 (#5fafff) - Secondary accent: timestamps, domains, hashtags
+	// === Primary UI Colors (true color hex — terminal-palette independent) ===
+	COLOR_ACCENT    = "#5f87ff" // Primary accent: borders, selections, header
+	COLOR_SECONDARY = "#5fafff" // Secondary accent: timestamps, domains, hashtags
 
 	// === Text Colors ===
-	COLOR_WHITE = "255" // ANSI 255 (#eeeeee) - Primary text, post content
-	COLOR_LIGHT = "250" // ANSI 250 (#bcbcbc) - Secondary text, slightly dimmed
-	COLOR_MUTED = "245" // ANSI 245 (#8a8a8a) - Tertiary text, disabled, hints
-	COLOR_DIM   = "240" // ANSI 240 (#585858) - Very dim text, borders, separators
+	COLOR_WHITE = "#eeeeee" // Primary text, post content
+	COLOR_LIGHT = "#bcbcbc" // Secondary text, slightly dimmed
+	COLOR_MUTED = "#8a8a8a" // Tertiary text, disabled, hints
+	COLOR_DIM   = "#585858" // Very dim text, borders, separators
 
 	// === Semantic Colors ===
-	COLOR_USERNAME = "48"  // ANSI 48 (#00ff87) - Usernames stand out
-	COLOR_SUCCESS  = "48"  // ANSI 48 (#00ff87) - Success messages (same as username for cohesion)
-	COLOR_ERROR    = "196" // ANSI 196 (#ff0000) - Errors, delete actions, warnings
-	COLOR_CRITICAL = "9"   // ANSI 9 (#ff5555) - Critical errors, terminal size warnings
-	COLOR_WARNING  = "214" // ANSI 214 (#ffaf00) - Content warnings, caution (amber)
+	COLOR_USERNAME = "#00ff87" // Usernames stand out
+	COLOR_SUCCESS  = "#00ff87" // Success messages (same as username for cohesion)
+	COLOR_ERROR    = "#ff0000" // Errors, delete actions, warnings
+	COLOR_CRITICAL = "#ff5555" // Critical errors, terminal size warnings
+	COLOR_WARNING  = "#ffaf00" // Content warnings, caution (amber)
 
 	// === Interactive Elements ===
-	COLOR_HASHTAG = "75"  // ANSI 75 (#5fafff) - Hashtags (same as secondary for harmony)
-	COLOR_MENTION = "48"  // ANSI 48 (#00ff87) - Mentions (same as username for consistency)
-	COLOR_LINK    = "48"  // ANSI 48 (#00ff87) - Hyperlinks (same as username/mention)
-	COLOR_BUTTON  = "117" // ANSI 117 (#87d7ff) - Button highlights, active elements
+	COLOR_HASHTAG = "#5fafff" // Hashtags (same as secondary for harmony)
+	COLOR_MENTION = "#00ff87" // Mentions (same as username for consistency)
+	COLOR_LINK    = "#00ff87" // Hyperlinks (same as username/mention)
+	COLOR_BUTTON  = "#87d7ff" // Button highlights, active elements
 
 	// === Section/Title Colors ===
-	COLOR_CAPTION = "170" // ANSI 170 (#d75fd7) - Section captions, titles
-	COLOR_HELP    = "245" // ANSI 245 (#8a8a8a) - Help text (same as muted)
+	COLOR_CAPTION = "#d75fd7" // Section captions, titles
+	COLOR_HELP    = "#8a8a8a" // Help text (same as muted)
 
 	// === Background Colors ===
-	COLOR_BLACK = "0" // ANSI 0 (#000000) - Button text on light backgrounds
+	COLOR_BLACK = "#000000" // Button text on light backgrounds
 
-	// === OSC8 Hyperlink Colors (RGB format for true color terminals) ===
-	COLOR_LINK_RGB    = "0;255;135" // RGB for hyperlinks (#00ff87) - matches COLOR_LINK
-	COLOR_MENTION_RGB = "0;255;135" // RGB for mentions (#00ff87) - matches COLOR_MENTION
-
-	// === ANSI Escape Sequences (for inline coloring without breaking backgrounds) ===
-	ANSI_WARNING_START = "\033[38;5;214m" // Start warning color (orange/yellow)
-	ANSI_COLOR_RESET   = "\033[39m"       // Reset foreground to default
+	// === ANSI Escape Sequences — canonical values live in util/ to avoid import cycles ===
+	// Use util.AnsiHashtagStart, util.AnsiLinkStart, etc. directly.
+	// These aliases exist for header/badge coloring that can't easily import util.
+	ANSI_WARNING_START  = "\033[38;2;255;175;0m" // #ffaf00 - matches COLOR_WARNING (keep in sync with util.AnsiWarningStart)
+	ANSI_COLOR_RESET    = "\033[39m"             // Reset foreground to default (keep in sync with util.AnsiColorReset)
 
 	// === Deprecated aliases (for backwards compatibility during transition) ===
 	// These will be removed in a future version - use the semantic names above

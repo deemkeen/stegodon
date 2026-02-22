@@ -341,7 +341,7 @@ If terminal is too small, a warning is displayed instead of the TUI.
 
 ### Color Support
 
-The application uses ANSI256 color profile for broad compatibility:
+The application uses TrueColor (24-bit) profile for palette-independent rendering:
 
 ```go
 func NewProgram(m Model) *tea.Program {

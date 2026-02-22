@@ -22,8 +22,8 @@ The `ui/header` package provides the navigation header component.
 
 ```go
 const (
-    COLOR_ACCENT    = "69"  // ANSI 69 (#5f87ff) - Primary accent: borders, selections, header
-    COLOR_SECONDARY = "75"  // ANSI 75 (#5fafff) - Secondary accent: timestamps, domains, hashtags
+    COLOR_ACCENT    = "#5f87ff" // Primary accent: borders, selections, header
+    COLOR_SECONDARY = "#5fafff" // Secondary accent: timestamps, domains, hashtags
 )
 ```
 
@@ -31,10 +31,10 @@ const (
 
 ```go
 const (
-    COLOR_WHITE = "255"  // ANSI 255 (#eeeeee) - Primary text, post content
-    COLOR_LIGHT = "250"  // ANSI 250 (#bcbcbc) - Secondary text, slightly dimmed
-    COLOR_MUTED = "245"  // ANSI 245 (#8a8a8a) - Tertiary text, disabled, hints
-    COLOR_DIM   = "240"  // ANSI 240 (#585858) - Very dim text, borders, separators
+    COLOR_WHITE = "#eeeeee" // Primary text, post content
+    COLOR_LIGHT = "#bcbcbc" // Secondary text, slightly dimmed
+    COLOR_MUTED = "#8a8a8a" // Tertiary text, disabled, hints
+    COLOR_DIM   = "#585858" // Very dim text, borders, separators
 )
 ```
 
@@ -42,11 +42,11 @@ const (
 
 ```go
 const (
-    COLOR_USERNAME = "48"   // ANSI 48 (#00ff87) - Usernames stand out
-    COLOR_SUCCESS  = "48"   // ANSI 48 (#00ff87) - Success messages
-    COLOR_ERROR    = "196"  // ANSI 196 (#ff0000) - Errors, delete actions, warnings
-    COLOR_CRITICAL = "9"    // ANSI 9 (#ff5555) - Critical errors, terminal size warnings
-    COLOR_WARNING  = "214"  // ANSI 214 (#ffaf00) - Content warnings, caution
+    COLOR_USERNAME = "#00ff87" // Usernames stand out
+    COLOR_SUCCESS  = "#00ff87" // Success messages
+    COLOR_ERROR    = "#ff0000" // Errors, delete actions, warnings
+    COLOR_CRITICAL = "#ff5555" // Critical errors, terminal size warnings
+    COLOR_WARNING  = "#ffaf00" // Content warnings, caution
 )
 ```
 
@@ -54,34 +54,34 @@ const (
 
 ```go
 const (
-    COLOR_HASHTAG = "75"   // ANSI 75 (#5fafff) - Hashtags
-    COLOR_MENTION = "48"   // ANSI 48 (#00ff87) - Mentions
-    COLOR_LINK    = "48"   // ANSI 48 (#00ff87) - Hyperlinks
-    COLOR_BUTTON  = "117"  // ANSI 117 (#87d7ff) - Button highlights
-    COLOR_CAPTION = "170"  // ANSI 170 (#d75fd7) - Section captions, titles
-    COLOR_HELP    = "245"  // ANSI 245 (#8a8a8a) - Help text
+    COLOR_HASHTAG = "#5fafff" // Hashtags
+    COLOR_MENTION = "#00ff87" // Mentions
+    COLOR_LINK    = "#00ff87" // Hyperlinks
+    COLOR_BUTTON  = "#87d7ff" // Button highlights
+    COLOR_CAPTION = "#d75fd7" // Section captions, titles
+    COLOR_HELP    = "#8a8a8a" // Help text
 )
 ```
 
 ### ANSI Escape Sequences
 
-For inline coloring without breaking backgrounds:
+For inline coloring without breaking backgrounds. Canonical true-color constants live in `util/util.go` (to avoid import cycles); `ui/common/styles.go` keeps aliases for header/badge use.
 
 ```go
+// ui/common/styles.go
 const (
-    ANSI_WARNING_START = "\033[38;5;214m"  // Start warning color
-    ANSI_COLOR_RESET   = "\033[39m"        // Reset foreground to default
+    ANSI_WARNING_START  = "\033[38;2;255;175;0m"  // #ffaf00 - matches COLOR_WARNING
+    ANSI_COLOR_RESET    = "\033[39m"               // Reset foreground to default
 )
-```
 
-### OSC 8 Hyperlink Colors
-
-RGB format for true color terminals:
-
-```go
+// util/util.go (canonical source for inline ANSI escapes)
 const (
-    COLOR_LINK_RGB    = "0;255;135"  // RGB for hyperlinks (#00ff87)
-    COLOR_MENTION_RGB = "0;255;135"  // RGB for mentions (#00ff87)
+    AnsiHashtagStart = "\033[38;2;95;175;255m"   // #5fafff - matches COLOR_HASHTAG
+    AnsiMentionStart = "\033[38;2;0;255;135;4m"  // #00ff87 + underline - matches COLOR_MENTION
+    AnsiLinkStart    = "\033[38;2;0;255;135;4m"  // #00ff87 + underline - matches COLOR_LINK
+    AnsiWarningStart = "\033[38;2;255;175;0m"    // #ffaf00 - matches COLOR_WARNING
+    AnsiColorReset   = "\033[39m"                // Reset foreground to default
+    AnsiColorULReset = "\033[39;24m"             // Reset foreground + underline
 )
 ```
 

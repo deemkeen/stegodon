@@ -37,13 +37,13 @@ func MainTui() wish.Middleware {
 			return nil
 		}
 
-		// Set the global color profile to ANSI256 for Docker compatibility
-		lipgloss.SetColorProfile(termenv.ANSI256)
+		// Set the global color profile to TrueColor (24-bit) for accurate hex color rendering
+		lipgloss.SetColorProfile(termenv.TrueColor)
 
 		m := ui.NewModel(*acc, pty.Window.Width, pty.Window.Height)
 		return tea.NewProgram(m, tea.WithFPS(60), tea.WithInput(s), tea.WithOutput(s), tea.WithAltScreen())
 	}
-	return bm.MiddlewareWithProgramHandler(teaHandler, termenv.ANSI256)
+	return bm.MiddlewareWithProgramHandler(teaHandler, termenv.TrueColor)
 }
 
 // handleCLI processes CLI commands in non-interactive mode

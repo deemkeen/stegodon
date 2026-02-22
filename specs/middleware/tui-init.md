@@ -36,7 +36,7 @@ func MainTui() wish.Middleware {
         }
 
         // 3. Configure color profile
-        lipgloss.SetColorProfile(termenv.ANSI256)
+        lipgloss.SetColorProfile(termenv.TrueColor)
 
         // 4. Create main model
         m := ui.NewModel(*acc, pty.Window.Width, pty.Window.Height)
@@ -49,7 +49,7 @@ func MainTui() wish.Middleware {
             tea.WithAltScreen(),
         )
     }
-    return bm.MiddlewareWithProgramHandler(teaHandler, termenv.ANSI256)
+    return bm.MiddlewareWithProgramHandler(teaHandler, termenv.TrueColor)
 }
 ```
 
@@ -82,16 +82,16 @@ Dimensions are passed to the model for layout calculations.
 
 ## Color Profile
 
-### ANSI256 Mode
+### TrueColor Mode
 
 ```go
-lipgloss.SetColorProfile(termenv.ANSI256)
+lipgloss.SetColorProfile(termenv.TrueColor)
 ```
 
-ANSI256 (8-bit color) is used for Docker compatibility:
-- Works in most terminal emulators
-- Consistent across SSH connections
-- Avoids TrueColor detection issues
+TrueColor (24-bit color) is used for accurate hex color rendering:
+- Renders colors independent of terminal palette
+- Avoids ANSI 256-color palette inconsistencies across terminals
+- Supported by all modern terminal emulators (Ghostty, iTerm2, Alacritty, etc.)
 
 ### Color Profile Options
 
@@ -280,7 +280,7 @@ Non-interactive sessions are rejected with a message.
 ```go
 import bm "github.com/charmbracelet/wish/bubbletea"
 
-return bm.MiddlewareWithProgramHandler(teaHandler, termenv.ANSI256)
+return bm.MiddlewareWithProgramHandler(teaHandler, termenv.TrueColor)
 ```
 
 The `wish/bubbletea` middleware:

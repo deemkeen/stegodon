@@ -102,7 +102,7 @@ Account identification uses SHA256 hash of the public key.
 ### Terminal Requirements
 
 - **Minimum size**: 115x28 characters
-- **Color support**: 24-bit color preferred, ANSI256 fallback
+- **Color support**: TrueColor (24-bit)
 - **Alt-screen**: Required for TUI
 
 ---

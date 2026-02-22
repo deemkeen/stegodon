@@ -8,7 +8,7 @@ This document specifies terminal dimension requirements and color support.
 
 Stegodon TUI requires:
 - **Minimum dimensions**: 115×28 characters
-- **Color support**: ANSI256 (8-bit) mode
+- **Color support**: TrueColor (24-bit) mode
 - **Alt-screen**: Required for TUI rendering
 
 ---
@@ -57,7 +57,7 @@ Current size: 80x24
 Please resize your terminal.
 ```
 
-Displayed in critical red color (`ANSI 9 / #ff5555`).
+Displayed in critical red color (`#ff5555`).
 
 ---
 
@@ -104,32 +104,32 @@ const (
 
 ## Color Support
 
-### ANSI256 Mode
+### TrueColor Mode
 
-Stegodon uses ANSI256 (8-bit color) for maximum compatibility:
+Stegodon uses TrueColor (24-bit color) for accurate, palette-independent rendering:
 
 ```go
 import "github.com/muesli/termenv"
 
 // Set color profile globally
-lipgloss.SetColorProfile(termenv.ANSI256)
+lipgloss.SetColorProfile(termenv.TrueColor)
 
 // Also set for BubbleTea middleware
-return bm.MiddlewareWithProgramHandler(teaHandler, termenv.ANSI256)
+return bm.MiddlewareWithProgramHandler(teaHandler, termenv.TrueColor)
 ```
 
-### Why ANSI256
+### Why TrueColor
 
 | Mode | Colors | Compatibility |
 |------|--------|---------------|
-| TrueColor (24-bit) | 16M | Modern terminals only |
-| ANSI256 (8-bit) | 256 | Wide compatibility |
+| TrueColor (24-bit) | 16M | Modern terminals |
+| ANSI256 (8-bit) | 256 | Wide but palette-dependent |
 | ANSI (4-bit) | 16 | Universal |
 
-ANSI256 was chosen for:
-- Docker container compatibility
-- Consistent SSH session rendering
-- Works in most terminal emulators
+TrueColor was chosen for:
+- Hex colors render identically across all terminals
+- No dependency on terminal's 256-color palette mapping
+- Supported by all modern terminals (Ghostty, iTerm2, Alacritty, etc.)
 
 ---
 
@@ -322,5 +322,5 @@ Minimum required: 115x28
 - `ui/supertui.go` - Minimum size check, window resize handling
 - `ui/common/styles.go` - Color palette definitions
 - `ui/common/layout.go` - Layout constants
-- `middleware/maintui.go` - ANSI256 mode setup
+- `middleware/maintui.go` - TrueColor mode setup
 - `Dockerfile` - `TERM=xterm-256color` configuration

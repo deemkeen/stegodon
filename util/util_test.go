@@ -852,7 +852,7 @@ func TestHighlightHashtagsTerminal_SingleHashtag(t *testing.T) {
 	result := HighlightHashtagsTerminal(input)
 
 	// Check for ANSI color codes
-	if !strings.Contains(result, "\033[38;5;75m#world\033[39m") {
+	if !strings.Contains(result, "\033[38;2;95;175;255m#world\033[39m") {
 		t.Errorf("Expected colored hashtag, got: %s", result)
 	}
 }
@@ -862,10 +862,10 @@ func TestHighlightHashtagsTerminal_MultipleHashtags(t *testing.T) {
 	result := HighlightHashtagsTerminal(input)
 
 	// Check for ANSI color codes for both hashtags
-	if !strings.Contains(result, "\033[38;5;75m#golang\033[39m") {
+	if !strings.Contains(result, "\033[38;2;95;175;255m#golang\033[39m") {
 		t.Errorf("Expected colored #golang, got: %s", result)
 	}
-	if !strings.Contains(result, "\033[38;5;75m#rust\033[39m") {
+	if !strings.Contains(result, "\033[38;2;95;175;255m#rust\033[39m") {
 		t.Errorf("Expected colored #rust, got: %s", result)
 	}
 }
@@ -980,12 +980,12 @@ func TestCountVisibleCharsWithANSI(t *testing.T) {
 	}{
 		{
 			name:  "text with ANSI color code",
-			input: "\033[38;5;75m#joke\033[39m hello",
+			input: "\033[38;2;95;175;255m#joke\033[39m hello",
 			want:  11, // "#joke hello" = 11 visible chars
 		},
 		{
 			name:  "text with multiple ANSI codes",
-			input: "\033[38;5;75m#tag1\033[39m and \033[38;5;75m#tag2\033[39m",
+			input: "\033[38;2;95;175;255m#tag1\033[39m and \033[38;2;95;175;255m#tag2\033[39m",
 			want:  15, // "#tag1 and #tag2" = 15 visible chars
 		},
 		{
@@ -995,7 +995,7 @@ func TestCountVisibleCharsWithANSI(t *testing.T) {
 		},
 		{
 			name:  "mixed ANSI hashtag and OSC 8 link",
-			input: "\033[38;2;0;255;127;4m\033]8;;https://example.com\033\\Link\033]8;;\033\\\033[39;24m \033[38;5;75m#tag\033[39m",
+			input: "\033[38;2;0;255;127;4m\033]8;;https://example.com\033\\Link\033]8;;\033\\\033[39;24m \033[38;2;95;175;255m#tag\033[39m",
 			want:  9, // "Link #tag" = 9 visible chars
 		},
 		{
@@ -1195,7 +1195,7 @@ func TestHighlightMentionsTerminal_SingleMention(t *testing.T) {
 	result := HighlightMentionsTerminal(input, "example.com") // Remote user
 
 	// Check for OSC 8 hyperlink with ANSI color codes
-	// Format: \033[38;5;48;4m\033]8;;URL\033\\TEXT\033]8;;\033\\\033[39;24m
+	// Format: \033[38;2;0;255;135;4m\033]8;;URL\033\\TEXT\033]8;;\033\\\033[39;24m
 	if !strings.Contains(result, "\033]8;;https://mastodon.social/@alice\033\\") {
 		t.Errorf("Expected OSC 8 hyperlink, got: %s", result)
 	}
