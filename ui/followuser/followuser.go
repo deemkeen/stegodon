@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/deemkeen/stegodon/activitypub"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/ui/common"
@@ -37,7 +37,7 @@ func InitialModel(accountId uuid.UUID) Model {
 	ti.Prompt = common.ListSelectedPrefix
 	ti.Focus()
 	ti.CharLimit = 150
-	ti.Width = 60
+	ti.SetWidth(60)
 
 	return Model{
 		TextInput: ti,
@@ -83,7 +83,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		return m, clearStatusAfter(2 * time.Second)
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "enter":
 			// Parse input - can be user@domain format or a URL
@@ -143,7 +143,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	var s strings.Builder
 
 	s.WriteString(common.CaptionStyle.Render("follow remote user"))
@@ -163,7 +163,7 @@ func (m Model) View() string {
 		s.WriteString("\n")
 	}
 
-	return s.String()
+	return tea.NewView(s.String())
 }
 
 // clearStatusMsg is sent after a delay to clear status/error messages

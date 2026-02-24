@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/google/uuid"
 )
 
@@ -59,7 +59,7 @@ func TestUpdate_TermsAcceptanceErrorMsg(t *testing.T) {
 
 func TestUpdate_EscapeKey(t *testing.T) {
 	m := InitialModel(uuid.New())
-	keyMsg := tea.KeyMsg{Type: tea.KeyEscape}
+	keyMsg := tea.KeyPressMsg{Code: tea.KeyEscape}
 
 	newM, cmd := m.Update(keyMsg)
 
@@ -78,7 +78,7 @@ func TestView_ContainsTitle(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "Terms and Conditions") {
+	if !strings.Contains(view.Content, "Terms and Conditions") {
 		t.Error("Expected view to contain 'Terms and Conditions'")
 	}
 }
@@ -89,7 +89,7 @@ func TestView_ContainsContent(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "Test terms content here") {
+	if !strings.Contains(view.Content, "Test terms content here") {
 		t.Error("Expected view to contain the terms content")
 	}
 }
@@ -99,10 +99,10 @@ func TestView_ContainsInstructions(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "ENTER") {
+	if !strings.Contains(view.Content, "ENTER") {
 		t.Error("Expected view to contain ENTER instruction")
 	}
-	if !strings.Contains(view, "ESC") {
+	if !strings.Contains(view.Content, "ESC") {
 		t.Error("Expected view to contain ESC instruction")
 	}
 }
@@ -113,7 +113,7 @@ func TestView_ShowsError(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "Test error message") {
+	if !strings.Contains(view.Content, "Test error message") {
 		t.Error("Expected view to contain error message")
 	}
 }

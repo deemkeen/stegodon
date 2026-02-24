@@ -3,7 +3,7 @@ package ui
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
 	"github.com/deemkeen/stegodon/ui/terms"
@@ -50,7 +50,7 @@ func TestMessageRoutingDoesNotPanic(t *testing.T) {
 	}{
 		{"ActivateViewMsg", common.ActivateViewMsg{}},
 		{"DeactivateViewMsg", common.DeactivateViewMsg{}},
-		{"KeyMsg", tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}},
+		{"KeyPressMsg", tea.KeyPressMsg{Code: 'j', Text: "j"}},
 		{"SessionState", common.UpdateNoteList},
 	}
 
@@ -109,7 +109,7 @@ func TestViewSwitchingDoesNotPanic(t *testing.T) {
 					err = r.(error)
 				}
 			}()
-			teaModel, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'\t'}})
+			teaModel, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 			model = teaModel.(MainModel)
 		}()
 
@@ -343,7 +343,7 @@ func TestAccountSettingsModelUpdatedAfterUsernameChange(t *testing.T) {
 	}
 
 	// Simulate pressing enter on bio step (Step 2) - goes directly to main app
-	updatedModel, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updatedModel, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	mainModel := updatedModel.(MainModel)
 
 	// Verify we're now in CreateNoteView (main app)
@@ -435,7 +435,7 @@ func TestHomeTimelineStaysActiveWhenVisible(t *testing.T) {
 			model.state = tc.oldState
 
 			// Simulate tab navigation to switch state
-			key := tea.KeyMsg{Type: tea.KeyTab}
+			key := tea.KeyPressMsg{Code: tea.KeyTab}
 			updatedModel, cmd := model.Update(key)
 			mainModel := updatedModel.(MainModel)
 
@@ -474,7 +474,7 @@ func TestNotificationsAlwaysActive(t *testing.T) {
 		model.state = view
 
 		// Simulate tab to next view
-		updatedModel, cmd := model.Update(tea.KeyMsg{Type: tea.KeyTab})
+		updatedModel, cmd := model.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 		mainModel := updatedModel.(MainModel)
 
 		// Verify update doesn't panic
@@ -501,7 +501,7 @@ func TestTabNavigationWithTimelineActivation(t *testing.T) {
 	model.state = common.CreateNoteView
 
 	// Tab from CreateNote (timeline visible) to HomeTimeline (timeline visible)
-	updatedModel, _ := model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	updatedModel, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	mainModel := updatedModel.(MainModel)
 
 	if mainModel.state != common.HomeTimelineView {
@@ -509,7 +509,7 @@ func TestTabNavigationWithTimelineActivation(t *testing.T) {
 	}
 
 	// Tab to MyPosts (timeline NOT visible)
-	updatedModel, _ = mainModel.Update(tea.KeyMsg{Type: tea.KeyTab})
+	updatedModel, _ = mainModel.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	mainModel = updatedModel.(MainModel)
 
 	if mainModel.state != common.MyPostsView {
@@ -532,7 +532,7 @@ func TestShiftTabNavigationWithTimelineActivation(t *testing.T) {
 	model.state = common.MyPostsView
 
 	// Shift-Tab from MyPosts (timeline NOT visible) to HomeTimeline (timeline visible)
-	updatedModel, _ := model.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	updatedModel, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
 	mainModel := updatedModel.(MainModel)
 
 	if mainModel.state != common.HomeTimelineView {
@@ -555,7 +555,7 @@ func TestNKeyNavigationToNotifications(t *testing.T) {
 	model.state = common.HomeTimelineView
 
 	// Press 'ctrl+n' to go to notifications (timeline becomes hidden)
-	updatedModel, _ := model.Update(tea.KeyMsg{Type: tea.KeyCtrlN})
+	updatedModel, _ := model.Update(tea.KeyPressMsg{Code: 'n', Mod: tea.ModCtrl})
 	mainModel := updatedModel.(MainModel)
 
 	if mainModel.state != common.NotificationsView {
@@ -581,12 +581,12 @@ func TestActivateDeactivateCycle(t *testing.T) {
 
 	// Go through a cycle: CreateNote -> HomeTimeline -> MyPosts -> back to HomeTimeline
 	transitions := []struct {
-		key      tea.KeyMsg
+		key      tea.KeyPressMsg
 		expected common.SessionState
 	}{
-		{tea.KeyMsg{Type: tea.KeyTab}, common.HomeTimelineView},
-		{tea.KeyMsg{Type: tea.KeyTab}, common.MyPostsView},
-		{tea.KeyMsg{Type: tea.KeyShiftTab}, common.HomeTimelineView},
+		{tea.KeyPressMsg{Code: tea.KeyTab}, common.HomeTimelineView},
+		{tea.KeyPressMsg{Code: tea.KeyTab}, common.MyPostsView},
+		{tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}, common.HomeTimelineView},
 	}
 
 	for i, trans := range transitions {
@@ -719,7 +719,7 @@ func TestTermsAcceptanceViewBlocksTabNavigation(t *testing.T) {
 	model.state = common.TermsAcceptanceView
 
 	// Try to tab away
-	updatedModel, _ := model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	updatedModel, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	mainModel := updatedModel.(MainModel)
 
 	// State should remain TermsAcceptanceView
@@ -728,7 +728,7 @@ func TestTermsAcceptanceViewBlocksTabNavigation(t *testing.T) {
 	}
 
 	// Also test shift+tab
-	updatedModel, _ = mainModel.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	updatedModel, _ = mainModel.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
 	mainModel = updatedModel.(MainModel)
 
 	if mainModel.state != common.TermsAcceptanceView {
@@ -783,7 +783,7 @@ func TestTermsAcceptanceViewRendersTerms(t *testing.T) {
 	view := model.View()
 
 	// The view should be non-empty
-	if len(view) == 0 {
+	if len(view.Content) == 0 {
 		t.Error("Expected non-empty view for TermsAcceptanceView")
 	}
 

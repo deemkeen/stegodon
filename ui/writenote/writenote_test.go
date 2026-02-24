@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/deemkeen/stegodon/ui/common"
 	"github.com/deemkeen/stegodon/util"
 	"github.com/google/uuid"
@@ -17,7 +17,7 @@ func TestEmptyNoteValidation(t *testing.T) {
 	m := InitialNote(100, uuid.New())
 
 	// Test 1: Try to save empty note
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 
 	if m.Error == "" {
 		t.Error("Expected error message when saving empty note")
@@ -27,7 +27,7 @@ func TestEmptyNoteValidation(t *testing.T) {
 	}
 
 	// Test 2: Type something and verify error clears
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
 
 	if m.Error != "" {
 		t.Errorf("Expected error to clear when typing, but still has: '%s'", m.Error)
@@ -42,7 +42,7 @@ func TestEmptyNoteWithWhitespaceValidation(t *testing.T) {
 	m.Textarea.SetValue("   \n\n  \t  ")
 
 	// Try to save (should fail because NormalizeInput will trim to empty)
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 
 	if m.Error == "" {
 		t.Error("Expected error message when saving whitespace-only note")
@@ -61,7 +61,7 @@ func TestValidNoteDoesNotShowError(t *testing.T) {
 
 	// Try to save (should succeed and clear any previous errors)
 	oldValue := m.Textarea.Value()
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 
 	if m.Error != "" {
 		t.Errorf("Expected no error for valid note, got: '%s'", m.Error)
@@ -88,14 +88,14 @@ func TestErrorClearsOnBackspace(t *testing.T) {
 	m := InitialNote(100, uuid.New())
 
 	// Try to save empty note to trigger error
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 
 	if m.Error == "" {
 		t.Fatal("Setup error: expected error from empty save")
 	}
 
 	// Press backspace
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
 
 	if m.Error != "" {
 		t.Errorf("Expected error to clear on backspace, but still has: '%s'", m.Error)
@@ -122,7 +122,7 @@ func TestErrorInEditMode(t *testing.T) {
 	m.Textarea.SetValue("")
 
 	// Try to save empty note in edit mode
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 
 	if m.Error == "" {
 		t.Error("Expected error when saving empty note in edit mode")
@@ -148,7 +148,7 @@ func TestViewShowsError(t *testing.T) {
 	view := m.View()
 
 	// Check that error message appears in view
-	if !strings.Contains(view, "Cannot save an empty note") {
+	if !strings.Contains(view.Content, "Cannot save an empty note") {
 		t.Error("Expected error message to appear in view")
 	}
 }
@@ -161,7 +161,7 @@ func TestViewWithoutError(t *testing.T) {
 	view := m.View()
 
 	// Check that no error styling appears
-	if strings.Contains(view, "Cannot save") {
+	if strings.Contains(view.Content, "Cannot save") {
 		t.Error("Should not show error message when no error exists")
 	}
 }
@@ -214,7 +214,7 @@ func Test1000CharacterValidation(t *testing.T) {
 	m.Textarea.SetValue(longText)
 
 	// Try to save
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 
 	// Should show error
 	if m.Error == "" {
@@ -237,7 +237,7 @@ func Test1000CharacterValidationWithMarkdown(t *testing.T) {
 	m.Textarea.SetValue(testText)
 
 	// Try to save
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 
 	// Should show error because full text > 1000
 	if m.Error == "" {
@@ -254,7 +254,7 @@ func TestURLAutoPasteConversion(t *testing.T) {
 	m.Textarea.SetValue(testURL)
 
 	// Trigger update to process auto-conversion
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 0, Text: ""})
 
 	// Should have been converted to markdown format with "Link" as text
 	value := m.Textarea.Value()
@@ -274,7 +274,7 @@ func TestURLAutoPasteDoesNotConvertPartialText(t *testing.T) {
 	m.Textarea.SetValue(testText)
 
 	// Trigger update
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("")})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 0, Text: ""})
 
 	// Should NOT be auto-converted (not a pure URL paste)
 	value := m.Textarea.Value()
@@ -353,32 +353,32 @@ func TestViewShowsLinkIndicator(t *testing.T) {
 	// Test 1: No links - should not show indicator
 	m.Textarea.SetValue("Just plain text")
 	view := m.View()
-	if strings.Contains(view, "markdown link") {
+	if strings.Contains(view.Content, "markdown link") {
 		t.Error("Should not show link indicator when no links present")
 	}
 
 	// Test 2: Single link - should show indicator with singular
 	m.Textarea.SetValue("[Link](https://example.com)")
 	view = m.View()
-	if !strings.Contains(view, "✓ 1 markdown link detected") {
+	if !strings.Contains(view.Content, "✓ 1 markdown link detected") {
 		t.Error("Should show '1 markdown link detected' for single link")
 	}
-	if strings.Contains(view, "links detected") {
+	if strings.Contains(view.Content, "links detected") {
 		t.Error("Should use singular 'link' not plural 'links' for single link")
 	}
 
 	// Test 3: Multiple links - should show indicator with plural
 	m.Textarea.SetValue("[site1](https://example.com) and [site2](https://test.com)")
 	view = m.View()
-	if !strings.Contains(view, "✓ 2 markdown links detected") {
+	if !strings.Contains(view.Content, "✓ 2 markdown links detected") {
 		t.Error("Should show '2 markdown links detected' for multiple links")
 	}
-	if !strings.Contains(view, "links detected") {
+	if !strings.Contains(view.Content, "links detected") {
 		t.Error("Should use plural 'links' for multiple links")
 	}
 
 	// Test 4: Indicator should appear with green checkmark
-	if !strings.Contains(view, "✓") {
+	if !strings.Contains(view.Content, "✓") {
 		t.Error("Link indicator should contain checkmark symbol")
 	}
 }
@@ -394,16 +394,16 @@ func TestViewLinkIndicatorWithError(t *testing.T) {
 	view := m.View()
 
 	// Both should be present in the view
-	if !strings.Contains(view, "✓ 1 markdown link detected") {
+	if !strings.Contains(view.Content, "✓ 1 markdown link detected") {
 		t.Error("Link indicator should be present even when error exists")
 	}
-	if !strings.Contains(view, "Some error message") {
+	if !strings.Contains(view.Content, "Some error message") {
 		t.Error("Error message should be present")
 	}
 
 	// Link indicator should come before error (based on View() order)
-	linkPos := strings.Index(view, "✓ 1 markdown link")
-	errorPos := strings.Index(view, "Some error message")
+	linkPos := strings.Index(view.Content, "✓ 1 markdown link")
+	errorPos := strings.Index(view.Content, "Some error message")
 	if linkPos > errorPos {
 		t.Error("Link indicator should appear before error message in view")
 	}

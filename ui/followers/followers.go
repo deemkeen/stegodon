@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/deemkeen/stegodon/activitypub"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
@@ -79,7 +79,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		return m, clearStatusAfter(3 * time.Second)
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "up", "k":
 			if m.Selected > 0 {
@@ -146,7 +146,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	var s strings.Builder
 
 	s.WriteString(common.CaptionStyle.Render(fmt.Sprintf("followers (%d)", len(m.Followers))))
@@ -154,7 +154,7 @@ func (m Model) View() string {
 
 	if len(m.Followers) == 0 {
 		s.WriteString(common.ListEmptyStyle.Render("No followers yet. Share your profile to get followers!"))
-		return s.String()
+		return tea.NewView(s.String())
 	}
 
 	start := m.Offset
@@ -215,7 +215,7 @@ func (m Model) View() string {
 		s.WriteString(common.ListErrorStyle.Render(m.Error))
 	}
 
-	return s.String()
+	return tea.NewView(s.String())
 }
 
 // followersLoadedMsg is sent when followers are loaded

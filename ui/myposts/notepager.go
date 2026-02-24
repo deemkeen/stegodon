@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/deemkeen/stegodon/activitypub"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
@@ -109,7 +109,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.Offset = m.Selected
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		// If confirming delete, only handle y/n
 		if m.confirmingDelete {
 			switch msg.String() {
@@ -203,7 +203,7 @@ func max(a, b int) int {
 	return b
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	var s strings.Builder
 
 	s.WriteString(common.CaptionStyle.Render(fmt.Sprintf("my posts (%d notes)", len(m.Notes))))
@@ -287,7 +287,7 @@ func (m Model) View() string {
 		}
 	}
 
-	return s.String()
+	return tea.NewView(s.String())
 }
 
 // notesLoadedMsg is sent when notes are loaded

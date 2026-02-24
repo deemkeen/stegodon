@@ -3,7 +3,7 @@ package followers
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/google/uuid"
 )
@@ -81,25 +81,25 @@ func TestUpdate_KeyboardNavigation(t *testing.T) {
 	model.Selected = 0
 
 	// Test down navigation with 'j'
-	newModel, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	newModel, _ := model.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	if newModel.Selected != 1 {
 		t.Errorf("Expected selected 1 after 'j', got %d", newModel.Selected)
 	}
 
 	// Test up navigation with 'k'
-	newModel, _ = newModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	newModel, _ = newModel.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	if newModel.Selected != 0 {
 		t.Errorf("Expected selected 0 after 'k', got %d", newModel.Selected)
 	}
 
 	// Test down with arrow key
-	newModel, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	newModel, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if newModel.Selected != 1 {
 		t.Errorf("Expected selected 1 after down arrow, got %d", newModel.Selected)
 	}
 
 	// Test up with arrow key
-	newModel, _ = newModel.Update(tea.KeyMsg{Type: tea.KeyUp})
+	newModel, _ = newModel.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if newModel.Selected != 0 {
 		t.Errorf("Expected selected 0 after up arrow, got %d", newModel.Selected)
 	}
@@ -114,7 +114,7 @@ func TestUpdate_SelectionBounds(t *testing.T) {
 	model.Selected = 0
 
 	// Try to go up from 0 (should stay at 0)
-	newModel, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	newModel, _ := model.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	if newModel.Selected != 0 {
 		t.Errorf("Expected selected to stay at 0 when at top")
 	}
@@ -122,7 +122,7 @@ func TestUpdate_SelectionBounds(t *testing.T) {
 	// Go to last item
 	model.Selected = 1
 	// Try to go down from last (should stay at last)
-	newModel, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	newModel, _ = model.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	if newModel.Selected != 1 {
 		t.Errorf("Expected selected to stay at 1 when at bottom")
 	}
@@ -142,7 +142,7 @@ func TestUpdate_FollowBack_LocalFollower(t *testing.T) {
 	model.Selected = 0
 
 	// Press 'f' to follow back
-	newModel, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	newModel, cmd := model.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
 
 	if cmd == nil {
 		t.Fatal("Expected follow command to be returned")
@@ -172,7 +172,7 @@ func TestUpdate_FollowBack_RemoteFollower(t *testing.T) {
 	model.Selected = 0
 
 	// Press 'f' to follow back
-	newModel, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	newModel, cmd := model.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
 
 	if cmd == nil {
 		t.Fatal("Expected follow command to be returned")
@@ -194,7 +194,7 @@ func TestUpdate_FollowBack_EmptyList_NoAction(t *testing.T) {
 	model.Selected = 0
 
 	// Press 'f' when no followers exist
-	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	_, cmd := model.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
 
 	// Should not return a command (no followers to follow back)
 	if cmd != nil {
@@ -216,7 +216,7 @@ func TestUpdate_FollowBack_OutOfBounds_NoAction(t *testing.T) {
 	model.Selected = 5 // Out of bounds
 
 	// Press 'f' when selection is out of bounds
-	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	_, cmd := model.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
 
 	// Should not return a command (selection is invalid)
 	if cmd != nil {
@@ -371,11 +371,11 @@ func TestView_EmptyFollowers(t *testing.T) {
 
 	view := model.View()
 
-	if view == "" {
+	if view.Content == "" {
 		t.Errorf("View should not be empty")
 	}
 	// Should show empty message about no followers
-	if len(model.Followers) == 0 && view == "" {
+	if len(model.Followers) == 0 && view.Content == "" {
 		t.Errorf("Should render something even with no followers")
 	}
 }
@@ -397,7 +397,7 @@ func TestView_WithFollowers(t *testing.T) {
 
 	view := model.View()
 
-	if view == "" {
+	if view.Content == "" {
 		t.Errorf("View should not be empty with followers")
 	}
 }
@@ -415,7 +415,7 @@ func TestView_WithStatusMessage(t *testing.T) {
 
 	view := model.View()
 
-	if view == "" {
+	if view.Content == "" {
 		t.Errorf("View should not be empty")
 	}
 	// Note: We can't easily test if the status is actually rendered
@@ -435,7 +435,7 @@ func TestView_WithErrorMessage(t *testing.T) {
 
 	view := model.View()
 
-	if view == "" {
+	if view.Content == "" {
 		t.Errorf("View should not be empty")
 	}
 	// Note: We can't easily test if the error is actually rendered

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
 	"github.com/google/uuid"
@@ -165,7 +165,7 @@ func TestUpdate_Navigation(t *testing.T) {
 	m.Selected = 0
 
 	// Move down
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	if m.Selected != 1 {
 		t.Errorf("Expected Selected 1 after down, got %d", m.Selected)
 	}
@@ -174,7 +174,7 @@ func TestUpdate_Navigation(t *testing.T) {
 	}
 
 	// Move down again
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.Selected != 2 {
 		t.Errorf("Expected Selected 2 after down, got %d", m.Selected)
 	}
@@ -183,13 +183,13 @@ func TestUpdate_Navigation(t *testing.T) {
 	}
 
 	// Try to move past end
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.Selected != 2 {
 		t.Errorf("Expected Selected 2 (stay at end), got %d", m.Selected)
 	}
 
 	// Move up
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	if m.Selected != 1 {
 		t.Errorf("Expected Selected 1 after up, got %d", m.Selected)
 	}
@@ -198,7 +198,7 @@ func TestUpdate_Navigation(t *testing.T) {
 	}
 
 	// Move up again
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.Selected != 0 {
 		t.Errorf("Expected Selected 0 after up, got %d", m.Selected)
 	}
@@ -207,7 +207,7 @@ func TestUpdate_Navigation(t *testing.T) {
 	}
 
 	// Try to move past start
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.Selected != 0 {
 		t.Errorf("Expected Selected 0 (stay at start), got %d", m.Selected)
 	}
@@ -216,7 +216,7 @@ func TestUpdate_Navigation(t *testing.T) {
 func TestUpdate_EscapeReturnsToLocalUsers(t *testing.T) {
 	m := InitialModel(uuid.New(), 120, 40, "")
 
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	if cmd == nil {
 		t.Fatal("Expected command for escape")
@@ -247,7 +247,7 @@ func TestUpdate_EnterEmitsViewThreadMsg(t *testing.T) {
 	}
 	m.Selected = 0
 
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if cmd == nil {
 		t.Fatal("Expected command for enter")
@@ -289,7 +289,7 @@ func TestUpdate_EnterWithNoObjectURI(t *testing.T) {
 	}
 	m.Selected = 0
 
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if cmd == nil {
 		t.Fatal("Expected command for enter")
@@ -316,7 +316,7 @@ func TestUpdate_EnterWithNoPosts(t *testing.T) {
 	m.Posts = []domain.Note{} // No posts
 	m.Selected = 0
 
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if cmd != nil {
 		t.Error("Expected no command when there are no posts")
@@ -332,7 +332,7 @@ func TestUpdate_FollowToggle(t *testing.T) {
 	m.IsFollowing = false
 
 	// Press f to toggle follow - should return a command
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
 
 	if cmd == nil {
 		t.Error("Expected command for follow toggle")
@@ -343,7 +343,7 @@ func TestUpdate_FollowToggleNoProfile(t *testing.T) {
 	m := InitialModel(uuid.New(), 120, 40, "")
 	m.ProfileUser = nil
 
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
 
 	if cmd != nil {
 		t.Error("Expected no command when profile is nil")
@@ -413,7 +413,7 @@ func TestView_Loading(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "Loading profile") {
+	if !strings.Contains(view.Content, "Loading profile") {
 		t.Error("Expected loading message in view")
 	}
 }
@@ -425,7 +425,7 @@ func TestView_Error(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "user not found") {
+	if !strings.Contains(view.Content, "user not found") {
 		t.Error("Expected error message in view")
 	}
 }
@@ -435,7 +435,7 @@ func TestView_NoProfile(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "No profile to display") {
+	if !strings.Contains(view.Content, "No profile to display") {
 		t.Error("Expected 'No profile to display' message")
 	}
 }
@@ -462,22 +462,22 @@ func TestView_ProfileWithPosts(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "Alice in Wonderland") {
+	if !strings.Contains(view.Content, "Alice in Wonderland") {
 		t.Error("Expected display name in view")
 	}
-	if !strings.Contains(view, "@alice") {
+	if !strings.Contains(view.Content, "@alice") {
 		t.Error("Expected handle in view")
 	}
-	if !strings.Contains(view, "Exploring the fediverse") {
+	if !strings.Contains(view.Content, "Exploring the fediverse") {
 		t.Error("Expected bio in view")
 	}
-	if !strings.Contains(view, "following") {
+	if !strings.Contains(view.Content, "following") {
 		t.Error("Expected follow status in view")
 	}
-	if !strings.Contains(view, "recent posts (1)") {
+	if !strings.Contains(view.Content, "recent posts (1)") {
 		t.Error("Expected recent posts count in view")
 	}
-	if !strings.Contains(view, "A wonderful test post") {
+	if !strings.Contains(view.Content, "A wonderful test post") {
 		t.Error("Expected post content in view")
 	}
 }
@@ -494,10 +494,10 @@ func TestView_ProfileNotFollowing(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "not following") {
+	if !strings.Contains(view.Content, "not following") {
 		t.Error("Expected 'not following' in view")
 	}
-	if !strings.Contains(view, "No posts yet") {
+	if !strings.Contains(view.Content, "No posts yet") {
 		t.Error("Expected 'No posts yet' message")
 	}
 }
@@ -515,7 +515,7 @@ func TestView_DisplayNameFallback(t *testing.T) {
 	view := m.View()
 
 	// Should fall back to username
-	if !strings.Contains(view, "bob") {
+	if !strings.Contains(view.Content, "bob") {
 		t.Error("Expected username as fallback for empty display name")
 	}
 }
@@ -532,7 +532,7 @@ func TestView_StatusMessage(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "Following @alice") {
+	if !strings.Contains(view.Content, "Following @alice") {
 		t.Error("Expected status message in view")
 	}
 }
@@ -549,7 +549,7 @@ func TestView_ErrorMessage(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "Failed to toggle follow") {
+	if !strings.Contains(view.Content, "Failed to toggle follow") {
 		t.Error("Expected error message in view")
 	}
 }

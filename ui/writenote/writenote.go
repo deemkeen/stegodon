@@ -6,10 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/cursor"
-	"github.com/charmbracelet/bubbles/textarea"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/textarea"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/deemkeen/stegodon/activitypub"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
@@ -77,7 +76,6 @@ func InitialNote(contentWidth int, userId uuid.UUID) Model {
 	ti.ShowLineNumbers = false
 	ti.SetWidth(common.TextInputDefaultWidth)
 	ti.SetHeight(10) // Double the default height
-	ti.Cursor.SetMode(cursor.CursorBlink)
 	ti.Focus()
 
 	// Load configuration to get max characters setting
@@ -462,45 +460,45 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.showAutocomplete = false
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		// Clear error when user starts typing
-		if msg.Type == tea.KeyRunes || msg.Type == tea.KeyBackspace {
+		if msg.String() != "ctrl+s" && msg.String() != "ctrl+a" && msg.String() != "ctrl+c" && msg.String() != "esc" {
 			m.Error = ""
 		}
 
 		// Handle autocomplete navigation when popup is visible
 		if m.showAutocomplete {
-			switch msg.Type {
-			case tea.KeyUp:
+			switch msg.String() {
+			case "up":
 				if m.autocompleteIndex > 0 {
 					m.autocompleteIndex--
 				}
 				return m, nil
-			case tea.KeyDown:
+			case "down":
 				if m.autocompleteIndex < len(m.filteredCandidates)-1 {
 					m.autocompleteIndex++
 				}
 				return m, nil
-			case tea.KeyTab, tea.KeyEnter:
+			case "tab", "enter":
 				// Insert selected suggestion
 				if len(m.filteredCandidates) > 0 {
 					m.insertAutocompleteSuggestion()
 				}
 				m.showAutocomplete = false
 				return m, nil
-			case tea.KeyEsc:
+			case "esc":
 				// Close autocomplete
 				m.showAutocomplete = false
 				return m, nil
 			}
 		}
 
-		switch msg.Type {
-		case tea.KeyCtrlA:
+		switch msg.String() {
+		case "ctrl+a":
 			if m.Textarea.Focused() {
 				m.Textarea.Blur()
 			}
-		case tea.KeyCtrlS:
+		case "ctrl+s":
 			rawValue := m.Textarea.Value()
 
 			// Validate that note is not empty (trim whitespace for validation)
@@ -576,9 +574,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				m.Error = ""
 				return m, createNoteModelCmd(&note)
 			}
-		case tea.KeyCtrlC:
+		case "ctrl+c":
 			return m, tea.Quit
-		case tea.KeyEsc:
+		case "esc":
 			// Cancel edit mode or reply mode
 			if m.isEditing {
 				m.isEditing = false
@@ -767,7 +765,7 @@ func (m Model) CharCount() int {
 	return maxLetters - visibleChars
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	styledTextarea := lipgloss.NewStyle().PaddingLeft(5).PaddingRight(5).Render(m.Textarea.View())
 
 	// Show autocomplete popup if active
@@ -857,7 +855,7 @@ func (m Model) View() string {
 				Render(m.serverMessage.Message)
 	}
 
-	return fmt.Sprintf("%s\n\n%s%s%s%s%s\n\n%s%s", caption, replyContext, styledTextarea, autocompletePopup, linkIndicator, errorSection, charsLeft, serverMessageSection)
+	return tea.NewView(fmt.Sprintf("%s\n\n%s%s%s%s%s\n\n%s%s", caption, replyContext, styledTextarea, autocompletePopup, linkIndicator, errorSection, charsLeft, serverMessageSection))
 }
 
 // renderAutocompletePopup renders the autocomplete suggestion list

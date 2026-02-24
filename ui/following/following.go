@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/deemkeen/stegodon/activitypub"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
@@ -56,7 +56,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.Error = ""
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "up", "k":
 			if m.Selected > 0 {
@@ -192,7 +192,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	var s strings.Builder
 
 	s.WriteString(common.CaptionStyle.Render(fmt.Sprintf("following (%d)", len(m.Following))))
@@ -200,7 +200,7 @@ func (m Model) View() string {
 
 	if len(m.Following) == 0 {
 		s.WriteString(common.ListEmptyStyle.Render("You're not following anyone yet.\nUse the follow user view to start following!"))
-		return s.String()
+		return tea.NewView(s.String())
 	}
 
 	start := m.Offset
@@ -269,7 +269,7 @@ func (m Model) View() string {
 		s.WriteString("\n")
 	}
 
-	return s.String()
+	return tea.NewView(s.String())
 }
 
 // followingLoadedMsg is sent when following list is loaded

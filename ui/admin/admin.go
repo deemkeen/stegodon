@@ -8,9 +8,8 @@ import (
 
 	"log"
 
-	"github.com/charmbracelet/bubbles/cursor"
-	"github.com/charmbracelet/bubbles/textarea"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/textarea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
@@ -103,7 +102,6 @@ func createTextarea(placeholder string, maxHeight int) textarea.Model {
 	t.ShowLineNumbers = false
 	t.SetWidth(50)
 	t.SetHeight(maxHeight)
-	t.Cursor.SetMode(cursor.CursorBlink)
 	return t
 }
 
@@ -470,7 +468,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		// Reload both users and bans lists to reflect the change
 		return m, tea.Batch(loadUsers(), loadBans())
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		m.Status = ""
 		m.Error = ""
 
@@ -509,7 +507,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 		if isFocused {
 			// Block enter key in single-line fields
-			if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "enter" {
+			if keyMsg, ok := msg.(tea.KeyPressMsg); ok && keyMsg.String() == "enter" {
 				if m.EditField == 0 || m.EditField == 2 {
 					// Don't pass enter to title or order textareas
 					return m, nil
@@ -537,7 +535,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleMenuKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) handleMenuKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "k":
 		if m.MenuSelected > 0 {
@@ -566,7 +564,7 @@ func (m Model) handleMenuKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleUsersKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) handleUsersKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		// Go back to menu
@@ -633,7 +631,7 @@ func (m Model) handleUsersKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleInfoBoxesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) handleInfoBoxesKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	// Handle delete confirmation
 	if m.ConfirmDelete {
 		switch msg.String() {
@@ -704,7 +702,7 @@ func (m Model) handleInfoBoxesKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleServerMessageKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) handleServerMessageKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if m.EditingServerMsg {
 		// Handle editing mode
 		switch msg.String() {
@@ -762,7 +760,7 @@ func (m Model) handleServerMessageKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleBansKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) handleBansKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.CurrentView = MenuView
@@ -794,7 +792,7 @@ func (m Model) handleBansKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleEditingKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) handleEditingKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	// Check if any textarea is focused
 	isFocused := m.TitleInput.Focused() || m.ContentInput.Focused() || m.OrderInput.Focused()
 
@@ -909,7 +907,7 @@ func (m *Model) focusCurrentField() {
 	}
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	var s strings.Builder
 
 	s.WriteString(common.CaptionStyle.Render("admin panel"))
@@ -954,10 +952,10 @@ func (m Model) View() string {
 		s.WriteString(common.ListErrorStyle.Render("Error: " + m.Error))
 	}
 
-	return s.String()
+	return tea.NewView(s.String())
 }
 
-func (m Model) handleTermsAndConditionsKeys(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) handleTermsAndConditionsKeys(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	if m.EditingTerms {
 		// Handle editing mode
 		switch msg.String() {

@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
@@ -562,7 +562,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "up", "k":
 			if m.Selected > -1 {
@@ -757,7 +757,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	var s strings.Builder
 
 	// Header
@@ -771,21 +771,21 @@ func (m Model) View() string {
 
 	if m.loading {
 		s.WriteString(m.spinner.View() + " Loading thread...")
-		return s.String()
+		return tea.NewView(s.String())
 	}
 
 	if m.errorMessage != "" {
 		s.WriteString(emptyStyle.Render("Error: " + m.errorMessage))
 		s.WriteString("\n\n")
 		s.WriteString(common.HelpStyle.Render("esc: back"))
-		return s.String()
+		return tea.NewView(s.String())
 	}
 
 	if m.ParentPost == nil {
 		s.WriteString(emptyStyle.Render("No thread to display"))
 		s.WriteString("\n\n")
 		s.WriteString(common.HelpStyle.Render("esc: back"))
-		return s.String()
+		return tea.NewView(s.String())
 	}
 
 	// Calculate content width using layout helpers (same as home timeline)
@@ -916,7 +916,7 @@ func (m Model) View() string {
 		s.WriteString("\n\n")
 	}
 
-	return s.String()
+	return tea.NewView(s.String())
 }
 
 func min(a, b int) int {

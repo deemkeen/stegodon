@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
 	"github.com/google/uuid"
@@ -137,25 +137,25 @@ func TestUpdate_KeyboardNavigation(t *testing.T) {
 	model.Selected = 0
 
 	// Test down navigation
-	newModel, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	newModel, _ := model.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	if newModel.Selected != 1 {
 		t.Errorf("Expected selected 1 after 'j', got %d", newModel.Selected)
 	}
 
 	// Test up navigation
-	newModel, _ = newModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	newModel, _ = newModel.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	if newModel.Selected != 0 {
 		t.Errorf("Expected selected 0 after 'k', got %d", newModel.Selected)
 	}
 
 	// Test down with arrow key
-	newModel, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	newModel, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if newModel.Selected != 1 {
 		t.Errorf("Expected selected 1 after down arrow, got %d", newModel.Selected)
 	}
 
 	// Test up with arrow key
-	newModel, _ = newModel.Update(tea.KeyMsg{Type: tea.KeyUp})
+	newModel, _ = newModel.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if newModel.Selected != 0 {
 		t.Errorf("Expected selected 0 after up arrow, got %d", newModel.Selected)
 	}
@@ -172,7 +172,7 @@ func TestUpdate_SelectionBounds(t *testing.T) {
 	model.Selected = 0
 
 	// Try to go up from 0 (should stay at 0)
-	newModel, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	newModel, _ := model.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	if newModel.Selected != 0 {
 		t.Errorf("Expected selected to stay at 0 when at top")
 	}
@@ -180,7 +180,7 @@ func TestUpdate_SelectionBounds(t *testing.T) {
 	// Go to last item
 	model.Selected = 1
 	// Try to go down from last (should stay at last)
-	newModel, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	newModel, _ = model.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	if newModel.Selected != 1 {
 		t.Errorf("Expected selected to stay at 1 when at bottom")
 	}
@@ -192,11 +192,11 @@ func TestView_EmptyNotifications(t *testing.T) {
 
 	view := model.View()
 
-	if view == "" {
+	if view.Content == "" {
 		t.Errorf("View should not be empty")
 	}
 	// Should show empty message
-	if len(model.Notifications) == 0 && view == "" {
+	if len(model.Notifications) == 0 && view.Content == "" {
 		t.Errorf("Should render something even with no notifications")
 	}
 }
@@ -217,7 +217,7 @@ func TestView_WithNotifications(t *testing.T) {
 
 	view := model.View()
 
-	if view == "" {
+	if view.Content == "" {
 		t.Errorf("View should not be empty with notifications")
 	}
 }
@@ -245,7 +245,7 @@ func TestUpdate_ViewNotification_WithLocalNote(t *testing.T) {
 	model.Selected = 0
 
 	// Press 'v' to view the notification
-	newModel, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+	newModel, cmd := model.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
 
 	if cmd == nil {
 		t.Fatal("Expected ViewThreadMsg command to be returned")
@@ -308,7 +308,7 @@ func TestUpdate_ViewNotification_WithRemoteNote(t *testing.T) {
 	model.Selected = 0
 
 	// Press 'v' to view the notification
-	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+	_, cmd := model.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
 
 	if cmd == nil {
 		t.Fatal("Expected ViewThreadMsg command to be returned")
@@ -354,7 +354,7 @@ func TestUpdate_ViewNotification_FollowType_NoAction(t *testing.T) {
 	model.Selected = 0
 
 	// Press 'v' on a follow notification
-	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+	_, cmd := model.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
 
 	// Should not return a command (follow notifications don't have notes)
 	if cmd != nil {
@@ -368,7 +368,7 @@ func TestUpdate_ViewNotification_EmptyList_NoAction(t *testing.T) {
 	model.Selected = 0
 
 	// Press 'v' when no notifications exist
-	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+	_, cmd := model.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
 
 	// Should not return a command (no notifications to view)
 	if cmd != nil {
@@ -396,7 +396,7 @@ func TestUpdate_FollowBack_LocalUser(t *testing.T) {
 	model.Selected = 0
 
 	// Press 'f' to follow back
-	newModel, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	newModel, cmd := model.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
 
 	if cmd == nil {
 		t.Fatal("Expected follow command to be returned")
@@ -436,7 +436,7 @@ func TestUpdate_FollowBack_RemoteUser(t *testing.T) {
 	model.Selected = 0
 
 	// Press 'f' to follow back
-	newModel, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	newModel, cmd := model.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
 
 	if cmd == nil {
 		t.Fatal("Expected follow command to be returned")
@@ -458,7 +458,7 @@ func TestUpdate_FollowBack_EmptyList_NoAction(t *testing.T) {
 	model.Selected = 0
 
 	// Press 'f' when no notifications exist
-	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	_, cmd := model.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
 
 	// Should not return a command (no notifications to follow)
 	if cmd != nil {
@@ -486,7 +486,7 @@ func TestUpdate_FollowBack_OutOfBounds_NoAction(t *testing.T) {
 	model.Selected = 5 // Out of bounds
 
 	// Press 'f' when selection is out of bounds
-	_, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	_, cmd := model.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
 
 	// Should not return a command (selection is invalid)
 	if cmd != nil {
@@ -516,7 +516,7 @@ func TestUpdate_FollowBack_NonFollowNotification(t *testing.T) {
 	model.Selected = 0
 
 	// Press 'f' on a like notification
-	newModel, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	newModel, cmd := model.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
 
 	// Should still allow following (f works on any notification)
 	if cmd == nil {

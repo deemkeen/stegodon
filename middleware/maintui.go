@@ -1,49 +1,79 @@
 package middleware
 
 import (
+	"context"
 	"log"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
-	bm "github.com/charmbracelet/wish/bubbletea"
 	"github.com/deemkeen/stegodon/cli"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui"
 	"github.com/deemkeen/stegodon/util"
 	"github.com/google/uuid"
-	"github.com/muesli/termenv"
 )
 
 func MainTui() wish.Middleware {
-	teaHandler := func(s ssh.Session) *tea.Program {
-		// Check for CLI command first (non-interactive mode)
-		if cmd := s.Command(); len(cmd) > 0 {
-			handleCLI(s, cmd)
-			return nil // Don't start TUI
+	return func(next ssh.Handler) ssh.Handler {
+		return func(s ssh.Session) {
+			// Check for CLI command first (non-interactive mode)
+			if cmd := s.Command(); len(cmd) > 0 {
+				handleCLI(s, cmd)
+				next(s)
+				return
+			}
+
+			pty, windowChanges, active := s.Pty()
+			if !active {
+				wish.Println(s, "no active terminal, skipping")
+				next(s)
+				return
+			}
+
+			err, acc := db.GetDB().ReadAccBySession(s)
+			if err != nil {
+				log.Println("Could not retrieve the user:", err)
+				next(s)
+				return
+			}
+
+			m := ui.NewModel(*acc, pty.Window.Width, pty.Window.Height)
+			in, out := ptyIO(s)
+			p := tea.NewProgram(m,
+				tea.WithFPS(60),
+				tea.WithInput(in),
+				tea.WithOutput(out),
+				tea.WithEnvironment(s.Environ()),
+				tea.WithColorProfile(colorprofile.TrueColor),
+				tea.WithWindowSize(pty.Window.Width, pty.Window.Height),
+			)
+
+			// Forward window resize events to the tea.Program
+			ctx, cancel := context.WithCancel(s.Context())
+			go func() {
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case w := <-windowChanges:
+						if p != nil {
+							p.Send(tea.WindowSizeMsg{Width: w.Width, Height: w.Height})
+						}
+					}
+				}
+			}()
+
+			if _, err := p.Run(); err != nil {
+				log.Printf("TUI program error: %v", err)
+			}
+			p.Kill()
+			cancel()
+			next(s)
 		}
-
-		pty, _, active := s.Pty()
-		if !active {
-			wish.Println(s, "no active terminal, skipping")
-			return nil
-		}
-
-		err, acc := db.GetDB().ReadAccBySession(s)
-		if err != nil {
-			log.Println("Could not retrieve the user:", err)
-			return nil
-		}
-
-		// Set the global color profile to TrueColor (24-bit) for accurate hex color rendering
-		lipgloss.SetColorProfile(termenv.TrueColor)
-
-		m := ui.NewModel(*acc, pty.Window.Width, pty.Window.Height)
-		return tea.NewProgram(m, tea.WithFPS(60), tea.WithInput(s), tea.WithOutput(s), tea.WithAltScreen())
 	}
-	return bm.MiddlewareWithProgramHandler(teaHandler, termenv.TrueColor)
 }
 
 // handleCLI processes CLI commands in non-interactive mode

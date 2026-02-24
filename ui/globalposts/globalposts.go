@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
@@ -181,7 +181,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.engagementBoosters = msg.boosters
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "up", "k":
 			if m.Selected > 0 {
@@ -354,7 +354,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	var s strings.Builder
 
 	s.WriteString(common.CaptionStyle.Render(fmt.Sprintf("global (%d posts)", len(m.Posts))))
@@ -530,7 +530,7 @@ func (m Model) View() string {
 		}
 	}
 
-	return s.String()
+	return tea.NewView(s.String())
 }
 
 // processGlobalPostContent applies the full text processing pipeline for terminal display.

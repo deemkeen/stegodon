@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/deemkeen/stegodon/ui/common"
 	"github.com/deemkeen/stegodon/util"
 	"github.com/google/uuid"
@@ -180,38 +180,38 @@ func TestUpdate_Navigation(t *testing.T) {
 	m.Selected = -1 // Start at parent
 
 	// Move down to first reply
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	if m.Selected != 0 {
 		t.Errorf("Expected Selected 0 after down, got %d", m.Selected)
 	}
 
 	// Move down to second reply
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.Selected != 1 {
 		t.Errorf("Expected Selected 1 after down, got %d", m.Selected)
 	}
 
 	// Move up back to first reply
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	if m.Selected != 0 {
 		t.Errorf("Expected Selected 0 after up, got %d", m.Selected)
 	}
 
 	// Move up to parent
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.Selected != -1 {
 		t.Errorf("Expected Selected -1 (parent) after up, got %d", m.Selected)
 	}
 
 	// Try to move up from parent (should stay at parent)
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.Selected != -1 {
 		t.Errorf("Expected Selected -1 (stay at parent), got %d", m.Selected)
 	}
 
 	// Move to last reply
 	m.Selected = 2
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.Selected != 2 {
 		t.Errorf("Expected Selected 2 (stay at last), got %d", m.Selected)
 	}
@@ -229,7 +229,7 @@ func TestUpdate_ReplyToParent(t *testing.T) {
 	}
 	m.Selected = -1 // Parent selected
 
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
 
 	if cmd == nil {
 		t.Fatal("Expected command for reply")
@@ -261,7 +261,7 @@ func TestUpdate_ReplyToDeletedParent(t *testing.T) {
 	m.Selected = -1 // Parent selected
 
 	// Try to reply to deleted parent - should not produce a command
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
 
 	if cmd != nil {
 		t.Error("Expected no command for reply to deleted parent")
@@ -287,7 +287,7 @@ func TestUpdate_ReplyToReply(t *testing.T) {
 	}
 	m.Selected = 0 // First reply selected
 
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
 
 	if cmd == nil {
 		t.Fatal("Expected command for reply to reply")
@@ -317,7 +317,7 @@ func TestUpdate_ReplyToLocalNoteWithoutObjectURI(t *testing.T) {
 	}
 	m.Selected = -1
 
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
 
 	if cmd == nil {
 		t.Fatal("Expected command for reply")
@@ -356,7 +356,7 @@ func TestUpdate_EnterOnReplyWithReplies(t *testing.T) {
 	}
 	m.Selected = 0
 
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if cmd == nil {
 		t.Fatal("Expected command for thread navigation")
@@ -396,7 +396,7 @@ func TestUpdate_EnterOnReplyWithNoReplies(t *testing.T) {
 	}
 	m.Selected = 0
 
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if cmd != nil {
 		t.Error("Expected no command for reply without sub-replies")
@@ -407,7 +407,7 @@ func TestUpdate_EscapeGoesBack(t *testing.T) {
 	m := InitialModel(uuid.New(), 120, 40, "")
 
 	// Default ReturnView is HomeTimelineView
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	if cmd == nil {
 		t.Fatal("Expected command for escape")
@@ -423,7 +423,7 @@ func TestUpdate_EscapeReturnsToProfileView(t *testing.T) {
 	m := InitialModel(uuid.New(), 120, 40, "")
 	m.ReturnView = common.ProfileView
 
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	if cmd == nil {
 		t.Fatal("Expected command for escape")
@@ -539,7 +539,7 @@ func TestView_Loading(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "Loading thread") {
+	if !strings.Contains(view.Content, "Loading thread") {
 		t.Error("Expected loading message in view")
 	}
 }
@@ -550,7 +550,7 @@ func TestView_Error(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "Error: post not found") {
+	if !strings.Contains(view.Content, "Error: post not found") {
 		t.Error("Expected error message in view")
 	}
 }
@@ -561,7 +561,7 @@ func TestView_NoThread(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "No thread to display") {
+	if !strings.Contains(view.Content, "No thread to display") {
 		t.Error("Expected 'No thread to display' message")
 	}
 }
@@ -581,7 +581,7 @@ func TestView_SingularReply(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "1 reply)") {
+	if !strings.Contains(view.Content, "1 reply)") {
 		t.Error("Expected singular '1 reply' in header")
 	}
 }
@@ -602,7 +602,7 @@ func TestView_PluralReplies(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "2 replies)") {
+	if !strings.Contains(view.Content, "2 replies)") {
 		t.Error("Expected plural '2 replies' in header")
 	}
 }
@@ -638,8 +638,11 @@ func TestThreadPost_Fields(t *testing.T) {
 }
 
 // Helper to create key messages
-func keyMsg(key string) tea.KeyMsg {
-	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)}
+func keyMsg(key string) tea.KeyPressMsg {
+	if len(key) > 0 {
+		return tea.KeyPressMsg{Code: rune(key[0]), Text: key}
+	}
+	return tea.KeyPressMsg{}
 }
 
 func TestView_ReplyIndentConsistency(t *testing.T) {
@@ -673,7 +676,7 @@ func TestView_ReplyIndentConsistency(t *testing.T) {
 	indentStr := "    "
 
 	// Find the reply section - look for the reply author
-	lines := strings.Split(view, "\n")
+	lines := strings.Split(view.Content, "\n")
 	foundReplyAuthor := false
 	replyLineIndices := []int{}
 
@@ -720,7 +723,7 @@ func TestView_ParentNotIndented(t *testing.T) {
 	m.Offset = -1
 
 	view := m.View()
-	lines := strings.Split(view, "\n")
+	lines := strings.Split(view.Content, "\n")
 
 	// Find the parent author line
 	for _, line := range lines {
@@ -766,12 +769,12 @@ func TestView_ReplyIndentAdaptiveWidth(t *testing.T) {
 			view := m.View()
 
 			// View should render without panic
-			if len(view) == 0 {
+			if len(view.Content) == 0 {
 				t.Error("View should not be empty")
 			}
 
 			// Should contain the reply
-			if !strings.Contains(view, "replier") {
+			if !strings.Contains(view.Content, "replier") {
 				t.Error("View should contain reply author")
 			}
 		})

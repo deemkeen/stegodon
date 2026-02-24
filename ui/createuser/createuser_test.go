@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func TestInitialModel(t *testing.T) {
@@ -40,7 +40,7 @@ func TestUsernameValidation_ValidCharacters(t *testing.T) {
 			model.TextInput.SetValue(username)
 
 			// Simulate pressing enter
-			newModel, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+			newModel, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 			// Should progress to step 1 (display name)
 			if newModel.Step != 1 {
@@ -75,7 +75,7 @@ func TestUsernameValidation_InvalidCharacters(t *testing.T) {
 			model.TextInput.SetValue(test.username)
 
 			// Simulate pressing enter
-			newModel, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+			newModel, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 			// Should stay at step 0
 			if newModel.Step != 0 {
@@ -100,7 +100,7 @@ func TestUsernameValidation_ClearErrorOnTyping(t *testing.T) {
 	model.Error = "Some error"
 
 	// Simulate typing
-	newModel, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	newModel, _ := model.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
 
 	if newModel.Error != "" {
 		t.Errorf("Expected error to be cleared on typing, got '%s'", newModel.Error)
@@ -112,7 +112,7 @@ func TestUsernameValidation_ClearErrorOnBackspace(t *testing.T) {
 	model.Error = "Some error"
 
 	// Simulate backspace
-	newModel, _ := model.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	newModel, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
 
 	if newModel.Error != "" {
 		t.Errorf("Expected error to be cleared on backspace, got '%s'", newModel.Error)
@@ -126,7 +126,7 @@ func TestDisplayNameStep(t *testing.T) {
 	model.DisplayName.Focus()
 
 	// Simulate pressing enter
-	newModel, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	newModel, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	// Should progress to step 2 (bio)
 	if newModel.Step != 2 {
@@ -141,7 +141,7 @@ func TestBioStep(t *testing.T) {
 
 	// At step 2, pressing enter should be handled by parent (supertui)
 	// The model itself doesn't change
-	newModel, _ := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	newModel, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	// Step should remain 2
 	if newModel.Step != 2 {
@@ -153,11 +153,11 @@ func TestView_Step0(t *testing.T) {
 	model := InitialModel()
 	view := model.View()
 
-	if !strings.Contains(view, "choose wisely") {
+	if !strings.Contains(view.Content, "choose wisely") {
 		t.Error("Step 0 view should contain prompt")
 	}
 
-	if !strings.Contains(view, "enter to continue") {
+	if !strings.Contains(view.Content, "enter to continue") {
 		t.Error("Step 0 view should contain help text")
 	}
 }
@@ -168,11 +168,11 @@ func TestView_Step1(t *testing.T) {
 	model.TextInput.SetValue("alice")
 	view := model.View()
 
-	if !strings.Contains(view, "Username: alice") {
+	if !strings.Contains(view.Content, "Username: alice") {
 		t.Error("Step 1 view should show username")
 	}
 
-	if !strings.Contains(view, "display name") {
+	if !strings.Contains(view.Content, "display name") {
 		t.Error("Step 1 view should mention display name")
 	}
 }
@@ -184,15 +184,15 @@ func TestView_Step2(t *testing.T) {
 	model.DisplayName.SetValue("Alice Test")
 	view := model.View()
 
-	if !strings.Contains(view, "Username: alice") {
+	if !strings.Contains(view.Content, "Username: alice") {
 		t.Error("Step 2 view should show username")
 	}
 
-	if !strings.Contains(view, "Display name: Alice Test") {
+	if !strings.Contains(view.Content, "Display name: Alice Test") {
 		t.Error("Step 2 view should show display name")
 	}
 
-	if !strings.Contains(view, "bio") {
+	if !strings.Contains(view.Content, "bio") {
 		t.Error("Step 2 view should mention bio")
 	}
 }
@@ -202,7 +202,7 @@ func TestView_WithError(t *testing.T) {
 	model.Error = "Test error message"
 	view := model.View()
 
-	if !strings.Contains(view, "Test error message") {
+	if !strings.Contains(view.Content, "Test error message") {
 		t.Error("View should display error message")
 	}
 }

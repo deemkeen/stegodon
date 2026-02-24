@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
@@ -57,7 +57,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.Error = ""
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		// Get the list of other users (excluding self)
 		otherUsers := m.getOtherUsers()
 
@@ -156,7 +156,7 @@ func (m Model) getOtherUsers() []domain.Account {
 	return others
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	var s strings.Builder
 
 	s.WriteString(common.CaptionStyle.Render(fmt.Sprintf("local users (%d)", len(m.Users))))
@@ -164,7 +164,7 @@ func (m Model) View() string {
 
 	if len(m.Users) == 0 {
 		s.WriteString(common.ListEmptyStyle.Render("No local users found."))
-		return s.String()
+		return tea.NewView(s.String())
 	}
 
 	// Show current user first (not selectable)
@@ -182,7 +182,7 @@ func (m Model) View() string {
 
 	if len(otherUsers) == 0 {
 		s.WriteString(common.ListEmptyStyle.Render("No other local users yet."))
-		return s.String()
+		return tea.NewView(s.String())
 	}
 
 	start := m.Offset
@@ -228,7 +228,7 @@ func (m Model) View() string {
 		s.WriteString("\n")
 	}
 
-	return s.String()
+	return tea.NewView(s.String())
 }
 
 // usersLoadedMsg is sent when users are loaded
