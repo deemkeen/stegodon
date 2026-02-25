@@ -2,7 +2,9 @@ package middleware
 
 import (
 	"context"
+	"io"
 	"log"
+	"sync"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/colorprofile"
@@ -15,6 +17,39 @@ import (
 	"github.com/deemkeen/stegodon/util"
 	"github.com/google/uuid"
 )
+
+// repaintWriter wraps an io.Writer to completely replace the cursed renderer's
+// differential cell output with a full-repaint of the view content.
+// This works around bubbletea v2's cursed renderer producing artifacts
+// over SSH due to incorrect differential cell updates.
+// See: https://github.com/charmbracelet/wish/pull/392
+type repaintWriter struct {
+	w     io.Writer
+	store *ui.ViewStore
+	once  sync.Once
+}
+
+func (rw *repaintWriter) Write(p []byte) (n int, err error) {
+	// Enter alt screen + hide cursor on first write, then never forward
+	// the cursed renderer's differential output again.
+	rw.once.Do(func() {
+		rw.w.Write([]byte("\033[?1049h")) // enter alt screen
+		rw.w.Write([]byte("\033[?25l"))   // hide cursor
+	})
+
+	content := rw.store.Load()
+	if len(content) > 0 {
+		// Synchronized output prevents tearing during the repaint.
+		rw.w.Write([]byte("\033[?2026h"))   // begin synchronized output
+		rw.w.Write([]byte("\033[H\033[2J")) // cursor home + erase screen
+		rw.w.Write([]byte(content))         // full view repaint
+		rw.w.Write([]byte("\033[?2026l"))   // end synchronized output
+	}
+
+	// Report full length consumed so bubbletea doesn't retry.
+	n = len(p)
+	return
+}
 
 func MainTui() wish.Middleware {
 	return func(next ssh.Handler) ssh.Handler {
@@ -41,11 +76,14 @@ func MainTui() wish.Middleware {
 			}
 
 			m := ui.NewModel(*acc, pty.Window.Width, pty.Window.Height)
+			viewStore := &ui.ViewStore{}
+			m.ViewContent = viewStore
 			in, out := ptyIO(s)
+			rw := &repaintWriter{w: out, store: viewStore}
 			p := tea.NewProgram(m,
-				tea.WithFPS(60),
+				tea.WithFPS(30),
 				tea.WithInput(in),
-				tea.WithOutput(out),
+				tea.WithOutput(rw),
 				tea.WithEnvironment(s.Environ()),
 				tea.WithColorProfile(colorprofile.TrueColor),
 				tea.WithWindowSize(pty.Window.Width, pty.Window.Height),
@@ -70,6 +108,9 @@ func MainTui() wish.Middleware {
 				log.Printf("TUI program error: %v", err)
 			}
 			p.Kill()
+			// Restore terminal: show cursor + leave alt screen
+			rw.w.Write([]byte("\033[?25h"))   // show cursor
+			rw.w.Write([]byte("\033[?1049l")) // leave alt screen
 			cancel()
 			next(s)
 		}
