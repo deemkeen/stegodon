@@ -75,7 +75,7 @@ Both servers support graceful shutdown on SIGTERM/SIGINT.
 
 ### TUI Architecture
 
-Built with [bubbletea](https://github.com/charmbracelet/bubbletea) MVC pattern. Main orchestrator in `ui/supertui.go`.
+Built with [bubbletea v2](https://charm.land/bubbletea/v2) MVC pattern. Main orchestrator in `ui/supertui.go`.
 
 **Views:**
 - `createuser` - First-time username selection

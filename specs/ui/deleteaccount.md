@@ -172,7 +172,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
         }
         return m, nil
 
-    case tea.KeyMsg:
+    case tea.KeyPressMsg:
         switch msg.String() {
         case "y", "Y":
             if m.ConfirmStep == 0 {
@@ -283,7 +283,7 @@ type deleteAccountResultMsg struct {
 ## View Rendering
 
 ```go
-func (m Model) View() string {
+func (m Model) View() tea.View {
     var s strings.Builder
 
     s.WriteString(common.CaptionStyle.Render("delete account"))

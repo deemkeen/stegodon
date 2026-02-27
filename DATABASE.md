@@ -419,6 +419,8 @@ idx_posts_fts_lookup_rowid ON posts_fts_lookup(fts_rowid)
 | notes | idx_notes_created_at | created_at DESC |
 | notes | idx_notes_object_uri | object_uri |
 | notes | idx_notes_in_reply_to_uri | in_reply_to_uri |
+| notes | idx_notes_user_created | user_id, created_at DESC |
+| notes | idx_notes_timeline | in_reply_to_uri, created_at DESC |
 | follows | idx_follows_account_id | account_id |
 | follows | idx_follows_target_account_id | target_account_id |
 | follows | idx_follows_uri | uri |
@@ -431,6 +433,10 @@ idx_posts_fts_lookup_rowid ON posts_fts_lookup(fts_rowid)
 | activities | idx_activities_object_uri | object_uri |
 | activities | idx_activities_from_relay | from_relay |
 | activities | idx_activities_in_reply_to | in_reply_to |
+| activities | idx_activities_actor_uri | actor_uri |
+| activities | idx_activities_relay_timeline | from_relay, activity_type, local, created_at DESC (partial) |
+| activities | idx_activities_remote_timeline | activity_type, local, actor_uri, created_at DESC (partial) |
+| activities | idx_activities_global_timeline | activity_type, local, in_reply_to, created_at DESC (partial) |
 | likes | idx_likes_note_id | note_id |
 | likes | idx_likes_account_id | account_id |
 | likes | idx_likes_object_uri | object_uri |

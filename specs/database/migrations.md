@@ -99,7 +99,13 @@ if _, err := tx.Exec(sqlCreateFollowsIndices); err != nil {
 | `activities` | `idx_activities_created_at` | Timeline ordering |
 | `activities` | `idx_activities_object_uri` | Deduplication |
 | `activities` | `idx_activities_from_relay` | Relay content filtering |
+| `activities` | `idx_activities_actor_uri` | Actor URI lookups |
+| `activities` | `idx_activities_relay_timeline` | Relay timeline queries (composite, partial) |
+| `activities` | `idx_activities_remote_timeline` | Remote followed timeline queries (composite, partial) |
+| `activities` | `idx_activities_global_timeline` | Global timeline queries (composite, partial) |
 | `notes` | `idx_notes_in_reply_to_uri` | Thread queries |
+| `notes` | `idx_notes_user_created` | Per-user timeline ordering |
+| `notes` | `idx_notes_timeline` | Timeline queries (non-reply + time) |
 | `follows` | `idx_follows_account_id` | Follower lookups |
 | `delivery_queue` | `idx_delivery_queue_next_retry` | Queue processing |
 
@@ -328,12 +334,26 @@ Additional performance indices added post-migration:
 
 ```go
 func (db *DB) MigratePerformanceIndexes() error {
-    db.db.Exec(`CREATE INDEX IF NOT EXISTS idx_notes_in_reply_to_uri
-                ON notes(in_reply_to_uri)`)
-    db.db.Exec(`CREATE INDEX IF NOT EXISTS idx_activities_object_uri
-                ON activities(object_uri)`)
-    db.db.Exec(`CREATE INDEX IF NOT EXISTS idx_activities_from_relay
-                ON activities(from_relay)`)
+    // Single-column indexes
+    db.db.Exec(`CREATE INDEX IF NOT EXISTS idx_notes_in_reply_to_uri ON notes(in_reply_to_uri)`)
+    db.db.Exec(`CREATE INDEX IF NOT EXISTS idx_activities_object_uri ON activities(object_uri)`)
+    db.db.Exec(`CREATE INDEX IF NOT EXISTS idx_activities_from_relay ON activities(from_relay)`)
+    db.db.Exec(`CREATE INDEX IF NOT EXISTS idx_activities_actor_uri ON activities(actor_uri)`)
+
+    // Composite indexes for timeline queries (eliminate full table scans + temp B-tree sorts)
+    db.db.Exec(`CREATE INDEX IF NOT EXISTS idx_activities_relay_timeline
+                ON activities(from_relay, activity_type, local, created_at DESC)
+                WHERE from_relay = 1 AND activity_type = 'Create' AND local = 0`)
+    db.db.Exec(`CREATE INDEX IF NOT EXISTS idx_activities_remote_timeline
+                ON activities(activity_type, local, actor_uri, created_at DESC)
+                WHERE activity_type = 'Create' AND local = 0`)
+    db.db.Exec(`CREATE INDEX IF NOT EXISTS idx_activities_global_timeline
+                ON activities(activity_type, local, in_reply_to, created_at DESC)
+                WHERE activity_type = 'Create' AND local = 0`)
+    db.db.Exec(`CREATE INDEX IF NOT EXISTS idx_notes_user_created ON notes(user_id, created_at DESC)`)
+    db.db.Exec(`CREATE INDEX IF NOT EXISTS idx_notes_timeline ON notes(in_reply_to_uri, created_at DESC)`)
+
+    // ... also adds in_reply_to, object_url columns + backfills ...
 }
 ```
 

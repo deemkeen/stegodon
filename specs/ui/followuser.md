@@ -254,7 +254,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
         }
         return m, clearStatusAfter(2 * time.Second)
 
-    case tea.KeyMsg:
+    case tea.KeyPressMsg:
         switch msg.String() {
         case "enter":
             // Validate and follow
@@ -275,7 +275,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 ## View Rendering
 
 ```go
-func (m Model) View() string {
+func (m Model) View() tea.View {
     var s strings.Builder
 
     s.WriteString(common.CaptionStyle.Render("follow remote user"))

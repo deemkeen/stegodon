@@ -106,6 +106,8 @@ CREATE INDEX IF NOT EXISTS idx_notes_user_id ON notes(user_id);
 CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notes_object_uri ON notes(object_uri);
 CREATE INDEX IF NOT EXISTS idx_notes_in_reply_to_uri ON notes(in_reply_to_uri);
+CREATE INDEX IF NOT EXISTS idx_notes_user_created ON notes(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notes_timeline ON notes(in_reply_to_uri, created_at DESC);
 ```
 
 ---
@@ -241,6 +243,13 @@ CREATE INDEX IF NOT EXISTS idx_activities_created_at ON activities(created_at DE
 CREATE INDEX IF NOT EXISTS idx_activities_object_uri ON activities(object_uri);
 CREATE INDEX IF NOT EXISTS idx_activities_from_relay ON activities(from_relay);
 CREATE INDEX IF NOT EXISTS idx_activities_in_reply_to ON activities(in_reply_to);
+CREATE INDEX IF NOT EXISTS idx_activities_actor_uri ON activities(actor_uri);
+CREATE INDEX IF NOT EXISTS idx_activities_relay_timeline ON activities(from_relay, activity_type, local, created_at DESC)
+    WHERE from_relay = 1 AND activity_type = 'Create' AND local = 0;
+CREATE INDEX IF NOT EXISTS idx_activities_remote_timeline ON activities(activity_type, local, actor_uri, created_at DESC)
+    WHERE activity_type = 'Create' AND local = 0;
+CREATE INDEX IF NOT EXISTS idx_activities_global_timeline ON activities(activity_type, local, in_reply_to, created_at DESC)
+    WHERE activity_type = 'Create' AND local = 0;
 ```
 
 ---

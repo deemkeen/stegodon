@@ -440,7 +440,7 @@ func parseActivityContent(activity *domain.Activity) (string, string) {
 ## Error and Loading States
 
 ```go
-func (m Model) View() string {
+func (m Model) View() tea.View {
     if m.loading {
         return emptyStyle.Render("Loading thread...")
     }

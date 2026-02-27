@@ -259,7 +259,7 @@ go build
 ## Tech Stack
 
 - **SSH:** [wish](https://github.com/charmbracelet/wish)
-- **TUI:** [bubbletea](https://github.com/charmbracelet/bubbletea), [lipgloss](https://github.com/charmbracelet/lipgloss)
+- **TUI:** [bubbletea v2](https://charm.land/bubbletea/v2), [lipgloss v2](https://charm.land/lipgloss/v2), [bubbles v2](https://charm.land/bubbles/v2)
 - **Web:** [gin](https://github.com/gin-gonic/gin)
 - **Database:** SQLite with WAL mode
 - **Federation:** Custom ActivityPub implementation with HTTP signatures

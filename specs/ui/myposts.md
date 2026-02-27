@@ -386,7 +386,7 @@ const DefaultItemsPerPage = 10  // From common package
 ### Rendering
 
 ```go
-func (m Model) View() string {
+func (m Model) View() tea.View {
     start := m.Offset
     end := min(start + common.DefaultItemsPerPage, len(m.Notes))
 

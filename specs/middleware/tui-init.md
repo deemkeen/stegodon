@@ -20,36 +20,51 @@ Each SSH session gets its own BubbleTea program instance. The MainTui middleware
 
 ```go
 func MainTui() wish.Middleware {
-    teaHandler := func(s ssh.Session) *tea.Program {
-        // 1. Check for active terminal
-        pty, _, active := s.Pty()
-        if !active {
-            wish.Println(s, "no active terminal, skipping")
-            return nil
+    return func(next ssh.Handler) ssh.Handler {
+        return func(s ssh.Session) {
+            // 1. Check for active terminal
+            pty, windowChanges, active := s.Pty()
+            if !active {
+                wish.Println(s, "no active terminal, skipping")
+                next(s)
+                return
+            }
+
+            // 2. Load user account
+            err, acc := db.GetDB().ReadAccBySession(s)
+            if err != nil {
+                log.Println("Could not retrieve the user:", err)
+                next(s)
+                return
+            }
+
+            // 3. Create main model with ViewStore for repaint workaround
+            m := ui.NewModel(*acc, pty.Window.Width, pty.Window.Height)
+            viewStore := &ui.ViewStore{}
+            m.ViewContent = viewStore
+
+            // 4. Create repaintWriter (bypasses cursed renderer artifacts over SSH)
+            in, out := ptyIO(s)
+            rw := &repaintWriter{w: out, store: viewStore}
+
+            // 5. Create BubbleTea program
+            p := tea.NewProgram(m,
+                tea.WithFPS(30),
+                tea.WithInput(in),
+                tea.WithOutput(rw),
+                tea.WithEnvironment(s.Environ()),
+                tea.WithColorProfile(colorprofile.TrueColor),
+                tea.WithWindowSize(pty.Window.Width, pty.Window.Height),
+            )
+
+            // 6. Handle window resizes
+            go func() { /* forward windowChanges to p.Send(tea.WindowSizeMsg{...}) */ }()
+
+            p.Run()
+            p.Kill()
+            next(s)
         }
-
-        // 2. Load user account
-        err, acc := db.GetDB().ReadAccBySession(s)
-        if err != nil {
-            log.Println("Could not retrieve the user:", err)
-            return nil
-        }
-
-        // 3. Configure color profile
-        lipgloss.SetColorProfile(termenv.TrueColor)
-
-        // 4. Create main model
-        m := ui.NewModel(*acc, pty.Window.Width, pty.Window.Height)
-
-        // 5. Create BubbleTea program
-        return tea.NewProgram(m,
-            tea.WithFPS(60),
-            tea.WithInput(s),
-            tea.WithOutput(s),
-            tea.WithAltScreen(),
-        )
     }
-    return bm.MiddlewareWithProgramHandler(teaHandler, termenv.TrueColor)
 }
 ```
 
@@ -85,10 +100,10 @@ Dimensions are passed to the model for layout calculations.
 ### TrueColor Mode
 
 ```go
-lipgloss.SetColorProfile(termenv.TrueColor)
+tea.WithColorProfile(colorprofile.TrueColor)
 ```
 
-TrueColor (24-bit color) is used for accurate hex color rendering:
+TrueColor (24-bit color) is set per-program via `WithColorProfile` (the global `lipgloss.SetColorProfile` was removed in v2):
 - Renders colors independent of terminal palette
 - Avoids ANSI 256-color palette inconsistencies across terminals
 - Supported by all modern terminal emulators (Ghostty, iTerm2, Alacritty, etc.)
@@ -110,27 +125,36 @@ TrueColor (24-bit color) is used for accurate hex color rendering:
 
 ```go
 tea.NewProgram(m,
-    tea.WithFPS(60),        // Frame rate
-    tea.WithInput(s),       // SSH session input
-    tea.WithOutput(s),      // SSH session output
-    tea.WithAltScreen(),    // Use alternate screen buffer
+    tea.WithFPS(30),
+    tea.WithInput(in),
+    tea.WithOutput(rw),                          // repaintWriter
+    tea.WithEnvironment(s.Environ()),
+    tea.WithColorProfile(colorprofile.TrueColor),
+    tea.WithWindowSize(pty.Window.Width, pty.Window.Height),
 )
 ```
 
 | Option | Description |
 |--------|-------------|
-| `WithFPS(60)` | 60 frames per second rendering |
-| `WithInput(s)` | Read from SSH session |
-| `WithOutput(s)` | Write to SSH session |
-| `WithAltScreen()` | Use alternate screen buffer |
+| `WithFPS(30)` | 30 frames per second rendering |
+| `WithInput(in)` | Read from PTY input |
+| `WithOutput(rw)` | Write to repaintWriter (full-repaint workaround) |
+| `WithEnvironment(...)` | Pass SSH session environment |
+| `WithColorProfile(...)` | Set TrueColor rendering |
+| `WithWindowSize(...)` | Set initial terminal dimensions (required over SSH) |
 
-### Alternate Screen Buffer
+### RepaintWriter
 
-Alt screen provides:
-- Clean screen on program start
-- Original screen restored on exit
-- No scroll history pollution
-- Standard TUI behavior
+The `repaintWriter` wraps the SSH output and replaces the cursed renderer's differential output with a full-repaint on every frame. This works around bubbletea v2's cursed renderer producing rendering artifacts over SSH (see [wish#392](https://github.com/charmbracelet/wish/pull/392)).
+
+- On first write: enters alt screen (`\033[?1049h`) and hides cursor (`\033[?25l`)
+- On each frame: discards cursed renderer output, clears screen, writes full view content
+- Uses synchronized output (BSU/ESU `\033[?2026h`/`\033[?2026l`) to prevent tearing
+- On shutdown: restores cursor and leaves alt screen
+
+### ViewStore
+
+`ViewStore` is a mutex-protected string store in `ui/supertui.go`. `MainModel.View()` stores its rendered content via `storeView()` before returning, so `repaintWriter` can access the latest full view independently of the cursed renderer.
 
 ---
 
@@ -275,18 +299,13 @@ Non-interactive sessions are rejected with a message.
 
 ## Middleware Integration
 
-### Wish BubbleTea Middleware
+### Wish Middleware
 
-```go
-import bm "github.com/charmbracelet/wish/bubbletea"
-
-return bm.MiddlewareWithProgramHandler(teaHandler, termenv.TrueColor)
-```
-
-The `wish/bubbletea` middleware:
-- Manages program lifecycle
-- Handles input/output routing
-- Cleans up on session end
+The TUI middleware is implemented as a standard `wish.Middleware` closure (the `wish/bubbletea` middleware package is not used with v2):
+- Creates the bubbletea program directly with `tea.NewProgram`
+- Uses `repaintWriter` for output to work around cursed renderer artifacts
+- Handles window resize forwarding via goroutine
+- Restores terminal state on shutdown
 
 ---
 
@@ -330,18 +349,13 @@ case tea.WindowSizeMsg:
 
 ## Frame Rate
 
-### 60 FPS Configuration
+### 30 FPS Configuration
 
 ```go
-tea.WithFPS(60)
+tea.WithFPS(30)
 ```
 
-60 frames per second provides:
-- Smooth scrolling
-- Responsive input
-- Good animation support
-
-For SSH, this means up to 60 screen updates per second, though actual updates occur only when state changes.
+30 frames per second provides a balance between responsive input and bandwidth efficiency over SSH. The `repaintWriter` sends a full screen repaint on every frame, so a lower FPS reduces bandwidth overhead. Actual updates occur only when state changes.
 
 ---
 

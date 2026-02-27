@@ -6,7 +6,7 @@ This document specifies the Terminal User Interface (TUI) architecture, includin
 
 ## Overview
 
-Stegodon's TUI is built with [BubbleTea](https://github.com/charmbracelet/bubbletea), a Go framework based on The Elm Architecture (Model-View-Update). The main orchestrator (`supertui.go`) coordinates 13 distinct views, handling navigation, message routing, and lifecycle management.
+Stegodon's TUI is built with [BubbleTea](https://charm.land/bubbletea/v2), a Go framework based on The Elm Architecture (Model-View-Update). The main orchestrator (`supertui.go`) coordinates 13 distinct views, handling navigation, message routing, and lifecycle management.
 
 ---
 
@@ -40,7 +40,7 @@ Each view implements the BubbleTea `Model` interface:
 type Model interface {
     Init() tea.Cmd
     Update(tea.Msg) (Model, tea.Cmd)
-    View() string
+    View() tea.View
 }
 ```
 
@@ -235,7 +235,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     var cmds []tea.Cmd
 
     switch msg := msg.(type) {
-    case tea.KeyMsg:
+    case tea.KeyPressMsg:
         // Global key handling (Tab, Ctrl+N, Ctrl+C)
         switch msg.String() {
         case "tab":
@@ -271,7 +271,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 | Message | Purpose |
 |---------|---------|
-| `tea.KeyMsg` | Keyboard input |
+| `tea.KeyPressMsg` | Keyboard input |
 | `tea.WindowSizeMsg` | Terminal resize |
 | `common.EditNoteMsg` | Switch to edit mode |
 | `common.DeleteNoteMsg` | Note was deleted |
@@ -290,7 +290,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 The main `View()` method composes the final output:
 
 ```go
-func (m MainModel) View() string {
+func (m MainModel) View() tea.View {
     var view string
 
     // Handle special states
@@ -344,21 +344,22 @@ If terminal is too small, a warning is displayed instead of the TUI.
 The application uses TrueColor (24-bit) profile for palette-independent rendering:
 
 ```go
-func NewProgram(m Model) *tea.Program {
-    return tea.NewProgram(
-        m,
-        tea.WithANSICompression(),
-        tea.WithAltScreen(),
-        tea.WithOutput(ansi256Writer),
-    )
-}
+p := tea.NewProgram(m,
+    tea.WithFPS(30),
+    tea.WithInput(in),
+    tea.WithOutput(rw),               // repaintWriter bypasses cursed renderer
+    tea.WithEnvironment(s.Environ()),
+    tea.WithColorProfile(colorprofile.TrueColor),
+    tea.WithWindowSize(pty.Window.Width, pty.Window.Height),
+)
 ```
 
 ### Rendering
 
-- 60 FPS default rendering rate
+- 30 FPS rendering rate
 - Alt-screen mode (preserves terminal history)
-- ANSI compression for efficient updates
+- Full-repaint via `repaintWriter` (workaround for cursed renderer artifacts over SSH)
+- Synchronized output (BSU/ESU) to prevent tearing
 
 ---
 
@@ -481,9 +482,9 @@ This prevents goroutine leaks when users navigate away from auto-refreshing view
 
 | Package | Purpose |
 |---------|---------|
-| `bubbletea` | TUI framework |
-| `bubbles` | Input components (textinput, viewport) |
-| `lipgloss` | Styling and layout |
+| `charm.land/bubbletea/v2` | TUI framework |
+| `charm.land/bubbles/v2` | Input components (textinput, viewport) |
+| `charm.land/lipgloss/v2` | Styling and layout |
 
 ---
 

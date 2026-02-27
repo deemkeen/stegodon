@@ -283,7 +283,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
         m.AutocompleteSelected = 0
         return m, nil
 
-    case tea.KeyMsg:
+    case tea.KeyPressMsg:
         if m.AutocompleteVisible {
             // Handle autocomplete navigation
             switch msg.String() {
@@ -403,7 +403,7 @@ func (m Model) submitEdit() tea.Cmd {
 ## View Rendering
 
 ```go
-func (m Model) View() string {
+func (m Model) View() tea.View {
     var header string
 
     // Build context-aware header

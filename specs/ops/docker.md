@@ -175,7 +175,8 @@ ENV TERM=xterm-256color
 ### Color Profile in Code
 
 ```go
-lipgloss.SetColorProfile(termenv.TrueColor)
+// Color profile set per-program in v2
+tea.WithColorProfile(colorprofile.TrueColor)
 ```
 
 Uses TrueColor (24-bit) for palette-independent color rendering:

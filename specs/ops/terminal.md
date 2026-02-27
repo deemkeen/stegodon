@@ -25,7 +25,7 @@ Stegodon TUI requires:
 ### Enforcement
 
 ```go
-func (m MainModel) View() string {
+func (m MainModel) View() tea.View {
     // Check minimum terminal size
     minWidth := 115
     minHeight := 28
@@ -69,10 +69,12 @@ Terminal dimensions are captured on SSH session start:
 
 ```go
 func MainTui() wish.Middleware {
-    teaHandler := func(s ssh.Session) (tea.Model, []tea.ProgramOption) {
-        pty, _, _ := s.Pty()
-        m := ui.NewModel(*acc, pty.Window.Width, pty.Window.Height)
-        return tea.NewProgram(m, tea.WithAltScreen())
+    return func(next ssh.Handler) ssh.Handler {
+        return func(s ssh.Session) {
+            pty, windowChanges, _ := s.Pty()
+            m := ui.NewModel(*acc, pty.Window.Width, pty.Window.Height)
+            // ... create repaintWriter, run program with tea.WithWindowSize() ...
+        }
     }
 }
 ```
@@ -109,13 +111,8 @@ const (
 Stegodon uses TrueColor (24-bit color) for accurate, palette-independent rendering:
 
 ```go
-import "github.com/muesli/termenv"
-
-// Set color profile globally
-lipgloss.SetColorProfile(termenv.TrueColor)
-
-// Also set for BubbleTea middleware
-return bm.MiddlewareWithProgramHandler(teaHandler, termenv.TrueColor)
+// Color profile is set per-program in v2 (global lipgloss.SetColorProfile was removed)
+tea.WithColorProfile(colorprofile.TrueColor)
 ```
 
 ### Why TrueColor

@@ -141,7 +141,7 @@ if err == nil && existingAcc != nil {
 ```go
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
     switch msg := msg.(type) {
-    case tea.KeyMsg:
+    case tea.KeyPressMsg:
         // Clear error when user types
         if msg.Type == tea.KeyRunes || msg.Type == tea.KeyBackspace {
             m.Error = ""
@@ -198,7 +198,7 @@ The view is centered both horizontally and vertically in the terminal.
 ### View Output
 
 ```go
-func (m Model) View() string {
+func (m Model) View() tea.View {
     // Build prompt based on step
     // Show accumulated values (username, display name)
     // Show current input field
