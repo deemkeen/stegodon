@@ -1,49 +1,120 @@
 package middleware
 
 import (
+	"context"
+	"io"
 	"log"
+	"sync"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
-	bm "github.com/charmbracelet/wish/bubbletea"
 	"github.com/deemkeen/stegodon/cli"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui"
 	"github.com/deemkeen/stegodon/util"
 	"github.com/google/uuid"
-	"github.com/muesli/termenv"
 )
 
-func MainTui() wish.Middleware {
-	teaHandler := func(s ssh.Session) *tea.Program {
-		// Check for CLI command first (non-interactive mode)
-		if cmd := s.Command(); len(cmd) > 0 {
-			handleCLI(s, cmd)
-			return nil // Don't start TUI
-		}
+// repaintWriter wraps an io.Writer to completely replace the cursed renderer's
+// differential cell output with a full-repaint of the view content.
+// This works around bubbletea v2's cursed renderer producing artifacts
+// over SSH due to incorrect differential cell updates.
+// See: https://github.com/charmbracelet/wish/pull/392
+type repaintWriter struct {
+	w     io.Writer
+	store *ui.ViewStore
+	once  sync.Once
+}
 
-		pty, _, active := s.Pty()
-		if !active {
-			wish.Println(s, "no active terminal, skipping")
-			return nil
-		}
+func (rw *repaintWriter) Write(p []byte) (n int, err error) {
+	// Enter alt screen + hide cursor on first write, then never forward
+	// the cursed renderer's differential output again.
+	rw.once.Do(func() {
+		rw.w.Write([]byte("\033[?1049h")) // enter alt screen
+		rw.w.Write([]byte("\033[?25l"))   // hide cursor
+	})
 
-		err, acc := db.GetDB().ReadAccBySession(s)
-		if err != nil {
-			log.Println("Could not retrieve the user:", err)
-			return nil
-		}
-
-		// Set the global color profile to TrueColor (24-bit) for accurate hex color rendering
-		lipgloss.SetColorProfile(termenv.TrueColor)
-
-		m := ui.NewModel(*acc, pty.Window.Width, pty.Window.Height)
-		return tea.NewProgram(m, tea.WithFPS(60), tea.WithInput(s), tea.WithOutput(s), tea.WithAltScreen())
+	content := rw.store.Load()
+	if len(content) > 0 {
+		// Synchronized output prevents tearing during the repaint.
+		rw.w.Write([]byte("\033[?2026h"))   // begin synchronized output
+		rw.w.Write([]byte("\033[H\033[2J")) // cursor home + erase screen
+		rw.w.Write([]byte(content))         // full view repaint
+		rw.w.Write([]byte("\033[?2026l"))   // end synchronized output
 	}
-	return bm.MiddlewareWithProgramHandler(teaHandler, termenv.TrueColor)
+
+	// Report full length consumed so bubbletea doesn't retry.
+	n = len(p)
+	return
+}
+
+func MainTui() wish.Middleware {
+	return func(next ssh.Handler) ssh.Handler {
+		return func(s ssh.Session) {
+			// Check for CLI command first (non-interactive mode)
+			if cmd := s.Command(); len(cmd) > 0 {
+				handleCLI(s, cmd)
+				next(s)
+				return
+			}
+
+			pty, windowChanges, active := s.Pty()
+			if !active {
+				wish.Println(s, "no active terminal, skipping")
+				next(s)
+				return
+			}
+
+			err, acc := db.GetDB().ReadAccBySession(s)
+			if err != nil {
+				log.Println("Could not retrieve the user:", err)
+				next(s)
+				return
+			}
+
+			m := ui.NewModel(*acc, pty.Window.Width, pty.Window.Height)
+			viewStore := &ui.ViewStore{}
+			m.ViewContent = viewStore
+			in, out := ptyIO(s)
+			rw := &repaintWriter{w: out, store: viewStore}
+			p := tea.NewProgram(m,
+				tea.WithFPS(30),
+				tea.WithInput(in),
+				tea.WithOutput(rw),
+				tea.WithEnvironment(s.Environ()),
+				tea.WithColorProfile(colorprofile.TrueColor),
+				tea.WithWindowSize(pty.Window.Width, pty.Window.Height),
+			)
+
+			// Forward window resize events to the tea.Program
+			ctx, cancel := context.WithCancel(s.Context())
+			go func() {
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case w := <-windowChanges:
+						if p != nil {
+							p.Send(tea.WindowSizeMsg{Width: w.Width, Height: w.Height})
+						}
+					}
+				}
+			}()
+
+			if _, err := p.Run(); err != nil {
+				log.Printf("TUI program error: %v", err)
+			}
+			p.Kill()
+			// Restore terminal: show cursor + leave alt screen
+			rw.w.Write([]byte("\033[?25h"))   // show cursor
+			rw.w.Write([]byte("\033[?1049l")) // leave alt screen
+			cancel()
+			next(s)
+		}
+	}
 }
 
 // handleCLI processes CLI commands in non-interactive mode

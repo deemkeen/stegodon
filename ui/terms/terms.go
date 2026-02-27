@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/ui/common"
 	"github.com/google/uuid"
@@ -45,7 +45,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.Accepted = true
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "enter":
 			// User accepts terms and conditions
@@ -60,7 +60,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	var s string
 
 	s += fmt.Sprintf("Terms and Conditions\n\n")
@@ -79,7 +79,7 @@ func (m Model) View() string {
 		s += "\n\n" + errorStyle.Render(m.Error)
 	}
 
-	return s
+	return tea.NewView(s)
 }
 
 // ViewWithWidth renders the view with proper width accounting for border and margins
@@ -90,7 +90,7 @@ func (m Model) ViewWithWidth(termWidth, termHeight int) string {
 		// Minimum width
 		common.TermsDialogMinWidth)
 
-	bordered := Style.Width(contentWidth).Render(m.View())
+	bordered := Style.Width(contentWidth).Render(m.View().Content)
 	return lipgloss.Place(termWidth, termHeight, lipgloss.Center, lipgloss.Center, bordered)
 }
 

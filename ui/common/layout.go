@@ -1,6 +1,6 @@
 package common
 
-import "github.com/charmbracelet/lipgloss"
+import "charm.land/lipgloss/v2"
 
 // Layout constants for the TUI
 // These values are derived from the actual styling applied to components

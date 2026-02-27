@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
@@ -123,7 +123,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if !m.Active {
 			return m, nil
 		}
@@ -210,9 +210,9 @@ func performSearch(query string) tea.Cmd {
 }
 
 // View renders the search overlay
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	if !m.Active {
-		return ""
+		return tea.NewView("")
 	}
 
 	var s strings.Builder
@@ -225,12 +225,12 @@ func (m Model) View() string {
 
 	if m.lastQuery == "" || len(m.lastQuery) < 2 {
 		s.WriteString(noResultsStyle.Render("type at least 2 characters to search"))
-		return s.String()
+		return tea.NewView(s.String())
 	}
 
 	if len(m.Results) == 0 {
 		s.WriteString(noResultsStyle.Render("no results found"))
-		return s.String()
+		return tea.NewView(s.String())
 	}
 
 	// Calculate layout
@@ -301,7 +301,7 @@ func (m Model) View() string {
 		}
 	}
 
-	return s.String()
+	return tea.NewView(s.String())
 }
 
 // itemsPerPage calculates how many results fit on screen

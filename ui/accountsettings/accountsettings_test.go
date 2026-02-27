@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/google/uuid"
 )
@@ -43,34 +43,34 @@ func TestMenuNavigation(t *testing.T) {
 	model := InitialModel(acc)
 
 	// Test down navigation
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	model, _ = model.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	if model.MenuItem != MenuEditBio {
 		t.Errorf("Expected MenuEditBio after down, got %d", model.MenuItem)
 	}
 
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if model.MenuItem != MenuChangeAvatar {
 		t.Errorf("Expected MenuChangeAvatar after down, got %d", model.MenuItem)
 	}
 
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if model.MenuItem != MenuDeleteAccount {
 		t.Errorf("Expected MenuDeleteAccount after down, got %d", model.MenuItem)
 	}
 
 	// Test that we can't go past the last item
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyDown})
+	model, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if model.MenuItem != MenuDeleteAccount {
 		t.Error("Should not go past MenuDeleteAccount")
 	}
 
 	// Test up navigation
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	model, _ = model.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	if model.MenuItem != MenuChangeAvatar {
 		t.Errorf("Expected MenuChangeAvatar after up, got %d", model.MenuItem)
 	}
 
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyUp})
+	model, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if model.MenuItem != MenuEditBio {
 		t.Errorf("Expected MenuEditBio after up, got %d", model.MenuItem)
 	}
@@ -91,7 +91,7 @@ func TestMenuHotkeys(t *testing.T) {
 
 	for _, tt := range tests {
 		model := InitialModel(acc)
-		model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{tt.key}})
+		model, _ = model.Update(tea.KeyPressMsg{Code: tt.key, Text: string(tt.key)})
 		if model.ViewState != tt.expectedState {
 			t.Errorf("Hotkey '%c' should switch to state %d, got %d", tt.key, tt.expectedState, model.ViewState)
 		}
@@ -103,13 +103,13 @@ func TestEditDisplayNameView(t *testing.T) {
 	model := InitialModel(acc)
 
 	// Enter edit display name view
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	model, _ = model.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
 	if model.ViewState != EditDisplayNameView {
 		t.Error("Should be in EditDisplayNameView")
 	}
 
 	// Test escape returns to menu
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	if model.ViewState != MenuView {
 		t.Error("Escape should return to MenuView")
 	}
@@ -120,13 +120,13 @@ func TestEditBioView(t *testing.T) {
 	model := InitialModel(acc)
 
 	// Enter edit bio view
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}})
+	model, _ = model.Update(tea.KeyPressMsg{Code: 'b', Text: "b"})
 	if model.ViewState != EditBioView {
 		t.Error("Should be in EditBioView")
 	}
 
 	// Test escape returns to menu
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	if model.ViewState != MenuView {
 		t.Error("Escape should return to MenuView")
 	}
@@ -137,7 +137,7 @@ func TestAvatarView(t *testing.T) {
 	model := InitialModel(acc)
 
 	// Enter avatar view
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	model, _ = model.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	if model.ViewState != AvatarView {
 		t.Error("Should be in AvatarView")
 	}
@@ -149,7 +149,7 @@ func TestAvatarView(t *testing.T) {
 	}
 
 	// Test escape returns to menu
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	if model.ViewState != MenuView {
 		t.Error("Escape should return to MenuView")
 	}
@@ -160,7 +160,7 @@ func TestDeleteConfirmation(t *testing.T) {
 	model := InitialModel(acc)
 
 	// Enter delete view
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	model, _ = model.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
 	if model.ViewState != DeleteView {
 		t.Error("Should be in DeleteView")
 	}
@@ -169,19 +169,19 @@ func TestDeleteConfirmation(t *testing.T) {
 	}
 
 	// First confirmation
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	model, _ = model.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	if model.ConfirmStep != 1 {
 		t.Error("After first 'y', confirm step should be 1")
 	}
 
 	// Cancel with 'n'
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	model, _ = model.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 	if model.ConfirmStep != 0 {
 		t.Error("After 'n', confirm step should be reset to 0")
 	}
 
 	// Test escape from delete view
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	if model.ViewState != MenuView {
 		t.Error("Escape should return to MenuView")
 	}
@@ -192,15 +192,15 @@ func TestDeleteConfirmationWithEscape(t *testing.T) {
 	model := InitialModel(acc)
 
 	// Enter delete view and confirm once
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	model, _ = model.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
+	model, _ = model.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 
 	if model.ConfirmStep != 1 {
 		t.Error("Should be at confirm step 1")
 	}
 
 	// Escape should reset confirm step
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	if model.ConfirmStep != 0 {
 		t.Error("Escape should reset confirm step")
 	}
@@ -212,41 +212,41 @@ func TestViewRendering(t *testing.T) {
 
 	// Test menu view renders
 	view := model.View()
-	if view == "" {
+	if view.Content == "" {
 		t.Error("Menu view should not be empty")
 	}
-	if !contains(view, "account settings") {
+	if !contains(view.Content, "account settings") {
 		t.Error("Menu view should contain 'account settings'")
 	}
-	if !contains(view, acc.Username) {
+	if !contains(view.Content, acc.Username) {
 		t.Error("Menu view should contain username")
 	}
 
 	// Test edit display name view renders
 	model.ViewState = EditDisplayNameView
 	view = model.View()
-	if !contains(view, "Edit Display Name") {
+	if !contains(view.Content, "Edit Display Name") {
 		t.Error("Edit display name view should contain 'Edit Display Name'")
 	}
 
 	// Test edit bio view renders
 	model.ViewState = EditBioView
 	view = model.View()
-	if !contains(view, "Edit Bio") {
+	if !contains(view.Content, "Edit Bio") {
 		t.Error("Edit bio view should contain 'Edit Bio'")
 	}
 
 	// Test avatar view renders
 	model.ViewState = AvatarView
 	view = model.View()
-	if !contains(view, "Change Avatar") {
+	if !contains(view.Content, "Change Avatar") {
 		t.Error("Avatar view should contain 'Change Avatar'")
 	}
 
 	// Test delete view renders
 	model.ViewState = DeleteView
 	view = model.View()
-	if !contains(view, "WARNING") {
+	if !contains(view.Content, "WARNING") {
 		t.Error("Delete view should contain 'WARNING'")
 	}
 }
@@ -338,7 +338,7 @@ func TestAvatarViewShowsCurrentAvatar(t *testing.T) {
 
 	view := model.View()
 	// Avatar file doesn't exist on disk, so the fallback logo renders as half-block characters
-	if !contains(view, "▀") {
+	if !contains(view.Content, "▀") {
 		t.Error("Avatar view should show rendered avatar")
 	}
 }
@@ -351,7 +351,7 @@ func TestAvatarViewShowsDefaultWhenNoAvatar(t *testing.T) {
 
 	view := model.View()
 	// Default logo renders as half-block characters
-	if !contains(view, "▀") {
+	if !contains(view.Content, "▀") {
 		t.Error("Avatar view should show default logo when no avatar is set")
 	}
 }
@@ -432,7 +432,7 @@ func TestEscapeStopsPolling(t *testing.T) {
 	model.isPolling = true
 	model.uploadURL = "http://example.com/upload/token"
 
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	model, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	if model.isPolling {
 		t.Error("Should stop polling when pressing Escape")

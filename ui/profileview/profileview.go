@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/deemkeen/stegodon/activitypub"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
@@ -255,7 +255,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.Error = ""
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "up", "k":
 			if m.Selected > 0 {
@@ -326,7 +326,7 @@ func (m Model) getPostCount() int {
 	return len(m.Posts)
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	var s strings.Builder
 
 	s.WriteString(common.CaptionStyle.Render("profile"))
@@ -334,17 +334,17 @@ func (m Model) View() string {
 
 	if m.loading {
 		s.WriteString(m.spinner.View() + " Loading profile...")
-		return s.String()
+		return tea.NewView(s.String())
 	}
 
 	if m.Error != "" && m.ProfileUser == nil && m.RemoteProfileUser == nil {
 		s.WriteString(emptyStyle.Render("Error: " + m.Error))
-		return s.String()
+		return tea.NewView(s.String())
 	}
 
 	if m.ProfileUser == nil && m.RemoteProfileUser == nil {
 		s.WriteString(emptyStyle.Render("No profile to display"))
-		return s.String()
+		return tea.NewView(s.String())
 	}
 
 	// Calculate content width
@@ -368,7 +368,7 @@ func (m Model) View() string {
 		s.WriteString("\n")
 	}
 
-	return s.String()
+	return tea.NewView(s.String())
 }
 
 func (m Model) viewLocalProfile(contentWidth int) string {

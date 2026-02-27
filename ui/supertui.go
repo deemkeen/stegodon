@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/deemkeen/stegodon/activitypub"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
@@ -45,6 +46,26 @@ var (
 				BorderForeground(lipgloss.Color(common.COLOR_ACCENT)).MarginLeft(1)
 )
 
+// ViewStore holds the latest rendered view content for the repaint writer.
+// This enables full-repaint rendering to work around bubbletea v2 cursed
+// renderer artifacts over SSH (see github.com/charmbracelet/wish/pull/392).
+type ViewStore struct {
+	mu      sync.Mutex
+	content string
+}
+
+func (vs *ViewStore) Store(content string) {
+	vs.mu.Lock()
+	vs.content = content
+	vs.mu.Unlock()
+}
+
+func (vs *ViewStore) Load() string {
+	vs.mu.Lock()
+	defer vs.mu.Unlock()
+	return vs.content
+}
+
 type MainModel struct {
 	width                int
 	height               int
@@ -52,6 +73,7 @@ type MainModel struct {
 	headerModel          header.Model
 	account              domain.Account
 	state                common.SessionState
+	ViewContent          *ViewStore
 	newUserModel         createuser.Model
 	termsModel           terms.Model
 	createModel          writenote.Model
@@ -270,9 +292,9 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.searchModel.Height = msg.Height
 		return m, nil
 
-	case tea.MouseMsg:
+	case tea.MouseClickMsg:
 		// Handle mouse clicks to switch focus between left and right panels
-		if msg.Type == tea.MouseLeft {
+		if msg.Button == tea.MouseLeft {
 			leftPanelWidth := m.width / 3
 
 			// Click on left panel (write note area)
@@ -294,6 +316,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case common.SessionState:
+		oldState := m.state
 		switch msg {
 		case common.CreateUserView:
 			m.state = common.CreateUserView
@@ -324,12 +347,13 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Note: This message is also a SessionState, so it will trigger reloads
 			// in myposts and hometimeline via the SessionState routing
 		}
+		if oldState != m.state {
+		}
 
 	case common.EditNoteMsg:
 		// Route EditNote message to writenote model and switch to CreateNoteView
 		m.createModel, cmd = m.createModel.Update(msg)
 		m.state = common.CreateNoteView
-		// Return single command directly instead of batching
 		return m, cmd
 
 	case common.DeleteNoteMsg:
@@ -378,7 +402,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Handle boost/unboost
 		return m, boostNoteCmd(m.account.Id, msg.NoteURI, msg.NoteID, msg.IsLocal, &m.account)
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		// When search overlay is active, route all keys to search model
 		// (except ctrl+c which always quits)
 		if m.searchModel.Active && msg.String() != "ctrl+c" {
@@ -414,7 +438,6 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					cmds = append(cmds, func() tea.Msg { return common.DeactivateAccountSettingsMsg{} })
 				}
 
-				// Note: No need to activate notifications - it's always active
 			}
 		case "tab":
 			// Deactivate search overlay on tab navigation
@@ -678,7 +701,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Route SessionState to threadview for like count updates
 		m.threadViewModel, cmd = m.threadViewModel.Update(msg)
 		cmds = append(cmds, cmd)
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		// Keyboard input handled below in separate switch
 	default:
 		// For other messages (data loaded messages, feedback messages, etc.),
@@ -827,7 +850,21 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 }
 
-func (m MainModel) View() string {
+func (m MainModel) storeView(v tea.View) tea.View {
+	if m.ViewContent != nil {
+		// Truncate to terminal height to prevent scrolling in alt screen.
+		// The cursed renderer clips internally, but our repaint writes raw content.
+		content := v.Content
+		lines := strings.SplitN(content, "\n", m.height+1)
+		if len(lines) > m.height {
+			content = strings.Join(lines[:m.height], "\n")
+		}
+		m.ViewContent.Store(content)
+	}
+	return v
+}
+
+func (m MainModel) View() tea.View {
 
 	// Check minimum terminal size
 	minWidth := 115
@@ -838,13 +875,15 @@ func (m MainModel) View() string {
 			"Terminal too small!\n\nMinimum required: %dx%d\nCurrent size: %dx%d\n\nPlease resize your terminal.",
 			minWidth, minHeight, m.width, m.height,
 		)
-		return lipgloss.NewStyle().
+		v := tea.NewView(lipgloss.NewStyle().
 			Width(m.width).
 			Height(m.height).
 			Align(lipgloss.Center, lipgloss.Center).
 			Foreground(lipgloss.Color(common.COLOR_CRITICAL)).
 			Bold(true).
-			Render(message)
+			Render(message))
+		v.AltScreen = true
+		return m.storeView(v)
 	}
 
 	var s string
@@ -852,133 +891,140 @@ func (m MainModel) View() string {
 	model := m.currentFocusedModel()
 
 	// Calculate responsive dimensions
+	// Reserve 1 column to prevent terminal auto-margin wrapping (bubbletea v2 cursed renderer issue)
+	effectiveWidth := m.width - 1
 	availableHeight := common.CalculateAvailableHeight(m.height)
 	leftPanelWidth := common.TextInputDefaultWidth + 10 // Fixed width for left panel (textarea + padding)
-	rightPanelWidth := common.CalculateRightPanelWidth(m.width, leftPanelWidth)
+	rightPanelWidth := common.CalculateRightPanelWidth(effectiveWidth, leftPanelWidth)
 
 	createStyleStr := lipgloss.NewStyle().
 		MaxHeight(availableHeight).
 		Height(availableHeight).
 		Width(leftPanelWidth).
 		MaxWidth(leftPanelWidth).
-		Margin(1).
-		Render(m.createModel.View())
+		Margin(1, 0).Padding(0, 1).
+		Render(m.createModel.View().Content)
 
 	homeTimelineStyleStr := lipgloss.NewStyle().
 		MaxHeight(availableHeight).
 		Height(availableHeight).
 		Width(rightPanelWidth).
 		MaxWidth(rightPanelWidth).
-		Margin(1).
-		Render(m.homeTimelineModel.View())
+		Margin(1, 0).Padding(0, 1).
+		Render(m.homeTimelineModel.View().Content)
 
 	myPostsStyleStr := lipgloss.NewStyle().
 		MaxHeight(availableHeight).
 		Height(availableHeight).
 		Width(rightPanelWidth).
 		MaxWidth(rightPanelWidth).
-		Margin(1).
-		Render(m.myPostsModel.View())
+		Margin(1, 0).Padding(0, 1).
+		Render(m.myPostsModel.View().Content)
 
 	globalPostsStyleStr := lipgloss.NewStyle().
 		MaxHeight(availableHeight).
 		Height(availableHeight).
 		Width(rightPanelWidth).
 		MaxWidth(rightPanelWidth).
-		Margin(1).
-		Render(m.globalPostsModel.View())
+		Margin(1, 0).Padding(0, 1).
+		Render(m.globalPostsModel.View().Content)
 
 	followStyleStr := lipgloss.NewStyle().
 		MaxHeight(availableHeight).
 		Height(availableHeight).
 		Width(rightPanelWidth).
 		MaxWidth(rightPanelWidth).
-		Margin(1).
-		Render(m.followModel.View())
+		Margin(1, 0).Padding(0, 1).
+		Render(m.followModel.View().Content)
 
 	followersStyleStr := lipgloss.NewStyle().
 		MaxHeight(availableHeight).
 		Height(availableHeight).
 		Width(rightPanelWidth).
 		MaxWidth(rightPanelWidth).
-		Margin(1).
-		Render(m.followersModel.View())
+		Margin(1, 0).Padding(0, 1).
+		Render(m.followersModel.View().Content)
 
 	followingStyleStr := lipgloss.NewStyle().
 		MaxHeight(availableHeight).
 		Height(availableHeight).
 		Width(rightPanelWidth).
 		MaxWidth(rightPanelWidth).
-		Margin(1).
-		Render(m.followingModel.View())
+		Margin(1, 0).Padding(0, 1).
+		Render(m.followingModel.View().Content)
 
 	localUsersStyleStr := lipgloss.NewStyle().
 		MaxHeight(availableHeight).
 		Height(availableHeight).
 		Width(rightPanelWidth).
 		MaxWidth(rightPanelWidth).
-		Margin(1).
-		Render(m.localUsersModel.View())
+		Margin(1, 0).Padding(0, 1).
+		Render(m.localUsersModel.View().Content)
 
 	adminStyleStr := lipgloss.NewStyle().
 		MaxHeight(availableHeight).
 		Height(availableHeight).
 		Width(rightPanelWidth).
 		MaxWidth(rightPanelWidth).
-		Margin(1).
-		Render(m.adminModel.View())
+		Margin(1, 0).Padding(0, 1).
+		Render(m.adminModel.View().Content)
 
 	relayStyleStr := lipgloss.NewStyle().
 		MaxHeight(availableHeight).
 		Height(availableHeight).
 		Width(rightPanelWidth).
 		MaxWidth(rightPanelWidth).
-		Margin(1).
-		Render(m.relayModel.View())
+		Margin(1, 0).Padding(0, 1).
+		Render(m.relayModel.View().Content)
 
 	accountSettingsStyleStr := lipgloss.NewStyle().
 		MaxHeight(availableHeight).
 		Height(availableHeight).
 		Width(rightPanelWidth).
 		MaxWidth(rightPanelWidth).
-		Margin(1).
-		Render(m.accountSettingsModel.View())
+		Margin(1, 0).Padding(0, 1).
+		Render(m.accountSettingsModel.View().Content)
 
 	threadViewStyleStr := lipgloss.NewStyle().
 		MaxHeight(availableHeight).
 		Height(availableHeight).
 		Width(rightPanelWidth).
 		MaxWidth(rightPanelWidth).
-		Margin(1).
-		Render(m.threadViewModel.View())
+		Margin(1, 0).Padding(0, 1).
+		Render(m.threadViewModel.View().Content)
 
 	profileViewStyleStr := lipgloss.NewStyle().
 		MaxHeight(availableHeight).
 		Height(availableHeight).
 		Width(rightPanelWidth).
 		MaxWidth(rightPanelWidth).
-		Margin(1).
-		Render(m.profileViewModel.View())
+		Margin(1, 0).Padding(0, 1).
+		Render(m.profileViewModel.View().Content)
 
 	notificationsStyleStr := lipgloss.NewStyle().
 		MaxHeight(availableHeight).
 		Height(availableHeight).
 		Width(rightPanelWidth).
 		MaxWidth(rightPanelWidth).
-		Margin(1).
-		Render(m.notificationsModel.View())
+		Margin(1, 0).Padding(0, 1).
+		Render(m.notificationsModel.View().Content)
 
 	if m.state == common.CreateUserView {
 		s = m.newUserModel.ViewWithWidth(m.width, m.height)
-		return s
+		v := tea.NewView(s)
+		v.AltScreen = true
+		return m.storeView(v)
 	} else if m.state == common.TermsAcceptanceView {
 		// Show terms acceptance (new users see this first, existing users if terms updated)
 		s = m.termsModel.ViewWithWidth(m.width, m.height)
-		return s
+		v := tea.NewView(s)
+		v.AltScreen = true
+		return m.storeView(v)
 	} else {
 		// Update header with current unread notification count
 		m.headerModel.UnreadCount = m.notificationsModel.UnreadCount
-		navContainer := lipgloss.NewStyle().Render(m.headerModel.View())
+		m.headerModel.Width = effectiveWidth
+		navContainer := lipgloss.NewStyle().Render(m.headerModel.View().Content)
 		s += navContainer + "\n"
 
 		// Render current view
@@ -988,7 +1034,7 @@ func (m MainModel) View() string {
 				searchStyleStr := lipgloss.NewStyle().
 					MaxHeight(availableHeight).Height(availableHeight).
 					Width(rightPanelWidth).MaxWidth(rightPanelWidth).
-					Margin(1).Render(m.searchModel.View())
+					Margin(1, 0).Padding(0, 1).Render(m.searchModel.View().Content)
 				s += lipgloss.JoinHorizontal(lipgloss.Top,
 					modelStyle.Render(createStyleStr),
 					focusedModelStyle.Render(searchStyleStr))
@@ -1002,7 +1048,7 @@ func (m MainModel) View() string {
 				searchStyleStr := lipgloss.NewStyle().
 					MaxHeight(availableHeight).Height(availableHeight).
 					Width(rightPanelWidth).MaxWidth(rightPanelWidth).
-					Margin(1).Render(m.searchModel.View())
+					Margin(1, 0).Padding(0, 1).Render(m.searchModel.View().Content)
 				s += lipgloss.JoinHorizontal(lipgloss.Top,
 					modelStyle.Render(createStyleStr),
 					focusedModelStyle.Render(searchStyleStr))
@@ -1016,7 +1062,7 @@ func (m MainModel) View() string {
 				searchStyleStr := lipgloss.NewStyle().
 					MaxHeight(availableHeight).Height(availableHeight).
 					Width(rightPanelWidth).MaxWidth(rightPanelWidth).
-					Margin(1).Render(m.searchModel.View())
+					Margin(1, 0).Padding(0, 1).Render(m.searchModel.View().Content)
 				s += lipgloss.JoinHorizontal(lipgloss.Top,
 					modelStyle.Render(createStyleStr),
 					focusedModelStyle.Render(searchStyleStr))
@@ -1030,7 +1076,7 @@ func (m MainModel) View() string {
 				searchStyleStr := lipgloss.NewStyle().
 					MaxHeight(availableHeight).Height(availableHeight).
 					Width(rightPanelWidth).MaxWidth(rightPanelWidth).
-					Margin(1).Render(m.searchModel.View())
+					Margin(1, 0).Padding(0, 1).Render(m.searchModel.View().Content)
 				s += lipgloss.JoinHorizontal(lipgloss.Top,
 					modelStyle.Render(createStyleStr),
 					focusedModelStyle.Render(searchStyleStr))
@@ -1153,7 +1199,7 @@ func (m MainModel) View() string {
 
 		helpStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color(common.COLOR_HELP)).
-			Width(m.width).
+			Width(effectiveWidth).
 			Align(lipgloss.Center)
 
 		// Calculate remaining vertical space and add it before footer
@@ -1167,7 +1213,9 @@ func (m MainModel) View() string {
 		}
 
 		s += helpStyle.Render(helpText)
-		return lipgloss.NewStyle().Render(s)
+		v := tea.NewView(s)
+		v.AltScreen = true
+		return m.storeView(v)
 	}
 }
 

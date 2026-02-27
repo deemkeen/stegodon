@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
 	"github.com/google/uuid"
@@ -100,7 +100,7 @@ func TestUpdate_Navigation(t *testing.T) {
 	m.Selected = 0
 
 	// Move down with 'j'
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	if m.Selected != 1 {
 		t.Errorf("Expected Selected 1 after 'j', got %d", m.Selected)
 	}
@@ -109,31 +109,31 @@ func TestUpdate_Navigation(t *testing.T) {
 	}
 
 	// Move down with down arrow
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.Selected != 2 {
 		t.Errorf("Expected Selected 2 after down, got %d", m.Selected)
 	}
 
 	// Try to move past last (should stay)
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.Selected != 2 {
 		t.Errorf("Expected Selected 2 (stay at last), got %d", m.Selected)
 	}
 
 	// Move up with 'k'
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	if m.Selected != 1 {
 		t.Errorf("Expected Selected 1 after 'k', got %d", m.Selected)
 	}
 
 	// Move up with up arrow
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.Selected != 0 {
 		t.Errorf("Expected Selected 0 after up, got %d", m.Selected)
 	}
 
 	// Try to move before first (should stay)
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.Selected != 0 {
 		t.Errorf("Expected Selected 0 (stay at first), got %d", m.Selected)
 	}
@@ -153,7 +153,7 @@ func TestUpdate_EditNote(t *testing.T) {
 	}
 	m.Selected = 0
 
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'u'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'u', Text: "u"})
 
 	if cmd == nil {
 		t.Fatal("Expected command for edit")
@@ -182,7 +182,7 @@ func TestUpdate_DeleteConfirmation(t *testing.T) {
 	m.Selected = 0
 
 	// Press 'd' to start delete confirmation
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
 
 	if !m.confirmingDelete {
 		t.Error("Expected confirmingDelete true after 'd'")
@@ -202,7 +202,7 @@ func TestUpdate_DeleteConfirmYes(t *testing.T) {
 	m.confirmingDelete = true
 	m.deleteTargetId = noteId
 
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 
 	if m.confirmingDelete {
 		t.Error("Expected confirmingDelete false after 'y'")
@@ -225,7 +225,7 @@ func TestUpdate_DeleteConfirmNo(t *testing.T) {
 	m.confirmingDelete = true
 	m.deleteTargetId = noteId
 
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'n', Text: "n"})
 
 	if m.confirmingDelete {
 		t.Error("Expected confirmingDelete false after 'n'")
@@ -247,7 +247,7 @@ func TestUpdate_DeleteConfirmEscape(t *testing.T) {
 	m.confirmingDelete = true
 	m.deleteTargetId = noteId
 
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEscape})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	if m.confirmingDelete {
 		t.Error("Expected confirmingDelete false after escape")
@@ -268,13 +268,13 @@ func TestUpdate_NavigationBlockedDuringConfirm(t *testing.T) {
 	m.deleteTargetId = m.Notes[0].Id
 
 	// Try to navigate while confirming - should be blocked
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.Selected != 0 {
 		t.Errorf("Expected navigation blocked during confirm, Selected changed to %d", m.Selected)
 	}
 
 	// Other keys should also be blocked
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'u'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'u', Text: "u"})
 	if cmd != nil {
 		t.Error("Expected edit blocked during confirm")
 	}
@@ -286,10 +286,10 @@ func TestView_EmptyNotes(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "No notes yet") {
+	if !strings.Contains(view.Content, "No notes yet") {
 		t.Error("Expected 'No notes yet' message")
 	}
-	if !strings.Contains(view, "Create your first note") {
+	if !strings.Contains(view.Content, "Create your first note") {
 		t.Error("Expected 'Create your first note' message")
 	}
 }
@@ -304,7 +304,7 @@ func TestView_NoteCount(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "3 notes") {
+	if !strings.Contains(view.Content, "3 notes") {
 		t.Error("Expected '3 notes' in header")
 	}
 }
@@ -324,7 +324,7 @@ func TestView_EditedIndicator(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "(edited)") {
+	if !strings.Contains(view.Content, "(edited)") {
 		t.Error("Expected '(edited)' indicator")
 	}
 }
@@ -341,10 +341,10 @@ func TestView_DeleteConfirmation(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "Delete this note?") {
+	if !strings.Contains(view.Content, "Delete this note?") {
 		t.Error("Expected delete confirmation message")
 	}
-	if !strings.Contains(view, "y to confirm") {
+	if !strings.Contains(view.Content, "y to confirm") {
 		t.Error("Expected 'y to confirm' in delete message")
 	}
 }
@@ -452,10 +452,10 @@ func TestUpdate_EmptyNotes_NoCrash(t *testing.T) {
 	m.Notes = []domain.Note{}
 
 	// Navigation on empty notes should not crash
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'u'}})
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'u', Text: "u"})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'd', Text: "d"})
 
 	// Should complete without panic
 	if m.confirmingDelete {

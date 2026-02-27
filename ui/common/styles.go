@@ -1,6 +1,6 @@
 package common
 
-import "github.com/charmbracelet/lipgloss"
+import "charm.land/lipgloss/v2"
 
 const (
 	// === Primary UI Colors (true color hex — terminal-palette independent) ===

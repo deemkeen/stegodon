@@ -5,8 +5,8 @@ import (
 	"log"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
 	"github.com/deemkeen/stegodon/activitypub"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
@@ -34,7 +34,7 @@ func InitialModel(adminId uuid.UUID, adminAcct *domain.Account, config *util.App
 	ti := textinput.New()
 	ti.Placeholder = "relay.example.com or https://relay.example.com/actor"
 	ti.CharLimit = 256
-	ti.Width = 60
+	ti.SetWidth(60)
 
 	return Model{
 		AdminId:   adminId,
@@ -267,7 +267,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		// In adding mode, handle input
 		if m.Adding {
 			switch msg.String() {
@@ -369,7 +369,7 @@ func max(a, b int) int {
 	return b
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	var s strings.Builder
 
 	s.WriteString(common.CaptionStyle.Render(fmt.Sprintf("relay management (%d relays)", len(m.Relays))))
@@ -381,7 +381,7 @@ func (m Model) View() string {
 		s.WriteString(m.Input.View())
 		s.WriteString("\n\n")
 		s.WriteString(common.HelpStyle.Render("enter: subscribe | esc: cancel"))
-		return s.String()
+		return tea.NewView(s.String())
 	}
 
 	if len(m.Relays) == 0 {
@@ -457,7 +457,7 @@ func (m Model) View() string {
 	s.WriteString("\n")
 	s.WriteString(common.HelpStyle.Render("keys: a add | d delete | p pause/resume | r retry | x clear content"))
 
-	return s.String()
+	return tea.NewView(s.String())
 }
 
 // extractDomain extracts the domain from a URL

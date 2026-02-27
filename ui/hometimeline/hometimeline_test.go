@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
 	"github.com/google/uuid"
@@ -162,7 +162,7 @@ func TestUpdate_Navigation(t *testing.T) {
 	m.Selected = 0
 
 	// Move down
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	if m.Selected != 1 {
 		t.Errorf("Expected Selected 1 after 'j', got %d", m.Selected)
 	}
@@ -171,31 +171,31 @@ func TestUpdate_Navigation(t *testing.T) {
 	}
 
 	// Move down again
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.Selected != 2 {
 		t.Errorf("Expected Selected 2 after down, got %d", m.Selected)
 	}
 
 	// Try to move past last (should stay)
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	if m.Selected != 2 {
 		t.Errorf("Expected Selected 2 (stay at last), got %d", m.Selected)
 	}
 
 	// Move up
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	if m.Selected != 1 {
 		t.Errorf("Expected Selected 1 after 'k', got %d", m.Selected)
 	}
 
 	// Move up
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.Selected != 0 {
 		t.Errorf("Expected Selected 0 after up, got %d", m.Selected)
 	}
 
 	// Try to move before first (should stay)
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 	if m.Selected != 0 {
 		t.Errorf("Expected Selected 0 (stay at first), got %d", m.Selected)
 	}
@@ -214,13 +214,13 @@ func TestUpdate_ToggleURL(t *testing.T) {
 	m.Selected = 0
 
 	// Toggle URL on
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
 	if !m.showingURL {
 		t.Error("Expected showingURL true after 'o'")
 	}
 
 	// Toggle URL off
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
 	if m.showingURL {
 		t.Error("Expected showingURL false after second 'o'")
 	}
@@ -239,7 +239,7 @@ func TestUpdate_ToggleURL_NoObjectURI(t *testing.T) {
 	m.Selected = 0
 
 	// Try to toggle URL - should not work without ObjectURI
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
 	if m.showingURL {
 		t.Error("Expected showingURL false when no ObjectURI")
 	}
@@ -258,7 +258,7 @@ func TestUpdate_ReplyToPost(t *testing.T) {
 	}
 	m.Selected = 0
 
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
 
 	if cmd == nil {
 		t.Fatal("Expected command for reply")
@@ -292,7 +292,7 @@ func TestUpdate_ReplyToLocalPostWithoutObjectURI(t *testing.T) {
 	}
 	m.Selected = 0
 
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
 
 	if cmd == nil {
 		t.Fatal("Expected command for reply")
@@ -325,7 +325,7 @@ func TestUpdate_EnterOnPostWithReplies(t *testing.T) {
 	}
 	m.Selected = 0
 
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if cmd == nil {
 		t.Fatal("Expected command for thread view")
@@ -362,7 +362,7 @@ func TestUpdate_EnterOnPostWithoutReplies(t *testing.T) {
 	}
 	m.Selected = 0
 
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if cmd != nil {
 		t.Error("Expected no command for post without replies")
@@ -384,7 +384,7 @@ func TestUpdate_EnterOnLocalPostWithoutObjectURI(t *testing.T) {
 	}
 	m.Selected = 0
 
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	if cmd == nil {
 		t.Fatal("Expected command for thread view")
@@ -429,10 +429,10 @@ func TestView_EmptyPosts(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "No posts yet") {
+	if !strings.Contains(view.Content, "No posts yet") {
 		t.Error("Expected 'No posts yet' message")
 	}
-	if !strings.Contains(view, "Follow some accounts") {
+	if !strings.Contains(view.Content, "Follow some accounts") {
 		t.Error("Expected follow suggestion")
 	}
 }
@@ -447,7 +447,7 @@ func TestView_PostCount(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "3 posts") {
+	if !strings.Contains(view.Content, "3 posts") {
 		t.Error("Expected '3 posts' in header")
 	}
 }
@@ -466,7 +466,7 @@ func TestView_SingularReply(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "1 reply") {
+	if !strings.Contains(view.Content, "1 reply") {
 		t.Error("Expected singular '1 reply'")
 	}
 }
@@ -485,7 +485,7 @@ func TestView_PluralReplies(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "5 replies") {
+	if !strings.Contains(view.Content, "5 replies") {
 		t.Error("Expected plural '5 replies'")
 	}
 }
@@ -590,11 +590,11 @@ func TestUpdate_EmptyPosts_NoCrash(t *testing.T) {
 	m.Posts = []domain.HomePost{}
 
 	// Navigation on empty posts should not crash
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
+	m, _ = m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
 
 	// Should complete without panic
 }
@@ -619,7 +619,7 @@ func TestUpdate_ToggleEngagementInfo_WithEngagement(t *testing.T) {
 	m.Selected = 0
 
 	// Toggle engagement info on
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'i', Text: "i"})
 
 	if !m.showingEngagement {
 		t.Error("Expected showingEngagement true after 'i' key")
@@ -629,7 +629,7 @@ func TestUpdate_ToggleEngagementInfo_WithEngagement(t *testing.T) {
 	}
 
 	// Toggle engagement info off
-	m, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
+	m, cmd = m.Update(tea.KeyPressMsg{Code: 'i', Text: "i"})
 
 	if m.showingEngagement {
 		t.Error("Expected showingEngagement false after second 'i' key")
@@ -652,7 +652,7 @@ func TestUpdate_ToggleEngagementInfo_NoEngagement(t *testing.T) {
 	m.Selected = 0
 
 	// Try to toggle engagement info on post without engagement
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'i', Text: "i"})
 
 	if m.showingEngagement {
 		t.Error("Expected showingEngagement to remain false for post without engagement")
@@ -720,7 +720,7 @@ func TestUpdate_NavigationResetsEngagementInfo(t *testing.T) {
 	m.showingEngagement = true // Set engagement info as visible
 
 	// Navigate down
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 
 	if m.showingEngagement {
 		t.Error("Expected showingEngagement reset to false after navigation")
@@ -733,7 +733,7 @@ func TestUpdate_NavigationResetsEngagementInfo(t *testing.T) {
 	m.showingEngagement = true
 
 	// Navigate up
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
 
 	if m.showingEngagement {
 		t.Error("Expected showingEngagement reset to false after up navigation")
@@ -754,7 +754,7 @@ func TestUpdate_EngagementInfo_OnlyLikes(t *testing.T) {
 	m.Selected = 0
 
 	// Should work with only likes
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'i', Text: "i"})
 
 	if !m.showingEngagement {
 		t.Error("Expected showingEngagement true for post with likes only")
@@ -778,7 +778,7 @@ func TestUpdate_EngagementInfo_OnlyBoosts(t *testing.T) {
 	m.Selected = 0
 
 	// Should work with only boosts
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'i', Text: "i"})
 
 	if !m.showingEngagement {
 		t.Error("Expected showingEngagement true for post with boosts only")
@@ -793,7 +793,7 @@ func TestUpdate_EngagementInfo_EmptyPosts(t *testing.T) {
 	m.Posts = []domain.HomePost{}
 
 	// Should not crash with empty posts
-	m, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
+	m, cmd := m.Update(tea.KeyPressMsg{Code: 'i', Text: "i"})
 
 	if m.showingEngagement {
 		t.Error("Expected showingEngagement false with empty posts")
@@ -823,25 +823,25 @@ func TestView_EngagementInfoDisplay(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "⭐ Liked by:") {
+	if !strings.Contains(view.Content, "⭐ Liked by:") {
 		t.Error("Expected 'Liked by:' section in view")
 	}
-	if !strings.Contains(view, "🔁 Boosted by:") {
+	if !strings.Contains(view.Content, "🔁 Boosted by:") {
 		t.Error("Expected 'Boosted by:' section in view")
 	}
-	if !strings.Contains(view, "@alice") {
+	if !strings.Contains(view.Content, "@alice") {
 		t.Error("Expected '@alice' in likers")
 	}
-	if !strings.Contains(view, "@bob@mastodon.social") {
+	if !strings.Contains(view.Content, "@bob@mastodon.social") {
 		t.Error("Expected '@bob@mastodon.social' in likers")
 	}
-	if !strings.Contains(view, "@dave") {
+	if !strings.Contains(view.Content, "@dave") {
 		t.Error("Expected '@dave' in boosters")
 	}
-	if !strings.Contains(view, "@eve@fosstodon.org") {
+	if !strings.Contains(view.Content, "@eve@fosstodon.org") {
 		t.Error("Expected '@eve@fosstodon.org' in boosters")
 	}
-	if !strings.Contains(view, "(Press 'i' to toggle back)") {
+	if !strings.Contains(view.Content, "(Press 'i' to toggle back)") {
 		t.Error("Expected toggle hint in view")
 	}
 }
@@ -865,13 +865,13 @@ func TestView_EngagementInfoDisplay_OnlyLikers(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "⭐ Liked by:") {
+	if !strings.Contains(view.Content, "⭐ Liked by:") {
 		t.Error("Expected 'Liked by:' section in view")
 	}
-	if strings.Contains(view, "🔁 Boosted by:") {
+	if strings.Contains(view.Content, "🔁 Boosted by:") {
 		t.Error("Did not expect 'Boosted by:' section when no boosters")
 	}
-	if !strings.Contains(view, "@alice") {
+	if !strings.Contains(view.Content, "@alice") {
 		t.Error("Expected '@alice' in likers")
 	}
 }
@@ -895,13 +895,13 @@ func TestView_EngagementInfoDisplay_OnlyBoosters(t *testing.T) {
 
 	view := m.View()
 
-	if strings.Contains(view, "⭐ Liked by:") {
+	if strings.Contains(view.Content, "⭐ Liked by:") {
 		t.Error("Did not expect 'Liked by:' section when no likers")
 	}
-	if !strings.Contains(view, "🔁 Boosted by:") {
+	if !strings.Contains(view.Content, "🔁 Boosted by:") {
 		t.Error("Expected 'Boosted by:' section in view")
 	}
-	if !strings.Contains(view, "@dave") {
+	if !strings.Contains(view.Content, "@dave") {
 		t.Error("Expected '@dave' in boosters")
 	}
 }
@@ -926,10 +926,10 @@ func TestView_EngagementInfoDisplay_NoData(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "No engagement information available yet") {
+	if !strings.Contains(view.Content, "No engagement information available yet") {
 		t.Error("Expected 'No engagement information available yet' message")
 	}
-	if !strings.Contains(view, "(Likes and boosts by local users will appear here)") {
+	if !strings.Contains(view.Content, "(Likes and boosts by local users will appear here)") {
 		t.Error("Expected fallback explanation message")
 	}
 }
@@ -965,23 +965,23 @@ func TestView_EngagementInfoDisplay_ManyUsers(t *testing.T) {
 	view := m.View()
 
 	// Should show first 10 likers + "and X more" message
-	if !strings.Contains(view, "...and 5 more") {
+	if !strings.Contains(view.Content, "...and 5 more") {
 		t.Error("Expected '...and 5 more' for likers")
 	}
 
 	// Should show first 10 boosters + "and X more" message
-	if !strings.Contains(view, "...and 2 more") {
+	if !strings.Contains(view.Content, "...and 2 more") {
 		t.Error("Expected '...and 2 more' for boosters")
 	}
 
 	// Verify we see the first users but not the ones beyond 10
-	if !strings.Contains(view, "@user1") {
+	if !strings.Contains(view.Content, "@user1") {
 		t.Error("Expected '@user1' in view")
 	}
-	if !strings.Contains(view, "@user10") {
+	if !strings.Contains(view.Content, "@user10") {
 		t.Error("Expected '@user10' in view")
 	}
-	if strings.Contains(view, "@user11") {
+	if strings.Contains(view.Content, "@user11") {
 		t.Error("Did not expect '@user11' (should be truncated)")
 	}
 }
@@ -1007,13 +1007,13 @@ func TestView_EngagementInfo_NotShowing(t *testing.T) {
 	view := m.View()
 
 	// Should show normal content, not engagement info
-	if strings.Contains(view, "⭐ Liked by:") {
+	if strings.Contains(view.Content, "⭐ Liked by:") {
 		t.Error("Did not expect 'Liked by:' when not showing engagement")
 	}
-	if strings.Contains(view, "🔁 Boosted by:") {
+	if strings.Contains(view.Content, "🔁 Boosted by:") {
 		t.Error("Did not expect 'Boosted by:' when not showing engagement")
 	}
-	if !strings.Contains(view, "Test post") {
+	if !strings.Contains(view.Content, "Test post") {
 		t.Error("Expected normal content to be displayed")
 	}
 }

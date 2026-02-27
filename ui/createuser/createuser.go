@@ -3,9 +3,9 @@ package createuser
 import (
 	"fmt"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/ui/common"
 	"github.com/deemkeen/stegodon/util"
@@ -38,9 +38,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case util.ErrMsg:
 		m.Err = msg
 		return m, nil
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		// Clear error when user starts typing
-		if msg.Type == tea.KeyRunes || msg.Type == tea.KeyBackspace {
+		if msg.String() != "enter" && msg.String() != "esc" && msg.String() != "ctrl+c" {
 			m.Error = ""
 		}
 
@@ -92,7 +92,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	var prompt string
 	var input string
 	var help string
@@ -128,7 +128,7 @@ func (m Model) View() string {
 		baseView += "\n\n" + errorStyle.Render(m.Error)
 	}
 
-	return baseView + "\n"
+	return tea.NewView(baseView + "\n")
 }
 
 // ViewWithWidth renders the view with proper width accounting for border and margins
@@ -139,7 +139,7 @@ func (m Model) ViewWithWidth(termWidth, termHeight int) string {
 		// Minimum width
 		common.CreateUserMinWidth)
 
-	bordered := Style.Width(contentWidth).Render(m.View())
+	bordered := Style.Width(contentWidth).Render(m.View().Content)
 	return lipgloss.Place(termWidth, termHeight, lipgloss.Center, lipgloss.Center, bordered)
 }
 
@@ -148,17 +148,17 @@ func InitialModel() Model {
 	ti.Placeholder = "ElonMusk666"
 	ti.Focus()
 	ti.CharLimit = 15
-	ti.Width = 20
+	ti.SetWidth(20)
 
 	displayName := textinput.New()
 	displayName.Placeholder = "John Doe"
 	displayName.CharLimit = 50
-	displayName.Width = 50
+	displayName.SetWidth(50)
 
 	bio := textinput.New()
 	bio.Placeholder = "CEO of X, Tesla, SpaceX..."
 	bio.CharLimit = 200
-	bio.Width = 60
+	bio.SetWidth(60)
 
 	return Model{
 		TextInput:   ti,

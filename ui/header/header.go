@@ -3,8 +3,8 @@ package header
 import (
 	"fmt"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
 	"github.com/deemkeen/stegodon/util"
@@ -25,8 +25,8 @@ func (m Model) Update(tea.Msg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) View() string {
-	return GetHeaderStyle(m.Acc, m.Width, m.UnreadCount)
+func (m Model) View() tea.View {
+	return tea.NewView(GetHeaderStyle(m.Acc, m.Width, m.UnreadCount))
 }
 
 func GetHeaderStyle(acc *domain.Account, width int, unreadCount int) string {

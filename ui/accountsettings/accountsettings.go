@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"
 	"github.com/deemkeen/stegodon/ui/common"
@@ -266,7 +266,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch m.ViewState {
 		case MenuView:
 			return m.updateMenu(msg)
@@ -284,7 +284,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) updateMenu(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) updateMenu(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "k":
 		if m.MenuItem > MenuEditDisplayName {
@@ -335,7 +335,7 @@ func (m Model) updateMenu(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) updateEditDisplayName(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) updateEditDisplayName(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.ViewState = MenuView
@@ -352,7 +352,7 @@ func (m Model) updateEditDisplayName(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) updateEditBio(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) updateEditBio(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.ViewState = MenuView
@@ -369,7 +369,7 @@ func (m Model) updateEditBio(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) updateAvatar(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) updateAvatar(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.ViewState = MenuView
@@ -384,7 +384,7 @@ func (m Model) updateAvatar(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) updateDelete(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) updateDelete(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "y", "Y":
 		if m.ConfirmStep == 0 {
@@ -406,7 +406,7 @@ func (m Model) updateDelete(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
 	var s strings.Builder
 
 	s.WriteString(common.CaptionStyle.Render("account settings"))
@@ -420,14 +420,14 @@ func (m Model) View() string {
 		s.WriteString("\n\n")
 		s.WriteString(byeStyle.Render("Bye bye!"))
 		s.WriteString("\n\n")
-		return s.String()
+		return tea.NewView(s.String())
 	}
 
 	if m.DeletionStatus == "completed" {
 		s.WriteString(confirmStyle.Render("Account deleted successfully"))
 		s.WriteString("\n\n")
 		s.WriteString(instructionStyle.Render("Logging out..."))
-		return s.String()
+		return tea.NewView(s.String())
 	}
 
 	switch m.ViewState {
@@ -453,7 +453,7 @@ func (m Model) View() string {
 		s.WriteString(warningStyle.Render(m.Error))
 	}
 
-	return s.String()
+	return tea.NewView(s.String())
 }
 
 func (m Model) renderMenu() string {
