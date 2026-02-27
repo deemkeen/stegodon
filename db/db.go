@@ -30,8 +30,6 @@ var (
 )
 
 const (
-	//TODO add indices
-
 	//Accounts
 	sqlCreateUserTable = `CREATE TABLE IF NOT EXISTS accounts(
                         id uuid NOT NULL PRIMARY KEY,

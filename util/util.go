@@ -67,7 +67,6 @@ func PublicKeyToString(s ssh.PublicKey) string {
 
 func PkToHash(pk string) string {
 	h := sha256.New()
-	// TODO add a pinch of salt
 	h.Write([]byte(pk))
 	return hex.EncodeToString(h.Sum(nil))
 }

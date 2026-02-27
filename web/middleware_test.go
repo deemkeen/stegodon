@@ -257,35 +257,53 @@ func TestMaxBytesMiddlewareErrorMessage(t *testing.T) {
 func TestCleanupOldLimiters(t *testing.T) {
 	rl := NewRateLimiter(rate.Limit(10), 20)
 
-	// Add more than 10000 limiters
-	for i := range 10001 {
-		ip := "192.168." + string(rune(i/256)) + "." + string(rune(i%256))
-		rl.getLimiter(ip)
+	// Add limiters with old timestamps (simulating inactive IPs)
+	rl.mu.Lock()
+	oldTime := time.Now().Add(-15 * time.Minute)
+	for i := range 100 {
+		ip := "10.0." + string(rune(i/256+1)) + "." + string(rune(i%256+1))
+		rl.limiters[ip] = &limiterEntry{
+			limiter:  rate.NewLimiter(rl.rate, rl.burst),
+			lastSeen: oldTime,
+		}
 	}
+	rl.mu.Unlock()
 
-	// Verify we have many limiters
+	// Add a recent limiter that should survive cleanup
+	recentLimiter := rl.getLimiter("192.168.1.1")
+
+	// Verify we have 101 limiters (100 old + 1 recent)
 	rl.mu.Lock()
 	count := len(rl.limiters)
 	rl.mu.Unlock()
 
-	if count <= 10000 {
-		t.Errorf("Expected more than 10000 limiters, got %d", count)
+	if count != 101 {
+		t.Errorf("Expected 101 limiters, got %d", count)
 	}
 
-	// Trigger cleanup by simulating the condition
+	// Simulate cleanup: evict entries older than 10 minutes
 	rl.mu.Lock()
-	if len(rl.limiters) > 10000 {
-		rl.limiters = make(map[string]*rate.Limiter)
+	cutoff := time.Now().Add(-10 * time.Minute)
+	for ip, entry := range rl.limiters {
+		if entry.lastSeen.Before(cutoff) {
+			delete(rl.limiters, ip)
+		}
 	}
 	rl.mu.Unlock()
 
-	// Verify cleanup happened
+	// Verify only the recent limiter survived
 	rl.mu.Lock()
 	newCount := len(rl.limiters)
 	rl.mu.Unlock()
 
-	if newCount != 0 {
-		t.Errorf("Expected 0 limiters after cleanup, got %d", newCount)
+	if newCount != 1 {
+		t.Errorf("Expected 1 limiter after cleanup, got %d", newCount)
+	}
+
+	// Verify the surviving limiter is the recent one
+	survivingLimiter := rl.getLimiter("192.168.1.1")
+	if survivingLimiter != recentLimiter {
+		t.Error("Recent limiter should survive cleanup")
 	}
 }
 

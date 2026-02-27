@@ -39,7 +39,7 @@ func PkToHash(pk string) string {
 |----------|-------|
 | Algorithm | SHA-256 |
 | Output | 64-character hex string |
-| Salt | None (TODO: add salt) |
+| Salt | None (not needed for high-entropy SSH keys) |
 
 ### Usage Flow
 
@@ -159,8 +159,13 @@ func VerifyRequest(req *http.Request, publicKeyPem string) (string, error) {
 Per-IP rate limiting using Go's `golang.org/x/time/rate` token bucket algorithm.
 
 ```go
+type limiterEntry struct {
+    limiter  *rate.Limiter
+    lastSeen time.Time
+}
+
 type RateLimiter struct {
-    limiters map[string]*rate.Limiter
+    limiters map[string]*limiterEntry
     mu       sync.RWMutex
     rate     rate.Limit
     burst    int
@@ -168,7 +173,7 @@ type RateLimiter struct {
 
 func NewRateLimiter(r rate.Limit, b int) *RateLimiter {
     rl := &RateLimiter{
-        limiters: make(map[string]*rate.Limiter),
+        limiters: make(map[string]*limiterEntry),
         rate:     r,
         burst:    b,
     }
@@ -226,9 +231,11 @@ func (rl *RateLimiter) cleanupOldLimiters() {
 
     for range ticker.C {
         rl.mu.Lock()
-        // Reset if map grows too large
-        if len(rl.limiters) > 10000 {
-            rl.limiters = make(map[string]*rate.Limiter)
+        cutoff := time.Now().Add(-10 * time.Minute)
+        for ip, entry := range rl.limiters {
+            if entry.lastSeen.Before(cutoff) {
+                delete(rl.limiters, ip)
+            }
         }
         rl.mu.Unlock()
     }
@@ -238,8 +245,8 @@ func (rl *RateLimiter) cleanupOldLimiters() {
 | Property | Value |
 |----------|-------|
 | Cleanup interval | 5 minutes |
-| Max entries | 10,000 |
-| Cleanup action | Full reset |
+| Eviction threshold | 10 minutes inactive |
+| Cleanup action | Per-entry eviction |
 
 ---
 
