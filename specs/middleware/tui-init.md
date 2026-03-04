@@ -148,7 +148,7 @@ tea.NewProgram(m,
 The `repaintWriter` wraps the SSH output and replaces the cursed renderer's differential output with a full-repaint on every frame. This works around bubbletea v2's cursed renderer producing rendering artifacts over SSH (see [wish#392](https://github.com/charmbracelet/wish/pull/392)).
 
 - On first write: enters alt screen (`\033[?1049h`) and hides cursor (`\033[?25l`)
-- On each frame: discards cursed renderer output, clears screen, writes full view content
+- On each frame: discards cursed renderer output, overwrites in place with per-line erase, buffered into a single write
 - Uses synchronized output (BSU/ESU `\033[?2026h`/`\033[?2026l`) to prevent tearing
 - On shutdown: restores cursor and leaves alt screen
 

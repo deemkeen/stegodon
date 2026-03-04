@@ -1,9 +1,11 @@
 package middleware
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"log"
+	"strings"
 	"sync"
 
 	tea "charm.land/bubbletea/v2"
@@ -39,11 +41,27 @@ func (rw *repaintWriter) Write(p []byte) (n int, err error) {
 
 	content := rw.store.Load()
 	if len(content) > 0 {
-		// Synchronized output prevents tearing during the repaint.
-		rw.w.Write([]byte("\033[?2026h"))   // begin synchronized output
-		rw.w.Write([]byte("\033[H\033[2J")) // cursor home + erase screen
-		rw.w.Write([]byte(content))         // full view repaint
-		rw.w.Write([]byte("\033[?2026l"))   // end synchronized output
+		// Build entire frame in a single buffer to maximize atomic delivery
+		// through PTY + SSH, reducing flicker on Linux terminals.
+		var buf bytes.Buffer
+		buf.WriteString("\033[?2026h") // begin synchronized output
+		buf.WriteString("\033[H")      // cursor home (overwrite in place)
+
+		// Per-line erase: append \033[K (erase to EOL) after each line
+		// to clear stale trailing chars without blanking the screen.
+		lines := strings.Split(content, "\n")
+		for i, line := range lines {
+			buf.WriteString(line)
+			buf.WriteString("\033[K") // erase to end of line
+			if i < len(lines)-1 {
+				buf.WriteByte('\n')
+			}
+		}
+
+		buf.WriteString("\033[J")      // erase from cursor to end of screen
+		buf.WriteString("\033[?2026l") // end synchronized output
+
+		rw.w.Write(buf.Bytes())
 	}
 
 	// Report full length consumed so bubbletea doesn't retry.
