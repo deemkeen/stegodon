@@ -10,9 +10,10 @@ import (
 	"syscall"
 	"time"
 
+	"charm.land/wish/v2"
+	"charm.land/wish/v2/bubbletea"
+	"charm.land/wish/v2/logging"
 	"github.com/charmbracelet/ssh"
-	"github.com/charmbracelet/wish"
-	"github.com/charmbracelet/wish/logging"
 	"github.com/deemkeen/stegodon/activitypub"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/middleware"
@@ -117,6 +118,7 @@ func (a *App) Initialize() error {
 		wish.WithHostKeyPath(sshKeyPath),
 		wish.WithPublicKeyAuth(func(ssh.Context, ssh.PublicKey) bool { return true }),
 		wish.WithMiddleware(
+			bubbletea.Middleware(middleware.TeaHandler),
 			middleware.MainTui(),
 			middleware.AuthMiddleware(a.config),
 			logging.MiddlewareWithLogger(log.Default()),

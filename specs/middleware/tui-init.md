@@ -6,15 +6,30 @@ This document specifies the BubbleTea program setup for each SSH session.
 
 ## Overview
 
-Each SSH session gets its own BubbleTea program instance. The MainTui middleware handles:
-- Terminal capability detection
+Each SSH session gets its own BubbleTea program instance. The `bubbletea.Middleware` from wish v2 handles:
+- PTY I/O setup (input/output routing)
+- Window resize forwarding
+- Program lifecycle management (alt screen, cursor, cleanup)
 - Color profile configuration
-- Main model initialization
-- Program lifecycle management
+
+The `MainTui` middleware handles CLI command interception before the TUI is started.
 
 ---
 
 ## Middleware Implementation
+
+### Middleware Stack (app/app.go)
+
+```go
+wish.WithMiddleware(
+    bubbletea.Middleware(middleware.TeaHandler),   // TUI (innermost)
+    middleware.MainTui(),                          // CLI interception
+    middleware.AuthMiddleware(a.config),            // Auth
+    logging.MiddlewareWithLogger(log.Default()),   // Logging (outermost)
+)
+```
+
+Execution order: Logging → Auth → MainTui → bubbletea.Middleware
 
 ### MainTui Function
 
@@ -22,51 +37,43 @@ Each SSH session gets its own BubbleTea program instance. The MainTui middleware
 func MainTui() wish.Middleware {
     return func(next ssh.Handler) ssh.Handler {
         return func(s ssh.Session) {
-            // 1. Check for active terminal
-            pty, windowChanges, active := s.Pty()
-            if !active {
-                wish.Println(s, "no active terminal, skipping")
-                next(s)
+            if cmd := s.Command(); len(cmd) > 0 {
+                handleCLI(s, cmd)
                 return
             }
-
-            // 2. Load user account
-            err, acc := db.GetDB().ReadAccBySession(s)
-            if err != nil {
-                log.Println("Could not retrieve the user:", err)
-                next(s)
-                return
-            }
-
-            // 3. Create main model with ViewStore for repaint workaround
-            m := ui.NewModel(*acc, pty.Window.Width, pty.Window.Height)
-            viewStore := &ui.ViewStore{}
-            m.ViewContent = viewStore
-
-            // 4. Create repaintWriter (bypasses cursed renderer artifacts over SSH)
-            in, out := ptyIO(s)
-            rw := &repaintWriter{w: out, store: viewStore}
-
-            // 5. Create BubbleTea program
-            p := tea.NewProgram(m,
-                tea.WithFPS(30),
-                tea.WithInput(in),
-                tea.WithOutput(rw),
-                tea.WithEnvironment(s.Environ()),
-                tea.WithColorProfile(colorprofile.TrueColor),
-                tea.WithWindowSize(pty.Window.Width, pty.Window.Height),
-            )
-
-            // 6. Handle window resizes
-            go func() { /* forward windowChanges to p.Send(tea.WindowSizeMsg{...}) */ }()
-
-            p.Run()
-            p.Kill()
             next(s)
         }
     }
 }
 ```
+
+CLI commands are intercepted here. Interactive sessions pass through to `bubbletea.Middleware`.
+
+### TeaHandler Function
+
+```go
+func TeaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
+    pty, _, _ := s.Pty()
+
+    err, acc := db.GetDB().ReadAccBySession(s)
+    if err != nil {
+        log.Println("Could not retrieve the user:", err)
+        return nil, nil
+    }
+
+    m := ui.NewModel(*acc, pty.Window.Width, pty.Window.Height)
+    return m, []tea.ProgramOption{
+        tea.WithFPS(30),
+        tea.WithColorProfile(colorprofile.TrueColor),
+    }
+}
+```
+
+The `bubbletea.Middleware` from wish v2 calls this handler for each session and takes care of:
+- Connecting SSH session I/O to the tea.Program
+- Forwarding window resize events as `tea.WindowSizeMsg`
+- Alt screen and cursor management
+- Proper cleanup on session end
 
 ---
 
@@ -74,15 +81,7 @@ func MainTui() wish.Middleware {
 
 ### PTY Check
 
-```go
-pty, _, active := s.Pty()
-if !active {
-    wish.Println(s, "no active terminal, skipping")
-    return nil
-}
-```
-
-Sessions without an active PTY (e.g., SSH commands without `-t`) are rejected.
+PTY detection is handled by `bubbletea.Middleware` internally via `bubbletea.MakeOptions(s)`, which selects the appropriate I/O based on whether a real PTY or emulated PTY is available.
 
 ### Window Dimensions
 
@@ -91,7 +90,7 @@ pty.Window.Width   // Terminal width in columns
 pty.Window.Height  // Terminal height in rows
 ```
 
-Dimensions are passed to the model for layout calculations.
+Dimensions are passed to the model for layout calculations. Resize events are automatically forwarded by `bubbletea.Middleware`.
 
 ---
 
@@ -103,7 +102,7 @@ Dimensions are passed to the model for layout calculations.
 tea.WithColorProfile(colorprofile.TrueColor)
 ```
 
-TrueColor (24-bit color) is set per-program via `WithColorProfile` (the global `lipgloss.SetColorProfile` was removed in v2):
+TrueColor (24-bit color) is set per-program via `WithColorProfile`:
 - Renders colors independent of terminal palette
 - Avoids ANSI 256-color palette inconsistencies across terminals
 - Supported by all modern terminal emulators (Ghostty, iTerm2, Alacritty, etc.)
@@ -123,38 +122,21 @@ TrueColor (24-bit color) is set per-program via `WithColorProfile` (the global `
 
 ### Program Configuration
 
+The `TeaHandler` returns these options:
+
 ```go
-tea.NewProgram(m,
+[]tea.ProgramOption{
     tea.WithFPS(30),
-    tea.WithInput(in),
-    tea.WithOutput(rw),                          // repaintWriter
-    tea.WithEnvironment(s.Environ()),
     tea.WithColorProfile(colorprofile.TrueColor),
-    tea.WithWindowSize(pty.Window.Width, pty.Window.Height),
-)
+}
 ```
 
 | Option | Description |
 |--------|-------------|
 | `WithFPS(30)` | 30 frames per second rendering |
-| `WithInput(in)` | Read from PTY input |
-| `WithOutput(rw)` | Write to repaintWriter (full-repaint workaround) |
-| `WithEnvironment(...)` | Pass SSH session environment |
 | `WithColorProfile(...)` | Set TrueColor rendering |
-| `WithWindowSize(...)` | Set initial terminal dimensions (required over SSH) |
 
-### RepaintWriter
-
-The `repaintWriter` wraps the SSH output and replaces the cursed renderer's differential output with a full-repaint on every frame. This works around bubbletea v2's cursed renderer producing rendering artifacts over SSH (see [wish#392](https://github.com/charmbracelet/wish/pull/392)).
-
-- On first write: enters alt screen (`\033[?1049h`) and hides cursor (`\033[?25l`)
-- On each frame: discards cursed renderer output, overwrites in place with per-line erase, buffered into a single write
-- Uses synchronized output (BSU/ESU `\033[?2026h`/`\033[?2026l`) to prevent tearing
-- On shutdown: restores cursor and leaves alt screen
-
-### ViewStore
-
-`ViewStore` is a mutex-protected string store in `ui/supertui.go`. `MainModel.View()` stores its rendered content via `storeView()` before returning, so `repaintWriter` can access the latest full view independently of the cursed renderer.
+The `bubbletea.Middleware` automatically adds I/O, environment, and window size options via `MakeOptions(s)`.
 
 ---
 
@@ -236,9 +218,10 @@ SSH Session
      └────────────┘
            │
            ▼
-     ┌────────────┐
-     │ tea.Program│
-     └────────────┘
+     ┌────────────────────────┐
+     │ bubbletea.Middleware   │
+     │ (creates tea.Program)  │
+     └────────────────────────┘
            │
            ▼
      ┌────────────┐
@@ -278,34 +261,27 @@ Each view component is initialized with appropriate data:
 err, acc := db.GetDB().ReadAccBySession(s)
 if err != nil {
     log.Println("Could not retrieve the user:", err)
-    return nil
+    return nil, nil
 }
 ```
 
-If account lookup fails, no program is created and the session ends.
+If account lookup fails, `TeaHandler` returns nil and no program is created.
 
 ### No Active Terminal
 
-```go
-if !active {
-    wish.Println(s, "no active terminal, skipping")
-    return nil
-}
-```
-
-Non-interactive sessions are rejected with a message.
+Handled by `bubbletea.Middleware` internally — sessions without an active PTY are rejected.
 
 ---
 
 ## Middleware Integration
 
-### Wish Middleware
+### Wish v2 bubbletea.Middleware
 
-The TUI middleware is implemented as a standard `wish.Middleware` closure (the `wish/bubbletea` middleware package is not used with v2):
-- Creates the bubbletea program directly with `tea.NewProgram`
-- Uses `repaintWriter` for output to work around cursed renderer artifacts
-- Handles window resize forwarding via goroutine
-- Restores terminal state on shutdown
+The TUI is served using wish v2's `bubbletea.Middleware`:
+- Calls `TeaHandler` to get the model and options for each session
+- Creates the bubbletea program with proper I/O via `MakeOptions(s)`
+- Handles window resize forwarding automatically
+- Manages alt screen and terminal state cleanup
 
 ---
 
@@ -333,7 +309,7 @@ func (m MainModel) Init() tea.Cmd {
 
 ## Window Resize Handling
 
-Terminal resize events propagate to all views:
+Terminal resize events are forwarded automatically by `bubbletea.Middleware` as `tea.WindowSizeMsg` and propagate to all views:
 
 ```go
 case tea.WindowSizeMsg:
@@ -355,13 +331,13 @@ case tea.WindowSizeMsg:
 tea.WithFPS(30)
 ```
 
-30 frames per second provides a balance between responsive input and bandwidth efficiency over SSH. The `repaintWriter` sends a full screen repaint on every frame, so a lower FPS reduces bandwidth overhead. Actual updates occur only when state changes.
+30 frames per second provides a balance between responsive input and bandwidth efficiency over SSH. Actual updates occur only when state changes.
 
 ---
 
 ## Source Files
 
-- `middleware/maintui.go` - MainTui middleware
+- `middleware/maintui.go` - MainTui middleware, TeaHandler
 - `ui/supertui.go` - NewModel, MainModel
 - `ui/common/layout.go` - DefaultWindowWidth, DefaultWindowHeight
 - `app/app.go` - Middleware stack configuration

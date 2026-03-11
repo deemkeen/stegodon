@@ -5,8 +5,8 @@ import (
 	"net"
 	"strings"
 
+	"charm.land/wish/v2"
 	"github.com/charmbracelet/ssh"
-	"github.com/charmbracelet/wish"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/util"
 )
