@@ -31,6 +31,7 @@ type AppConfig struct {
 		ShowGlobal      bool   `yaml:"showGlobal"`
 		SshOnly         bool   `yaml:"sshOnly"`
 		ShowTos         bool   `yaml:"showTos"`
+		IdleTimeout     int    `yaml:"idleTimeout"`
 	}
 }
 
@@ -83,6 +84,7 @@ func ReadConf() (*AppConfig, error) {
 	envShowGlobal := os.Getenv("STEGODON_SHOW_GLOBAL")
 	envSshOnly := os.Getenv("STEGODON_SSH_ONLY")
 	envShowTos := os.Getenv("STEGODON_SHOW_TOS")
+	envIdleTimeout := os.Getenv("STEGODON_IDLE_TIMEOUT")
 
 	if envHost != "" {
 		c.Conf.Host = envHost
@@ -144,6 +146,18 @@ func ReadConf() (*AppConfig, error) {
 		c.Conf.ShowTos = true
 	}
 
+	if envIdleTimeout != "" {
+		v, err := strconv.Atoi(envIdleTimeout)
+		if err != nil {
+			log.Printf("Error parsing STEGODON_IDLE_TIMEOUT: %v", err)
+		} else if v < 1 {
+			log.Printf("STEGODON_IDLE_TIMEOUT value %d is less than minimum of 1, setting to default 30", v)
+			c.Conf.IdleTimeout = 30
+		} else {
+			c.Conf.IdleTimeout = v
+		}
+	}
+
 	if envMaxChars != "" {
 		v, err := strconv.Atoi(envMaxChars)
 		if err != nil {
@@ -161,6 +175,11 @@ func ReadConf() (*AppConfig, error) {
 				c.Conf.MaxChars = v
 			}
 		}
+	}
+
+	// Set default idle timeout if not set in config or environment
+	if c.Conf.IdleTimeout == 0 {
+		c.Conf.IdleTimeout = 30
 	}
 
 	// Set default value if not set in config or environment

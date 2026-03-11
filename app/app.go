@@ -127,6 +127,7 @@ func (a *App) Initialize() error {
 	if err != nil {
 		return fmt.Errorf("failed to create SSH server: %w", err)
 	}
+	sshServer.IdleTimeout = time.Duration(a.config.Conf.IdleTimeout) * time.Minute
 	a.sshServer = sshServer
 
 	// Initialize HTTP router and server
