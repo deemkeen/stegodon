@@ -10,3 +10,4 @@
 /remote
 coverage.out
 /dist/
+.claude/

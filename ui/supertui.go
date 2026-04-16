@@ -679,8 +679,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Route SessionState to threadview for like count updates
 		m.threadViewModel, cmd = m.threadViewModel.Update(msg)
 		cmds = append(cmds, cmd)
-	case tea.KeyPressMsg:
-		// Keyboard input handled below in separate switch
+	case tea.KeyPressMsg, tea.PasteMsg, tea.PasteStartMsg, tea.PasteEndMsg:
+		// User input handled below via state-based routing
 	default:
 		// For other messages (data loaded messages, feedback messages, etc.),
 		// route based on model safety regarding goroutine leaks

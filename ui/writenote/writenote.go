@@ -62,6 +62,7 @@ type Model struct {
 	autocompleteCandidates []MentionCandidate // All available candidates
 	filteredCandidates     []MentionCandidate // Filtered based on current input
 	autocompleteIndex      int                // Currently selected suggestion
+	lastMentionQuery       string             // Last seen mention query, used to preserve selection across no-op updates
 	mentionStartPos        int                // Position where @ was typed
 	localDomain            string             // Local domain for identifying local users
 	// Server message
@@ -453,8 +454,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.isEditing = false
 		m.editingNoteId = uuid.Nil
 		m.originalCreatedAt = time.Time{}
-		// Clear textarea and focus
-		m.Textarea.SetValue("")
+		// Pre-fill textarea with @user@server mention (user can delete if desired)
+		mention := msg.Author
+		if !strings.HasPrefix(mention, "@") {
+			mention = "@" + mention
+		}
+		m.Textarea.SetValue(mention + " ")
+		m.Textarea.CursorEnd()
 		m.Textarea.Focus()
 		// Clear autocomplete
 		m.showAutocomplete = false
@@ -665,11 +671,20 @@ func (m *Model) updateAutocomplete() {
 		m.mentionStartPos = mentionStart
 		m.filterCandidates(query)
 		m.showAutocomplete = len(m.filteredCandidates) > 0
-		m.autocompleteIndex = 0
+		// Only reset selection when the query actually changes, so background
+		// messages (cursor blink, ticks) don't clobber the user's scroll position.
+		if query != m.lastMentionQuery {
+			m.autocompleteIndex = 0
+			m.lastMentionQuery = query
+		} else if m.autocompleteIndex >= len(m.filteredCandidates) {
+			// Clamp if candidates shrank
+			m.autocompleteIndex = 0
+		}
 	} else {
 		// Not typing a mention
 		m.showAutocomplete = false
 		m.mentionStartPos = -1
+		m.lastMentionQuery = ""
 	}
 }
 

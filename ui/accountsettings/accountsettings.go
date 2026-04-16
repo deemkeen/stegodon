@@ -105,12 +105,14 @@ func InitialModel(account *domain.Account) Model {
 	dnInput := textinput.New()
 	dnInput.Placeholder = "Display name"
 	dnInput.CharLimit = 50
+	dnInput.SetWidth(50)
 	dnInput.SetValue(account.DisplayName)
 
 	// Bio input
 	bioInput := textinput.New()
 	bioInput.Placeholder = "Bio/summary"
 	bioInput.CharLimit = 200
+	bioInput.SetWidth(60)
 	bioInput.SetValue(account.Summary)
 
 	conf, _ := util.ReadConf()

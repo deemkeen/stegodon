@@ -97,10 +97,8 @@ func loadRelays() tea.Cmd {
 			return relaysLoadedMsg{relays: []domain.Relay{}}
 		}
 		if relays == nil {
-			log.Printf("Relay panel: Relays is nil")
 			return relaysLoadedMsg{relays: []domain.Relay{}}
 		}
-		log.Printf("Relay panel: Loaded %d relays", len(*relays))
 		return relaysLoadedMsg{relays: *relays}
 	}
 }
@@ -115,7 +113,6 @@ func subscribeToRelay(adminAcct *domain.Account, relayURL string, config *util.A
 			log.Printf("Relay panel: Failed to subscribe to relay %s: %v", actorURI, err)
 			return relayAddedMsg{err: err}
 		}
-		log.Printf("Relay panel: Sent follow to relay %s", actorURI)
 		return relayAddedMsg{err: nil}
 	}
 }
@@ -151,7 +148,6 @@ func retryRelay(adminAcct *domain.Account, relay *domain.Relay, config *util.App
 			log.Printf("Relay panel: Failed to retry relay %s: %v", relay.ActorURI, err)
 			return relayRetryMsg{err: err}
 		}
-		log.Printf("Relay panel: Retried relay %s", relay.ActorURI)
 		return relayRetryMsg{err: nil}
 	}
 }
@@ -164,7 +160,6 @@ func toggleRelayPause(relayId uuid.UUID, paused bool) tea.Cmd {
 			log.Printf("Relay panel: Failed to update relay pause status: %v", err)
 			return relayPausedMsg{id: relayId, paused: paused, err: err}
 		}
-		log.Printf("Relay panel: Set relay %s paused=%v", relayId, paused)
 		return relayPausedMsg{id: relayId, paused: paused, err: nil}
 	}
 }
@@ -177,7 +172,6 @@ func deleteRelayContent() tea.Cmd {
 			log.Printf("Relay panel: Failed to delete relay content: %v", err)
 			return relayContentDeletedMsg{count: 0, err: err}
 		}
-		log.Printf("Relay panel: Deleted %d relay activities", count)
 		return relayContentDeletedMsg{count: count, err: nil}
 	}
 }
@@ -201,7 +195,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case relaysLoadedMsg:
-		log.Printf("Relay panel: Received relaysLoadedMsg with %d relays", len(msg.relays))
 		m.Relays = msg.relays
 		m.Selected = 0
 		m.Offset = 0

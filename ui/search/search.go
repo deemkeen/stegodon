@@ -74,6 +74,7 @@ func InitialModel(localDomain string) Model {
 	ti := textinput.New()
 	ti.Placeholder = "search posts..."
 	ti.CharLimit = 100
+	ti.SetWidth(60)
 
 	return Model{
 		Active:      false,
