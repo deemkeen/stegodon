@@ -6,22 +6,22 @@ require (
 	charm.land/bubbles/v2 v2.1.0
 	charm.land/bubbletea/v2 v2.0.6
 	charm.land/lipgloss/v2 v2.0.3
-	charm.land/wish/v2 v2.0.0
+	charm.land/wish/v2 v2.0.1
 	code.superseriousbusiness.org/httpsig v1.5.0
 	github.com/charmbracelet/colorprofile v0.4.3
 	github.com/charmbracelet/ssh v0.0.0-20250826160808-ebfa259c7309
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/gin-contrib/gzip v1.2.6
 	github.com/gin-gonic/gin v1.12.0
-	github.com/gomarkdown/markdown v0.0.0-20260412113850-134a5b2cce7f
+	github.com/gomarkdown/markdown v0.0.0-20260417124207-7d523f7318df
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/feeds v1.2.0
 	github.com/mattn/go-runewidth v0.0.23
-	golang.org/x/crypto v0.50.0
-	golang.org/x/image v0.39.0
+	golang.org/x/crypto v0.51.0
+	golang.org/x/image v0.40.0
 	golang.org/x/time v0.15.0
 	gopkg.in/yaml.v3 v3.0.1
-	modernc.org/sqlite v1.48.2
+	modernc.org/sqlite v1.50.1
 )
 
 require (
@@ -72,12 +72,12 @@ require (
 	go.mongodb.org/mongo-driver/v2 v2.5.0 // indirect
 	golang.org/x/arch v0.22.0 // indirect
 	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546 // indirect
-	golang.org/x/net v0.52.0 // indirect
+	golang.org/x/net v0.53.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.43.0 // indirect
-	golang.org/x/text v0.36.0 // indirect
+	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
-	modernc.org/libc v1.70.0 // indirect
+	modernc.org/libc v1.72.3 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )

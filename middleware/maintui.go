@@ -4,9 +4,9 @@ import (
 	"log"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/wish/v2"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/ssh"
-	"charm.land/wish/v2"
 	"github.com/deemkeen/stegodon/cli"
 	"github.com/deemkeen/stegodon/db"
 	"github.com/deemkeen/stegodon/domain"

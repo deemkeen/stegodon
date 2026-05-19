@@ -73,8 +73,8 @@ type HomePost struct {
 // SearchResult represents a post found via full-text search
 type SearchResult struct {
 	ID         uuid.UUID
-	Author     string    // @user or @user@domain
-	Snippet    string    // FTS5 snippet with highlight markers (<<…>>)
+	Author     string // @user or @user@domain
+	Snippet    string // FTS5 snippet with highlight markers (<<…>>)
 	Time       time.Time
 	ObjectURI  string
 	ObjectURL  string

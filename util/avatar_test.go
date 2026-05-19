@@ -55,8 +55,8 @@ func TestRenderImageToHalfBlocks_MultiRow(t *testing.T) {
 func TestRenderImageToHalfBlocks_TrueColorValues(t *testing.T) {
 	// Create a 1x2 image with known colors
 	img := image.NewRGBA(image.Rect(0, 0, 1, 2))
-	img.Set(0, 0, color.RGBA{255, 0, 0, 255})   // red foreground
-	img.Set(0, 1, color.RGBA{0, 255, 0, 255})   // green background
+	img.Set(0, 0, color.RGBA{255, 0, 0, 255}) // red foreground
+	img.Set(0, 1, color.RGBA{0, 255, 0, 255}) // green background
 
 	result := RenderImageToHalfBlocks(img, 1, 1)
 

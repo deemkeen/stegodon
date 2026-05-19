@@ -36,8 +36,8 @@ const (
 	// === ANSI Escape Sequences — canonical values live in util/ to avoid import cycles ===
 	// Use util.AnsiHashtagStart, util.AnsiLinkStart, etc. directly.
 	// These aliases exist for header/badge coloring that can't easily import util.
-	ANSI_WARNING_START  = "\033[38;2;255;175;0m" // #ffaf00 - matches COLOR_WARNING (keep in sync with util.AnsiWarningStart)
-	ANSI_COLOR_RESET    = "\033[39m"             // Reset foreground to default (keep in sync with util.AnsiColorReset)
+	ANSI_WARNING_START = "\033[38;2;255;175;0m" // #ffaf00 - matches COLOR_WARNING (keep in sync with util.AnsiWarningStart)
+	ANSI_COLOR_RESET   = "\033[39m"             // Reset foreground to default (keep in sync with util.AnsiColorReset)
 
 	// === Deprecated aliases (for backwards compatibility during transition) ===
 	// These will be removed in a future version - use the semantic names above
